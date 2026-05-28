@@ -22,10 +22,10 @@ html,body{height:100%;overflow:hidden;}
 body{font-family:var(--sans);background:var(--bg);color:var(--txt);display:flex;flex-direction:column;}
 
 /* NAV */
-nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 16px;display:flex;align-items:stretch;height:var(--nav-h);flex-shrink:0;}
+nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display:flex;align-items:stretch;height:var(--nav-h);flex-shrink:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;}
 .logo{display:flex;align-items:center;font-weight:800;font-size:.95rem;color:var(--blue2);margin-right:8px;letter-spacing:-.02em;}
 .logo b{color:var(--teal);}
-.ntab{display:flex;align-items:center;gap:5px;padding:0 13px;font-size:.78rem;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2.5px solid transparent;transition:all .17s;white-space:nowrap;}
+.ntab{display:flex;align-items:center;gap:4px;padding:0 9px;font-size:.72rem;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2.5px solid transparent;transition:all .17s;white-space:nowrap;flex-shrink:0;}
 .ntab:hover{color:var(--txt);}
 .ntab.on{color:var(--blue2);border-bottom-color:var(--blue);}
 .nbadge{background:var(--blue);color:#fff;border-radius:10px;padding:1px 6px;font-size:.62rem;font-family:var(--mono);}
@@ -169,11 +169,11 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 16px;displa
 .import-info{font-size:.7rem;color:var(--muted);font-family:var(--mono);}
 
 /* ══ SETTINGS ══ */
-#pg-settings .set-body{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:12px;}
+#pg-settings .set-body{flex:1;overflow-y:auto;overflow-x:hidden;padding:14px;display:flex;flex-direction:column;gap:12px;-webkit-overflow-scrolling:touch;}
 .set-card{background:var(--s1);border:1px solid var(--b1);border-radius:var(--r2);overflow:hidden;}
 .sch{padding:9px 13px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between;background:var(--s2);}
 .sch-t{font-size:.68rem;font-family:var(--mono);color:var(--muted);letter-spacing:.1em;text-transform:uppercase;}
-.slist{max-height:260px;overflow-y:auto;}
+.slist{max-height:180px;overflow-y:auto;}
 .si{padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.04);display:flex;align-items:center;gap:7px;}
 .si:last-child{border-bottom:none;}
 .si-n{font-size:.8rem;flex:1;}
@@ -208,6 +208,7 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 16px;displa
   <div class="logo">IAT<b>.</b>Orders</div>
   <div class="ntab on" onclick="showPage('entry',this)">✏️ Entry</div>
   <div class="ntab" onclick="showPage('orders',this)">📋 Orders <span class="nbadge" id="navBadge">0</span></div>
+  <div class="ntab" onclick="showPage('drivers',this)">🚗 Drivers</div>
   <div class="ntab" onclick="showPage('settings',this)">⚙️ Settings</div>
 </nav>
 
@@ -303,8 +304,26 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 16px;displa
   <div class="exp-bar">
     <button class="btn btn-red btn-sm" onclick="clearAll()">🗑 Clear All</button>
     <button class="btn btn-ghost btn-sm" onclick="exportXL()">⬇ Excel</button>
+    <button class="btn btn-blue btn-sm" onclick="showPrintDlg()">🖨 Print</button>
     <button class="btn btn-teal" onclick="saveToOneDrive()" id="odBtn">☁ Save to OneDrive</button>
   </div>
+</div>
+
+
+<!-- ══ DRIVERS PAGE ══ -->
+<div class="page" id="pg-drivers">
+  <div class="orders-head">
+    <div>
+      <div style="font-size:.68rem;font-family:var(--mono);color:var(--muted);letter-spacing:.1em;text-transform:uppercase">Assign Drivers</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <select id="drvFilter" style="background:var(--s2);border:1.5px solid var(--b2);border-radius:8px;padding:5px 10px;color:var(--txt);font-family:var(--sans);font-size:.78rem;outline:none" onchange="renderDriversPage()">
+        <option value="">All Drivers</option>
+        <option value="__num__">By Order #</option>
+      </select>
+    </div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px" id="drvList"></div>
 </div>
 
 <!-- ══ SETTINGS PAGE ══ -->
@@ -326,9 +345,37 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 16px;displa
         <button class="btn btn-teal btn-sm" onclick="addProd()">Add</button>
       </div>
     </div>
+    <div class="set-card">
+      <div class="sch"><span class="sch-t">Drivers</span><span class="badge" id="dCnt">0</span></div>
+      <div class="slist" id="drvSL"></div>
+      <div class="add-row">
+        <input type="text" id="addDI" placeholder="New driver..." onkeydown="if(event.key='Enter')addDriver()"/>
+        <button class="btn btn-teal btn-sm" onclick="addDriver()">Add</button>
+      </div>
+    </div>
   </div>
 </div>
 
+<div class="ov" id="printOv" onclick="hidePrintDlg()">
+  <div class="cb2" onclick="event.stopPropagation()">
+    <div class="lbl" style="margin-bottom:10px">🖨 Print Orders</div>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <div style="flex:1">
+        <div style="font-size:.65rem;color:var(--muted);margin-bottom:4px">From #</div>
+        <input type="number" min="1" id="printFrom" class="inp-f" style="text-align:center" placeholder="1"/>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:.65rem;color:var(--muted);margin-bottom:4px">To #</div>
+        <input type="number" min="1" id="printTo" class="inp-f" style="text-align:center" placeholder="10"/>
+      </div>
+    </div>
+    <div class="rg" style="justify-content:center">
+      <button class="btn btn-teal btn-sm" id="printConfirmBtn" onclick="confirmPrint()">🖨 Send to Printer</button>
+      <button class="btn btn-ghost btn-sm" onclick="hidePrintDlg()">Cancel</button>
+    </div>
+    <div id="printStatus" style="font-size:.7rem;color:var(--teal);margin-top:8px;text-align:center"></div>
+  </div>
+</div>
 <div class="ov" id="confOv">
   <div class="cb2">
     <p id="confMsg">Are you sure?</p>
@@ -347,6 +394,7 @@ const LS={get:(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v)
 let customers=LS.get('iat_c',DC);
 let products=LS.get('iat_p',DP);
 let freq=LS.get('iat_freq',{});
+let drivers=LS.get('iat_d',[]);
 let orders=[];
 let selCust=null;
 let selProds=new Map();
@@ -359,7 +407,7 @@ function sortedProds(list){return[...list].sort((a,b)=>(freq[b]||0)-(freq[a]||0)
   document.getElementById('orderDate').value=todayStr();
   renderCustDL(customers);
   renderPDropList('');
-  renderSettC();renderSettP();
+  renderSettC();renderSettP();renderSettD();
 })();
 
 function showPage(n,t){
@@ -368,7 +416,8 @@ function showPage(n,t){
   document.getElementById('pg-'+n).classList.add('on');
   if(t)t.classList.add('on');
   if(n==='orders')renderOrders();
-  if(n==='settings'){renderSettC();renderSettP();}
+  if(n==='drivers')renderDriversPage();
+  if(n==='settings'){renderSettC();renderSettP();renderSettD();}
 }
 
 
@@ -636,8 +685,8 @@ async function saveToOneDrive(){
   btn.textContent='⏳ Saving...';btn.disabled=true;
   try{
     const token=await getODToken();
-    const rows=[['Customer','','Product','Qty (kg)','Size (g)','Notes']];
-    orders.forEach(o=>rows.push([o.customer,'',o.product,o.qty,o.size||'',o.note||'']));
+    const rows=[['Driver','Customer','','Product','Qty (kg)','Size (g)','Notes']];
+    orders.forEach(o=>rows.push([o.driver||'',o.customer,'',o.product,o.qty,o.size||'',o.note||'']));
     const ws=XLSX.utils.aoa_to_sheet(rows);
     ws['!cols']=[{wch:30},{wch:4},{wch:22},{wch:10},{wch:10},{wch:28}];
     const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Orders');
@@ -658,12 +707,52 @@ async function saveToOneDrive(){
   }
 }
 
+// ── PRINT ──
+function showPrintDlg(){
+  document.getElementById('printOv').classList.add('on');
+  document.getElementById('printStatus').textContent='';
+  setTimeout(()=>document.getElementById('printFrom').focus(),100);
+}
+function hidePrintDlg(){document.getElementById('printOv').classList.remove('on');}
+async function confirmPrint(){
+  const from=document.getElementById('printFrom').value;
+  const to=document.getElementById('printTo').value;
+  if(!from||!to){toast('Enter both numbers','err');return;}
+  const btn=document.getElementById('printConfirmBtn');
+  const status=document.getElementById('printStatus');
+  btn.disabled=true;btn.textContent='Sending...';
+  status.textContent='';
+  try{
+    const token=await getODToken();
+    // Read existing workbook and add print range to Loading sheet
+    // We use a special marker file to signal the print range
+    const markerContent=JSON.stringify({from:parseInt(from),to:parseInt(to),ts:Date.now()});
+    const blob=new Blob([markerContent],{type:'application/json'});
+    const res=await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',{
+      method:'PUT',
+      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:blob
+    });
+    if(res.ok){
+      status.textContent=`✓ Print signal sent: ${from} → ${to}`;
+      status.style.color='var(--teal)';
+      toast(`✓ Print ${from}→${to} sent!`,'ok');
+      setTimeout(hidePrintDlg,1500);
+    } else {throw new Error('Failed');}
+  }catch(e){
+    status.textContent='✗ Error: '+e.message;
+    status.style.color='var(--red)';
+  }finally{
+    btn.disabled=false;btn.textContent='🖨 Send to Printer';
+  }
+}
+
 // ── EXPORT / IMPORT ──
 function todayStr(){return new Date().toISOString().slice(0,10);}
 function exportXL(){
   if(!orders.length){toast('No orders to export','err');return;}
-  const rows=[['Customer','','Product','Qty (kg)','Size (g)','Notes']];
-  orders.forEach(o=>rows.push([o.customer,'',o.product,o.qty,o.size||'',o.note||'']));
+  const rows=[['Driver','Customer','','Product','Qty (kg)','Size (g)','Notes']];
+  orders.forEach(o=>rows.push([o.driver||'',o.customer,'',o.product,o.qty,o.size||'',o.note||'']));
   const ws=XLSX.utils.aoa_to_sheet(rows);
   ws['!cols']=[{wch:30},{wch:4},{wch:22},{wch:10},{wch:10},{wch:28}];
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Orders');
@@ -727,7 +816,7 @@ function renderSettC(){
 function togCE(i){document.getElementById('csi'+i).classList.toggle('editing');}
 function saveCE(i){const v=document.getElementById('csi'+i).querySelector('input').value.trim();if(!v)return;customers[i]=v;LS.set('iat_c',customers);renderSettC();toast('✓','ok');}
 function delCI(i){confDlg(`Delete "${customers[i]}"?`,()=>{customers.splice(i,1);LS.set('iat_c',customers);renderSettC();toast('Deleted','ok');});}
-function addCust(){const v=document.getElementById('addCI').value.trim();if(!v)return;if(customers.includes(v)){toast('Exists','err');return;}customers.push(v);LS.set('iat_c',customers);renderSettC();document.getElementById('addCI').value='';toast('✓ Added','ok');}
+function addCust(){const v=document.getElementById('addCI').value.trim();if(!v)return;if(customers.includes(v)){toast('Exists','err');return;}customers.push(v);customers.sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase()));LS.set('iat_c',customers);renderSettC();document.getElementById('addCI').value='';toast('✓ Added','ok');}
 
 function renderSettP(){
   document.getElementById('pCnt').textContent=products.length;
@@ -744,6 +833,67 @@ function togPE(i){document.getElementById('psi'+i).classList.toggle('editing');}
 function savePE(i){const v=document.getElementById('psi'+i).querySelector('input').value.trim();if(!v)return;products[i]=v;LS.set('iat_p',products);renderSettP();toast('✓','ok');}
 function delPI(i){confDlg(`Delete "${products[i]}"?`,()=>{products.splice(i,1);LS.set('iat_p',products);renderSettP();toast('Deleted','ok');});}
 function addProd(){const v=document.getElementById('addPI').value.trim();if(!v)return;if(products.includes(v)){toast('Exists','err');return;}products.push(v);LS.set('iat_p',products);renderSettP();document.getElementById('addPI').value='';toast('✓ Added','ok');}
+
+// ── DRIVERS PAGE ──
+function renderDriversPage(){
+  // Update filter dropdown
+  const sel=document.getElementById('drvFilter');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">All Drivers</option><option value="__num__">By Order #</option><option value="__none__">⚠ No Driver</option>';
+  drivers.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent='🚗 '+d;sel.appendChild(o);});
+  sel.value=cur;
+  // Get unique customers from orders
+  const dateMap=new Map();
+  orders.forEach((o,i)=>{
+    const dk=o.date||'—';
+    if(!dateMap.has(dk))dateMap.set(dk,new Map());
+    const cm=dateMap.get(dk);
+    if(!cm.has(o.customer))cm.set(o.customer,{num:o.num,idx:i,driver:o.driver||''});
+  });
+  const el=document.getElementById('drvList');
+  if(!orders.length){el.innerHTML='<div class="empty"><div class="ei">🚗</div><p>No orders yet.</p></div>';return;}
+  // Build flat list of customer groups
+  let groups=[];
+  dateMap.forEach((custMap,date)=>{
+    custMap.forEach((info,cust)=>{
+      groups.push({date,cust,num:info.num,driver:info.driver});
+    });
+  });
+  // Filter
+  const filter=document.getElementById('drvFilter').value;
+  if(filter==='__num__') groups.sort((a,b)=>(a.num||0)-(b.num||0));
+  else if(filter==='__none__') groups=groups.filter(g=>!g.driver);
+  else if(filter) groups=groups.filter(g=>g.driver===filter);
+  el.innerHTML=groups.map(g=>`
+    <div style="background:var(--s2);border:1.5px solid var(--b1);border-radius:var(--r);padding:10px 13px;display:flex;align-items:center;gap:10px">
+      <span style="font-family:var(--mono);font-size:.7rem;color:var(--amber);min-width:24px;text-align:center">${g.num||'—'}</span>
+      <span style="flex:1;font-size:.83rem;font-weight:700;color:var(--blue2)">👤 ${g.cust}</span>
+      <select style="background:var(--s3);border:1.5px solid var(--b2);border-radius:7px;padding:5px 8px;color:var(--txt);font-family:var(--sans);font-size:.75rem;outline:none;max-width:130px" onchange="assignDriver('${esc(g.date)}','${esc(g.cust)}',this.value)">
+        <option value="">No driver</option>
+        ${drivers.map(d=>`<option value="${esc2(d)}"${g.driver===d?' selected':''}>${d}</option>`).join('')}
+      </select>
+    </div>`).join('');
+}
+function assignDriver(date,cust,driver){
+  orders.forEach(o=>{if((o.date||'—')===date&&o.customer===cust)o.driver=driver;});
+  renderDriversPage();
+  toast('✓ Driver assigned','ok');
+}
+
+// ── SETTINGS DRIVERS ──
+function renderSettD(){
+  document.getElementById('dCnt').textContent=drivers.length;
+  document.getElementById('drvSL').innerHTML=drivers.map((d,i)=>`
+    <div class="si" id="dsi${i}">
+      <span class="si-n">${d}</span>
+      <div class="si-e"><input type="text" value="${esc2(d)}" onkeydown="if(event.key==='Enter')saveDrvE(${i})"/></div>
+      <div class="si-btns"><button class="ib" onclick="togDrvE(${i})">✏️</button><button class="ib del" onclick="delDrv(${i})">🗑</button></div>
+    </div>`).join('');
+}
+function togDrvE(i){document.getElementById('dsi'+i).classList.toggle('editing');}
+function saveDrvE(i){const v=document.getElementById('dsi'+i).querySelector('input').value.trim();if(!v)return;drivers[i]=v;LS.set('iat_d',drivers);renderSettD();toast('✓','ok');}
+function delDrv(i){confDlg(`Delete "${drivers[i]}"?`,()=>{drivers.splice(i,1);LS.set('iat_d',drivers);renderSettD();toast('Deleted','ok');});}
+function addDriver(){const v=document.getElementById('addDI').value.trim();if(!v)return;if(drivers.includes(v)){toast('Exists','err');return;}drivers.push(v);drivers.sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase()));LS.set('iat_d',drivers);renderSettD();document.getElementById('addDI').value='';toast('✓ Added','ok');}
 
 function hi(t,q){if(!q)return t;return t.replace(new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi'),'<mark>$1</mark>');}
 function esc(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
