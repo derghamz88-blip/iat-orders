@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content"/>
+<title>IAT Orders</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#080b12;--s1:#0e1220;--s2:#141927;--s3:#1a2035;
+  --b1:#1e2540;--b2:#283060;
+  --blue:#4d7cfe;--blue2:#7da4ff;--teal:#2dd4bf;--amber:#fbbf24;--red:#f87171;
+  --txt:#e2e8f8;--muted:#5a6788;--faint:#2a3250;
+  --mono:'IBM Plex Mono',monospace;--sans:'Plus Jakarta Sans',sans-serif;
+  --r:10px;--r2:14px;
+  --nav-h:50px;--bar-h:56px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:var(--sans);background:var(--bg);color:var(--txt);display:flex;flex-direction:column;}
+
+/* NAV */
+nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 16px;display:flex;align-items:stretch;height:var(--nav-h);flex-shrink:0;}
+.logo{display:flex;align-items:center;font-weight:800;font-size:.95rem;color:var(--blue2);margin-right:8px;letter-spacing:-.02em;}
+.logo b{color:var(--teal);}
+.ntab{display:flex;align-items:center;gap:5px;padding:0 13px;font-size:.78rem;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2.5px solid transparent;transition:all .17s;white-space:nowrap;}
+.ntab:hover{color:var(--txt);}
+.ntab.on{color:var(--blue2);border-bottom-color:var(--blue);}
+.nbadge{background:var(--blue);color:#fff;border-radius:10px;padding:1px 6px;font-size:.62rem;font-family:var(--mono);}
+
+/* PAGES */
+.page{display:none;flex:1;overflow:hidden;flex-direction:column;}
+.page.on{display:flex;}
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-thumb{background:var(--b2);border-radius:2px;}
+
+/* ══ ENTRY PAGE ══ */
+/* Top: customer + product search FIXED at top */
+.entry-top{background:var(--s1);border-bottom:1px solid var(--b1);flex-shrink:0;padding:10px 14px;display:flex;flex-direction:column;gap:8px;}
+
+/* Customer row */
+.cust-row{display:flex;align-items:center;gap:8px;}
+.cust-label{font-family:var(--mono);font-size:.6rem;color:var(--blue2);letter-spacing:.1em;text-transform:uppercase;white-space:nowrap;}
+.pick-wrap{position:relative;flex:1;}
+.pick-btn{width:100%;background:var(--s2);border:2px solid var(--blue);border-radius:8px;padding:8px 11px;color:var(--txt);font-family:var(--sans);font-size:.88rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:space-between;transition:all .2s;}
+.pick-btn .ph{color:var(--muted);font-weight:400;font-size:.82rem;}
+.pick-btn .arr{color:var(--muted);font-size:.65rem;transition:transform .2s;flex-shrink:0;margin-left:6px;}
+.pick-btn.open .arr{transform:rotate(180deg);}
+
+/* Customer dropdown - opens UPWARD on mobile */
+.cdrop{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--s2);border:2px solid var(--b2);border-radius:0 0 var(--r2) var(--r2);z-index:400;box-shadow:0 16px 40px rgba(0,0,0,.7);display:none;flex-direction:column;max-height:55vh;}
+.cdrop.on{display:flex;}
+.drop-s{padding:9px 12px;border-bottom:1px solid var(--b1);display:flex;align-items:center;gap:7px;}
+.drop-s input{background:transparent;border:none;outline:none;color:var(--txt);font-family:var(--sans);font-size:.85rem;flex:1;}
+.drop-s input::placeholder{color:var(--muted);}
+.dl{overflow-y:auto;flex:1;}
+.di{padding:9px 13px;cursor:pointer;font-size:.83rem;border-bottom:1px solid rgba(255,255,255,.03);transition:background .12s;}
+.di:hover,.di:active{background:rgba(77,124,254,.12);color:var(--blue2);}
+.di.sel{background:rgba(77,124,254,.2);color:var(--blue2);font-weight:700;}
+.di mark{background:rgba(77,124,254,.3);color:var(--blue2);border-radius:2px;padding:0 1px;}
+.drop-add{padding:9px 13px;border-top:1px solid var(--b1);color:var(--teal);font-size:.8rem;cursor:pointer;display:flex;align-items:center;gap:7px;}
+.drop-add:hover{background:rgba(45,212,191,.07);}
+.drop-overlay{position:fixed;inset:0;z-index:390;display:none;}
+.drop-overlay.on{display:block;}
+
+/* Product search row */
+.prod-row{display:flex;align-items:center;gap:8px;}
+.prod-label{font-family:var(--mono);font-size:.6rem;color:var(--blue2);letter-spacing:.1em;text-transform:uppercase;white-space:nowrap;}
+.psrch-wrap{position:relative;flex:1;}
+.psrch-wrap input{width:100%;background:var(--s2);border:1.5px solid var(--b2);border-radius:8px;padding:8px 11px 8px 30px;color:var(--txt);font-family:var(--sans);font-size:.85rem;outline:none;transition:border-color .2s;}
+.psrch-wrap input:focus{border-color:var(--blue);}
+.psrch-wrap input::placeholder{color:var(--muted);}
+.psrch-ico{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:.8rem;pointer-events:none;}
+
+/* Product dropdown - also opens UPWARD */
+.pdrop{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--s2);border:2px solid var(--b2);border-radius:0 0 var(--r2) var(--r2);z-index:400;box-shadow:0 16px 40px rgba(0,0,0,.7);display:none;flex-direction:column;max-height:55vh;}
+.pdrop.on{display:flex;}
+.pdrop-list{overflow-y:auto;flex:1;}
+.pdi{padding:10px 14px;cursor:pointer;font-size:.85rem;border-bottom:1px solid rgba(255,255,255,.03);display:flex;align-items:center;justify-content:space-between;transition:background .12s;}
+.pdi:hover,.pdi:active{background:rgba(77,124,254,.08);}
+.pdi.chk{background:rgba(45,212,191,.08);color:var(--teal);}
+.pdi .ci{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--b2);display:flex;align-items:center;justify-content:center;font-size:.7rem;flex-shrink:0;}
+.pdi.chk .ci{background:var(--teal);border-color:var(--teal);color:#080b12;}
+.pdi mark{background:rgba(77,124,254,.25);color:var(--blue2);border-radius:2px;}
+.freq-badge{font-family:var(--mono);font-size:.65rem;color:var(--teal);min-width:24px;text-align:right;}
+
+/* New customer form */
+.nc-sheet{position:fixed;left:0;right:0;bottom:0;background:var(--s2);border-top:2px solid rgba(45,212,191,.3);border-radius:var(--r2) var(--r2) 0 0;z-index:500;padding:16px;display:none;flex-direction:column;gap:10px;}
+.nc-sheet.on{display:flex;}
+
+/* Middle: selected products with qty */
+.entry-mid{flex:1;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column;gap:6px;}
+.empty-hint{text-align:center;padding:30px 20px;color:var(--muted);font-size:.8rem;opacity:.6;}
+
+/* Selected product row */
+.sr{background:var(--s2);border:1.5px solid var(--b1);border-radius:var(--r);padding:9px 11px;display:flex;flex-direction:column;gap:5px;}
+.sr-top{display:flex;align-items:center;gap:7px;}
+.sr-name{flex:1;font-size:.82rem;font-weight:700;}
+.sr-name.chk{color:var(--amber);}
+.qc{display:flex;align-items:center;gap:4px;}
+.qb{width:28px;height:28px;border:1.5px solid var(--b2);border-radius:6px;background:var(--s3);color:var(--txt);font-size:.95rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;}
+.qb:hover,.qb:active{border-color:var(--blue);color:var(--blue2);}
+.qi{width:46px;height:28px;background:var(--s3);border:1.5px solid var(--b2);border-radius:6px;color:var(--txt);font-family:var(--mono);font-size:.82rem;text-align:center;outline:none;}
+.qi:focus{border-color:var(--blue);}
+.qu{font-family:var(--mono);font-size:.62rem;color:var(--muted);}
+.sr-del{background:transparent;border:none;color:var(--faint);cursor:pointer;font-size:.9rem;padding:3px 6px;border-radius:4px;transition:all .15s;}
+.sr-del:hover,.sr-del:active{color:var(--red);}
+.sz-row{display:flex;flex-wrap:wrap;gap:4px;align-items:center;}
+.sz-b{background:var(--s3);border:1.5px solid var(--b1);border-radius:5px;padding:3px 8px;font-family:var(--mono);font-size:.68rem;color:var(--muted);cursor:pointer;transition:all .15s;}
+.sz-b:hover,.sz-b:active{border-color:var(--amber);color:var(--amber);}
+.sz-b.sel{background:rgba(251,191,36,.12);border-color:var(--amber);color:var(--amber);font-weight:700;}
+.sz-cust{width:80px;background:var(--s3);border:1.5px solid var(--b1);border-radius:5px;padding:3px 8px;color:var(--txt);font-family:var(--mono);font-size:.7rem;outline:none;text-align:center;}
+.sz-cust:focus{border-color:var(--amber);}
+.note-inp{width:100%;background:transparent;border:none;border-bottom:1px dashed var(--faint);color:var(--muted);font-family:var(--sans);font-size:.72rem;outline:none;padding:2px 3px;transition:all .2s;}
+.note-inp:focus{border-color:var(--blue);color:var(--txt);}
+.note-inp::placeholder{color:var(--faint);}
+
+/* Bottom action bar */
+.entry-bar{background:var(--s1);border-top:1px solid var(--b1);padding:10px 14px;flex-shrink:0;}
+.btn{border:none;border-radius:var(--r);padding:10px 16px;font-family:var(--sans);font-size:.85rem;font-weight:700;cursor:pointer;transition:all .18s;display:flex;align-items:center;justify-content:center;gap:6px;}
+.btn-teal{background:var(--teal);color:#080b12;}
+.btn-teal:hover,.btn-teal:active{filter:brightness(1.1);}
+.btn-red{background:transparent;border:1.5px solid var(--red);color:var(--red);}
+.btn-red:active{background:rgba(248,113,113,.1);}
+.btn-blue{background:var(--blue);color:#fff;}
+.btn-blue:active{background:var(--blue2);}
+.btn-ghost{background:transparent;border:1.5px solid var(--b2);color:var(--muted);}
+.btn-ghost:active{border-color:var(--blue);color:var(--blue2);}
+.btn-full{width:100%;}
+.btn-sm{padding:6px 12px;font-size:.75rem;border-radius:7px;}
+.rg{display:flex;gap:7px;}
+.inp-f{width:100%;background:var(--s3);border:1.5px solid var(--b2);border-radius:var(--r);padding:9px 12px;color:var(--txt);font-family:var(--sans);font-size:.85rem;outline:none;transition:border-color .2s;}
+.inp-f:focus{border-color:var(--teal);}
+.inp-f::placeholder{color:var(--muted);}
+.lbl{font-family:var(--mono);font-size:.62rem;color:var(--teal);letter-spacing:.12em;text-transform:uppercase;margin-bottom:5px;}
+
+/* ══ ORDERS PAGE ══ */
+.orders-head{padding:12px 16px;border-bottom:1px solid var(--b1);background:var(--s1);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.import-btn{background:var(--s2);border:2px dashed var(--b2);border-radius:var(--r);padding:8px 14px;color:var(--muted);font-family:var(--sans);font-size:.8rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .2s;}
+.import-btn:hover,.import-btn:active{border-color:var(--blue2);color:var(--blue2);}
+.import-btn input{display:none;}
+.olist{padding:12px;display:flex;flex-direction:column;gap:9px;}
+.badge{background:var(--blue);color:#fff;border-radius:20px;padding:2px 9px;font-size:.66rem;font-family:var(--mono);}
+.cc{background:var(--s1);border:1px solid var(--b1);border-radius:var(--r2);overflow:hidden;animation:fi .2s ease;}
+@keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+.cc-h{background:linear-gradient(90deg,rgba(77,124,254,.15),transparent);border-bottom:1px solid var(--b1);padding:9px 13px;display:flex;align-items:center;justify-content:space-between;}
+.cc-name{font-size:.87rem;font-weight:800;color:var(--blue2);}
+.cc-del{background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:.72rem;padding:3px 7px;border-radius:4px;}
+.cc-del:active{color:var(--red);}
+.pr{padding:9px 13px;border-bottom:1px solid rgba(255,255,255,.04);display:grid;grid-template-columns:1fr auto auto auto;align-items:center;gap:8px;}
+.pr:last-child{border-bottom:none;}
+.pr-name{font-size:.82rem;font-weight:600;}
+.pr-sz{font-family:var(--mono);font-size:.68rem;background:rgba(251,191,36,.1);color:var(--amber);border-radius:4px;padding:1px 5px;}
+.pr-note{font-size:.68rem;color:var(--muted);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:80px;}
+.pr-qc{display:flex;align-items:center;gap:3px;}
+.pr-qb{width:22px;height:22px;border:1.5px solid var(--b2);border-radius:5px;background:var(--s2);color:var(--txt);font-size:.85rem;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.pr-qi{width:36px;height:22px;background:var(--s2);border:1.5px solid var(--b2);border-radius:5px;color:var(--txt);font-family:var(--mono);font-size:.72rem;text-align:center;outline:none;}
+.pr-unit{font-family:var(--mono);font-size:.6rem;color:var(--muted);}
+.cc-move{display:flex;flex-direction:column;gap:2px;margin-right:6px;}
+.cc-mb{background:var(--s3);border:1px solid var(--b2);border-radius:4px;width:22px;height:18px;color:var(--muted);cursor:pointer;font-size:.6rem;display:flex;align-items:center;justify-content:center;transition:all .15s;}
+.cc-mb:active{border-color:var(--blue2);color:var(--blue2);}
+.cc-mb:disabled{opacity:.2;cursor:default;}
+.cc-num{background:var(--s3);border:1.5px solid var(--b2);border-radius:5px;width:34px;height:22px;color:var(--amber);font-family:var(--mono);font-size:.72rem;text-align:center;outline:none;margin-right:4px;}
+.cc-num:focus{border-color:var(--amber);}
+.empty .ei{font-size:2.2rem;opacity:.18;margin-bottom:9px;}
+.exp-bar{padding:10px 14px;border-top:1px solid var(--b1);background:var(--s1);display:flex;gap:7px;justify-content:space-between;align-items:center;flex-shrink:0;}
+.import-info{font-size:.7rem;color:var(--muted);font-family:var(--mono);}
+
+/* ══ SETTINGS ══ */
+#pg-settings .set-body{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:12px;}
+.set-card{background:var(--s1);border:1px solid var(--b1);border-radius:var(--r2);overflow:hidden;}
+.sch{padding:9px 13px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between;background:var(--s2);}
+.sch-t{font-size:.68rem;font-family:var(--mono);color:var(--muted);letter-spacing:.1em;text-transform:uppercase;}
+.slist{max-height:260px;overflow-y:auto;}
+.si{padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.04);display:flex;align-items:center;gap:7px;}
+.si:last-child{border-bottom:none;}
+.si-n{font-size:.8rem;flex:1;}
+.si-cnt{font-family:var(--mono);font-size:.62rem;color:var(--teal);min-width:22px;text-align:right;}
+.si-e{display:none;flex:1;}
+.si-e input{width:100%;background:var(--s3);border:1.5px solid var(--blue);border-radius:5px;padding:4px 9px;color:var(--txt);font-family:var(--sans);font-size:.8rem;outline:none;}
+.si.editing .si-n,.si.editing .si-cnt{display:none;}
+.si.editing .si-e{display:block;}
+.si-btns{display:flex;gap:3px;flex-shrink:0;}
+.ib{background:transparent;border:1.5px solid var(--b2);border-radius:5px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.7rem;color:var(--muted);}
+.ib:active{border-color:var(--blue);color:var(--blue2);}
+.ib.del:active{border-color:var(--red);color:var(--red);}
+.add-row{padding:8px 12px;border-top:1px solid var(--b1);display:flex;gap:6px;background:var(--s2);}
+.add-row input{flex:1;background:var(--s3);border:1.5px solid var(--b2);border-radius:6px;padding:7px 10px;color:var(--txt);font-family:var(--sans);font-size:.8rem;outline:none;}
+.add-row input:focus{border-color:var(--teal);}
+
+/* TOAST */
+.toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%) translateY(12px);background:var(--s3);border:1px solid var(--b2);border-radius:var(--r);padding:8px 16px;font-size:.76rem;opacity:0;transition:all .22s;z-index:999;pointer-events:none;white-space:nowrap;}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
+.toast.ok{border-color:var(--teal);color:var(--teal);}
+.toast.err{border-color:var(--red);color:var(--red);}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:600;display:none;align-items:center;justify-content:center;}
+.ov.on{display:flex;}
+.cb2{background:var(--s2);border:1px solid var(--b2);border-radius:var(--r2);padding:20px;max-width:280px;width:90%;text-align:center;}
+.cb2 p{font-size:.85rem;margin-bottom:13px;line-height:1.5;}
+.cb2 .rg{justify-content:center;}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">IAT<b>.</b>Orders</div>
+  <div class="ntab on" onclick="showPage('entry',this)">✏️ Entry</div>
+  <div class="ntab" onclick="showPage('orders',this)">📋 Orders <span class="nbadge" id="navBadge">0</span></div>
+  <div class="ntab" onclick="showPage('settings',this)">⚙️ Settings</div>
+</nav>
+
+<!-- ══ ENTRY PAGE ══ -->
+<div class="page on" id="pg-entry">
+
+  <!-- TOP: customer + product search (stays fixed above keyboard) -->
+  <div class="entry-top">
+
+    <!-- Customer + date in corner -->
+    <div class="cust-row" style="justify-content:space-between;margin-bottom:2px">
+      <span class="cust-label">Customer</span>
+      <input type="date" id="orderDate" style="background:transparent;border:none;outline:none;color:var(--teal);font-family:var(--mono);font-size:.68rem;cursor:pointer;"/>
+    </div>
+    <div class="cust-row">
+      <span class="cust-label">Customer</span>
+      <div class="pick-wrap">
+        <button class="pick-btn" id="custBtn" onclick="togCDrop()">
+          <span id="custLbl" class="ph">Choose...</span>
+          <span class="arr">▼</span>
+        </button>
+        <!-- Customer dropdown inline -->
+        <div class="cdrop" id="custDrop">
+          <div class="drop-s">
+            <span style="color:var(--muted)">🔍</span>
+            <input type="text" id="custSrch" placeholder="Search customer..." oninput="filterCust()" autocomplete="off"/>
+          </div>
+          <div class="dl" id="custDL"></div>
+          <div class="drop-add" onclick="showNC()">➕ Add new customer</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Product search -->
+    <div class="prod-row">
+      <span class="prod-label">Product</span>
+      <div class="psrch-wrap">
+        <span class="psrch-ico">🔍</span>
+        <input type="text" id="prodSrch" placeholder="Search & select products..." oninput="filterPDrop()" onfocus="openPDrop()" autocomplete="off"/>
+        <!-- Product dropdown inline -->
+        <div class="pdrop" id="prodDrop">
+          <div class="pdrop-list" id="pdropList"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- MIDDLE: selected products list -->
+  <div class="entry-mid" id="entryMid">
+    <div class="empty-hint">👆 Select a customer and products above</div>
+  </div>
+
+  <!-- BOTTOM: add button -->
+  <div class="entry-bar">
+    <button class="btn btn-teal btn-full" onclick="addToOrder()">＋ Add to Order List</button>
+  </div>
+
+</div>
+
+<!-- New customer sheet -->
+<div class="ov" id="ncOv" onclick="hideNC()">
+  <div class="cb2" onclick="event.stopPropagation()">
+    <div class="lbl">New Customer</div>
+    <input type="text" class="inp-f" id="ncInp" placeholder="Customer name..." autocomplete="off" style="margin-bottom:10px"/>
+    <div class="rg" style="justify-content:center">
+      <button class="btn btn-teal btn-sm" onclick="saveNC()">✓ Save</button>
+      <button class="btn btn-ghost btn-sm" onclick="hideNC()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ORDERS PAGE ══ -->
+<div class="page" id="pg-orders">
+  <div class="orders-head">
+    <div>
+      <div style="font-size:.68rem;font-family:var(--mono);color:var(--muted);letter-spacing:.1em;text-transform:uppercase">All Orders</div>
+      <div style="font-size:.7rem;color:var(--muted);margin-top:2px;font-family:var(--mono)" id="importInfo">—</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <label class="import-btn">
+        📂 Load Excel
+        <input type="file" accept=".xlsx,.xls,.csv" onchange="importXL(event)"/>
+      </label>
+      <span class="badge" id="ordBadge">0</span>
+    </div>
+  </div>
+  <div style="flex:1;overflow-y:auto;">
+    <div class="olist" id="olist">
+      <div class="empty"><div class="ei">📋</div><p>No orders yet.</p></div>
+    </div>
+  </div>
+  <div class="exp-bar">
+    <button class="btn btn-red btn-sm" onclick="clearAll()">🗑 Clear All</button>
+    <button class="btn btn-teal" onclick="exportXL()">⬇ Export Excel</button>
+  </div>
+</div>
+
+<!-- ══ SETTINGS PAGE ══ -->
+<div class="page" id="pg-settings">
+  <div class="set-body">
+    <div class="set-card">
+      <div class="sch"><span class="sch-t">Customers</span><span class="badge" id="cCnt">0</span></div>
+      <div class="slist" id="custSL"></div>
+      <div class="add-row">
+        <input type="text" id="addCI" placeholder="New customer..." onkeydown="if(event.key==='Enter')addCust()"/>
+        <button class="btn btn-teal btn-sm" onclick="addCust()">Add</button>
+      </div>
+    </div>
+    <div class="set-card">
+      <div class="sch"><span class="sch-t">Products <span style="color:var(--teal);font-size:.55rem">sorted by frequency</span></span><span class="badge" id="pCnt">0</span></div>
+      <div class="slist" id="prodSL"></div>
+      <div class="add-row">
+        <input type="text" id="addPI" placeholder="New product..." onkeydown="if(event.key==='Enter')addProd()"/>
+        <button class="btn btn-teal btn-sm" onclick="addProd()">Add</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="ov" id="confOv">
+  <div class="cb2">
+    <p id="confMsg">Are you sure?</p>
+    <div class="rg"><button class="btn btn-red btn-sm" id="confYes">Delete</button><button class="btn btn-ghost btn-sm" onclick="closeConf()">Cancel</button></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const DC=["Aswaaq – (JVC)","Aswaaq – Al Mizhar","Aswaaq – Al Quoz","Aswaaq – Al Warqa","Aswaaq – Deira","Aswaaq – Nad Al Sheba","Aswaaq – NAD AL HAMAR","Aswaaq– Al Barsha","Aswaaq- UMM SUQEIM","Géant – Al Furjan","Géant – Dubai hillS","Géant – MUDON","Géant – REMRAAM","Géant – Sahara Centre","Géant – Villanova","Monoprix – Creek Beach","(RTA)","9Th cut","Abed Al kader 1","Abed Al kader 2","Abed Al kader 3","Abu adam","Abu zulf","ACC.Bzorayat Sham","Adham Baraka","AGATHA","Akl baytna","Akl baytna catering","Al Ain Oasis","AL BAIT AL HAMAWI","Al bait al soory","AL BAIT ALMASRI","AL BAWADl ALSURlAH","AL EMPRATOR","AL FARAH","Al Haytham","Al hout","AL JOORI","Al kalha restuarant","AL MADINA","Al marjan","Al rabee al shami","AL SADIQ","AL SADIQ (RTA)","Al Sayad","Al shami","Al thouq al shami","Al zulf rest","Alaa aldeen / Arjan","ALAM AL TAWFEER","All spice catering","alrukn alshami","ALTlMAR AL LlBNANlA","ARAMTEC","AROOS DAMASCUS","Askim","Aswaaq - Al Sofouh","AWWAl ALMADINA","Ayham Dawoud","B beita","BAALBAK Abu Dhabi","BAALBAK Alqouz","BAALBAK Hessa","BAALBAK Shikh zaid","Bahaa","BAIT AL MONA","BAIT ALKARM ALAALEI","BAIT ALSHAWARMA","BAIT ELKABAB","BASSMA","BEAST MEAT","BEAST MEAT Dubai hills","Bewaz restaurant","Bustan Al Dayaa","byblos","Bzorayat Al Sham","Carneus","Carni Store","CASH CUSTUMER","CELLO","Cello ( Mohammad )","CHEF EFRANJYEH international","CHEF EFRANJYEH satwa","Chef taher","CREATIVE CUTS","dabbagh almahaba","DAR AL SAJAA","Dergham aldaoud","Dr.Qussai /SAMPLE","Dr.Qussai swead","e Jaby","Etir alsham","Extra Abdulghadir","Extra Habib","FABRIQUE","Farooj Al Madina","Farooj altabiaa","Farsi restaurant ( JLT)","First Crust","FITOUT","Food source","Géant – Serena","Géant – Emaar","Géant – Motor city","GEANT-ONE PARK AVE","george debbaneh","GILANEH","GMG EMAAR SOUTH","GMG Gate Boutik","GOLDEN HEART Al ain","Golden cut","GOLDEN HEART Entaj","GOLDEN HEART Hasad","GOLDEN HEART Khalifa","GOLDEN HEART Shamkha","GOLDEN HEART Zaid","GREEN ROYAL","HABIBULLAH 1","HABIBULLAH 10","HABIBULLAH 2","HABIBULLAH 3","HABIBULLAH 4","HABIBULLAH 5","HABIBULLAH 6","HABIBULLAH 7","HABIBULLAH 8","HABIBULLAH 9","Halal","Hamidiya","Home delivery","Home delivery Abu Dhabi","Home delivery Halal","Home delivery Zabihati 1","Home delivery Zabihati 2","Home delivery Zabihati 3","Home delivery Zabihati 4","Home delivery Zabihati 5","Home delivery Zabihati 6","HOMSI","Hope","Hossam RTA","IMRAN MEAT shop","ISTANBUL","Jabal Lebnan Arjan","JABAL LUBNAN JLT","Jamal and Qasim Al-Halabi","JAMAR WA HAJAR","UNION Jurf","KABAB ARBEL","Kababi","Kanz al madam","KARAMNA AL ARABl","Kaseh Kabab","La vita catering","LE POULAILLER","Lekker meat shop","M L S Abu Dhabi Mushrif mall","M L S Alqouz","M L S Marina","M L S motor city","M L S silicon","Maan / IAT","manazil alshaam","MARYAM RASHID","Mashraqa coffee","Mazarena","meat avenue","Meat Beirut","Meat counter","MEATOLOGY","Mellows Rest","Miran Arbil","MIY foodstuff","Monoprix – Etihad Towers","Monoprix –PALM NAK","Mr . AHMAD GHANNAM","Mr . Mahmoud Ghannam","Mr . Muhannad Shatat","Mr . Obay Swaid","Mr .Ibrahim Al-Daour","Mr. Mohamed Ghanam","NADERANG RESTURANT","NALI","NASEM- JABAL LUBNAN","New day","Night to night","nour kahila","Obaid Sandal","OLIVE","On mart","Order","Qadisya Sharjah","Qasr AL Kabab","Quadrant","Qusay Al-Saifi","Rana Dweek","Rashidiya","Raw cut animal food","RAWABl MARKET","REEF AL MULAIHA","REIF Japanese Kushiyaki","ROBOW AL FARAH","Rocky land foodstuff","union Rumailah","Said salloum","Sharjah slaughterhouse","Soule Cafe","Soule soups","SPRINGBOK","Stouf Bierut","Sultan butchery","TALLAT ALKHAIR","TASTE N TASTE","Tayba","THE CHICKSTER","THE LEBANESE BUTCHER","Three by Eva","THREE STACKS","union TROLLEY'S","True Value","UNION International","UNION Jumeirah Safa","UNION Nad Al Sheba","Union abu hail","UNION Al khawaneej","UNION Al Nahda","UNION Al Warqa","UNION Al Wasl","UNION Aweer","UNION Barsha","Union barsha south","UNION Hamriya","UNION Hessa","UNION Jumeirah First","UNION Mankhool","UNION MOTOR CITY","UNION Nad Al Hamer","UNION NAKHEEL","UNION Rashidiya","UNION RUKAN","Union silicon","UNION Towar","UNION Umm Suqeim","WAFI","Wunderdog","YAGUT (RTA)","Yasmin al sham","zabihati","ZAHRAT","Zeyad Hassan","AL KHALIL","Amr alla","Al shsmi foodstuff","Abu samer","KHAYR MAZARENA","LAHMAH & FAHMAH","Wahat al aman","Centro","Chef Ayman","Shanasheel Restaurant","RUKN ALHLLA","Aswaaq – Al Mizhar tender","Aswaaq – Al Quoz tender","Aswaaq – Al Warqa tender","Aswaaq – Deira tender","Aswaaq – Nad Al Sheba tender","Aswaaq – NAD AL HAMAR tender","Aswaaq– Al Barsha tender","Aswaaq- UMM SUQEIM tender","Géant – Al Furjan tender","Géant – Dubai hillS tender","Géant – MUDON tender","Géant – REMRAAM tender","Géant – Sahara Centre tender","Géant – Villanova tender","Monoprix – Creek Beach tender","(RTA) tender"];
+const DP=["Chicken","Liver","Liver 500","Breast","Breast 500","Whole Legs","Whole Legs 500","Thigh","Thigh 500","Drum","Drum 500","Wings","Wings 500","BREAST WITH BONE","Chicken BLW Wings","Thigh BL-SL","Thigh BL-SO","Thigh SL","Whole legs BL-SL","Whole legs BL-SO","Whole legs SL","Thigh BL-SL 500","Thigh BL-SO 500","Thigh SL 500","Whole legs BL-SL 500","Whole legs BL-SO 500","Whole legs SL 500","Heart","Heart 500","Gizzard","Gizzard 500","Whole Chicken Frozen","Whole Legs 500 FF","Breast Frozen","Thigh 500 FF","Tail","Drum 500 FF","Minced","Wings 500 FF","Bone","Kashra","Neck","Skin","Mix Chicken","DRUM SL 500"];
+const SIZES=["800","900","1000","1100","1200","1300","1400","1500"];
+const isCHK=p=>['Chicken','Chicken BLW Wings','Whole Chicken Frozen'].includes(p);
+const LS={get:(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}},set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}}};
+
+let customers=LS.get('iat_c',DC);
+let products=LS.get('iat_p',DP);
+let freq=LS.get('iat_freq',{});
+let orders=[];
+let selCust=null;
+let selProds=new Map();
+let cOpen=false,pOpen=false;
+
+function todayStr(){const d=new Date();return d.toISOString().slice(0,10);}
+function sortedProds(list){return[...list].sort((a,b)=>(freq[b]||0)-(freq[a]||0));}
+
+(()=>{
+  document.getElementById('orderDate').value=todayStr();
+  renderCustDL(customers);
+  renderPDropList('');
+  renderSettC();renderSettP();
+})();
+
+function showPage(n,t){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.ntab').forEach(x=>x.classList.remove('on'));
+  document.getElementById('pg-'+n).classList.add('on');
+  if(t)t.classList.add('on');
+  if(n==='orders')renderOrders();
+  if(n==='settings'){renderSettC();renderSettP();}
+}
+
+
+// ── CUSTOMER DROPDOWN ──
+function togCDrop(){cOpen?closeCDrop():openCDrop();}
+function openCDrop(){
+  cOpen=true;
+  document.getElementById('custDrop').classList.add('on');
+  document.getElementById('custBtn').classList.add('open');
+  setTimeout(()=>document.getElementById('custSrch').focus(),50);
+  renderCustDL(customers);
+}
+function closeCDrop(){
+  cOpen=false;
+  document.getElementById('custDrop').classList.remove('on');
+  document.getElementById('custBtn').classList.remove('open');
+}
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.pick-wrap'))closeCDrop();
+  if(!e.target.closest('.psrch-wrap'))closePDrop();
+});
+function filterCust(){
+  const q=document.getElementById('custSrch').value.toLowerCase();
+  renderCustDL(customers.filter(c=>c.toLowerCase().includes(q)));
+}
+function renderCustDL(list){
+  document.getElementById('custDL').innerHTML=list.map(c=>
+    `<div class="di${c===selCust?' sel':''}" onclick="pickCust('${esc(c)}')">${hi(c,document.getElementById('custSrch').value)}</div>`
+  ).join('');
+}
+function pickCust(name){
+  selCust=name;
+  const l=document.getElementById('custLbl');l.textContent=name;l.classList.remove('ph');
+  closeCDrop();
+}
+function showNC(){closeCDrop();document.getElementById('ncOv').classList.add('on');setTimeout(()=>document.getElementById('ncInp').focus(),100);}
+function hideNC(){document.getElementById('ncOv').classList.remove('on');document.getElementById('ncInp').value='';}
+function saveNC(){
+  const n=document.getElementById('ncInp').value.trim();
+  if(!n){toast('Enter a name','err');return;}
+  if(customers.includes(n)){toast('Already exists','err');return;}
+  customers.push(n);LS.set('iat_c',customers);
+  renderCustDL(customers);pickCust(n);hideNC();toast('✓ Customer added','ok');
+}
+
+// ── PRODUCT DROPDOWN ──
+function openPDrop(){
+  pOpen=true;
+  document.getElementById('prodDrop').classList.add('on');
+  renderPDropList(document.getElementById('prodSrch').value.toLowerCase());
+}
+function closePDrop(){
+  pOpen=false;
+  document.getElementById('prodDrop').classList.remove('on');
+}
+function filterPDrop(){
+  const q=document.getElementById('prodSrch').value.toLowerCase();
+  openPDrop();
+  renderPDropList(q);
+}
+function renderPDropList(q){
+  let list=q?products.filter(p=>p.toLowerCase().includes(q)):products;
+  list=sortedProds(list);
+  document.getElementById('pdropList').innerHTML=list.map(p=>{
+    const f=freq[p]||0;
+    return `<div class="pdi${selProds.has(p)?' chk':''}" onclick="togProd('${esc(p)}')">
+      <span>${hi(p,q)}</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        ${f>0?`<span class="freq-badge">${f}×</span>`:''}
+        <span class="ci">${selProds.has(p)?'✓':''}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+function togProd(name){
+  if(selProds.has(name))selProds.delete(name);
+  else{
+    selProds.set(name,{qty:1,size:'',note:''});
+    document.getElementById('prodSrch').value='';
+    renderPDropList('');
+    renderSelRows();
+    return;
+  }
+  renderPDropList(document.getElementById('prodSrch').value.toLowerCase());
+  renderSelRows();
+}
+
+// ── SELECTED ROWS ──
+function renderSelRows(){
+  const el=document.getElementById('entryMid');
+  if(!selProds.size){el.innerHTML='<div class="empty-hint">👆 Select a customer and products above</div>';return;}
+  el.innerHTML=[...selProds.entries()].map(([p,d])=>`
+    <div class="sr">
+      <div class="sr-top">
+        <span class="sr-name${isCHK(p)?' chk':''}">${p}</span>
+        <div class="qc">
+          <button class="qb" onclick="adjQ('${esc(p)}',-1)">−</button>
+          <input class="qi" type="number" min="0.5" step="0.5" value="${d.qty}" oninput="setQ('${esc(p)}',this.value)"/>
+          <button class="qb" onclick="adjQ('${esc(p)}',1)">+</button>
+        </div>
+        <span class="qu">kg</span>
+        <button class="sr-del" onclick="togProd('${esc(p)}')">✕</button>
+      </div>
+      ${isCHK(p)?`<div class="sz-row">
+        ${SIZES.map(s=>`<span class="sz-b${d.size===s?' sel':''}" onclick="setSz('${esc(p)}','${s}')">${s}</span>`).join('')}
+        <input class="sz-cust" type="number" placeholder="custom g" value="${!SIZES.includes(d.size)?d.size:''}" oninput="setSz('${esc(p)}',this.value)"/>
+      </div>`:''}
+      <input class="note-inp" type="text" placeholder="Note..." value="${esc2(d.note)}" oninput="setNote('${esc(p)}',this.value)"/>
+    </div>`).join('');
+}
+function adjQ(p,d){const o=selProds.get(p);if(o){o.qty=Math.max(0.5,Math.round((parseFloat(o.qty)||0.5)+d*0.5)*10/10);renderSelRows();}}
+function setQ(p,v){const o=selProds.get(p);if(o)o.qty=Math.max(0.5,parseFloat(v)||0.5);}
+function setSz(p,v){const o=selProds.get(p);if(o){o.size=v;renderSelRows();}}
+function setNote(p,v){const o=selProds.get(p);if(o)o.note=v;}
+
+// ── ADD TO ORDER ──
+function addToOrder(){
+  if(!selCust){toast('Select a customer first','err');return;}
+  if(!selProds.size){toast('Select at least one product','err');return;}
+  const date=document.getElementById('orderDate').value||todayStr();
+  // always assign next sequential number
+  const maxNum=orders.filter(o=>o.date===date).reduce((m,o)=>Math.max(m,o.num||0),0);
+  const num=maxNum+1;
+  selProds.forEach((d,p)=>{
+    orders.push({num,date,customer:selCust,product:p,qty:d.qty,size:d.size,note:d.note});
+    freq[p]=(freq[p]||0)+1;
+  });
+  LS.set('iat_freq',freq);
+  toast(`✓ ${selProds.size} item(s) added for ${selCust}`,'ok');
+  selProds.clear();
+  document.getElementById('prodSrch').value='';
+  renderSelRows();renderPDropList('');updateBadges();
+}
+
+// ── ORDERS ──
+function renderOrders(){
+  const el=document.getElementById('olist');
+  updateBadges();
+  if(!orders.length){el.innerHTML='<div class="empty"><div class="ei">📋</div><p>No orders yet.</p></div>';return;}
+  // Group preserving order
+  const dateMap=new Map();
+  orders.forEach((o,i)=>{
+    const dk=o.date||'—';
+    if(!dateMap.has(dk))dateMap.set(dk,new Map());
+    const cm=dateMap.get(dk);
+    if(!cm.has(o.customer))cm.set(o.customer,[]);
+    cm.get(o.customer).push({...o,idx:i});
+  });
+  el.innerHTML=[...dateMap.entries()].map(([date,custMap])=>{
+    const custKeys=[...custMap.keys()];
+    return `<div style="margin-bottom:4px">
+      <div style="font-family:var(--mono);font-size:.65rem;color:var(--teal);padding:6px 4px;letter-spacing:.08em">📅 ${date}</div>
+      ${custKeys.map((c,ci)=>{
+        const items=custMap.get(c);
+        const canUp=ci>0; const canDn=ci<custKeys.length-1;
+        return `<div class="cc">
+          <div class="cc-h">
+            <span class="cc-name" style="display:flex;align-items:center;gap:4px">
+              <div class="cc-move">
+                <button class="cc-mb" ${canUp?'':'disabled'} onclick="moveGroup('${esc(date)}','${esc(c)}',-1)">▲</button>
+                <button class="cc-mb" ${canDn?'':'disabled'} onclick="moveGroup('${esc(date)}','${esc(c)}',1)">▼</button>
+              </div>
+              <input class="cc-num" type="number" min="1" value="${items[0].num||''}" title="Order #" onchange="setGroupNum('${esc(date)}','${esc(c)}',this.value)" onclick="this.select()"/>
+              👤 ${c}
+            </span>
+            <button class="cc-del" onclick="delCust('${esc(c)}','${date}')">Remove ✕</button>
+          </div>
+          ${items.map(o=>`<div class="pr">
+            <div>
+              <div class="pr-name">${o.product}</div>
+              <div style="display:flex;gap:4px;margin-top:2px">
+                ${o.size?`<span class="pr-sz">${o.size}g</span>`:''}
+                ${o.note?`<span class="pr-note">📝 ${o.note}</span>`:''}
+              </div>
+            </div>
+            <div class="pr-qc">
+              <button class="pr-qb" onclick="adjO(${o.idx},-1)">−</button>
+              <input class="pr-qi" type="number" min="0.5" step="0.5" value="${o.qty}" oninput="setOQ(${o.idx},this.value)"/>
+              <button class="pr-qb" onclick="adjO(${o.idx},1)">+</button>
+            </div>
+            <span class="pr-unit">kg</span>
+            <button class="pr-del" onclick="delRow(${o.idx})">✕</button>
+          </div>`).join('')}
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+}
+function moveGroup(date,cust,dir){
+  // Get all indices belonging to this date+cust group and adjacent group
+  const myIdxs=orders.reduce((a,o,i)=>{if((o.date||'—')===date&&o.customer===cust)a.push(i);return a;},[]);
+  if(!myIdxs.length)return;
+  // Find customers for this date in order
+  const seen=[];
+  orders.forEach(o=>{if((o.date||'—')===date&&!seen.includes(o.customer))seen.push(o.customer);});
+  const ci=seen.indexOf(cust);
+  const swapCust=seen[ci+dir];
+  if(!swapCust)return;
+  const swapIdxs=orders.reduce((a,o,i)=>{if((o.date||'—')===date&&o.customer===swapCust)a.push(i);return a;},[]);
+  // Extract groups, swap, rebuild orders
+  const myRows=myIdxs.map(i=>orders[i]);
+  const swapRows=swapIdxs.map(i=>orders[i]);
+  const otherRows=orders.filter((_,i)=>!myIdxs.includes(i)&&!swapIdxs.includes(i));
+  // Reconstruct preserving relative positions
+  const minIdx=Math.min(...myIdxs,...swapIdxs);
+  const newOrders=[...orders];
+  if(dir<0){
+    // my group goes where swap was (earlier), swap goes where my was (later)
+    swapIdxs.forEach((idx,j)=>{newOrders[myIdxs[j]]=swapRows[j];});
+    myIdxs.forEach((idx,j)=>{newOrders[swapIdxs[j]]=myRows[j];});
+  } else {
+    swapIdxs.forEach((idx,j)=>{newOrders[myIdxs[j]]=swapRows[j];});
+    myIdxs.forEach((idx,j)=>{newOrders[swapIdxs[j]]=myRows[j];});
+  }
+  orders=newOrders;
+  renderOrders();
+  toast('✓ Moved','ok');
+}
+function setGroupNum(date,cust,v){
+  const n=parseInt(v)||0;
+  orders.forEach(o=>{if((o.date||'—')===date&&o.customer===cust)o.num=n;});
+  renderOrders();
+}
+function adjO(i,d){orders[i].qty=Math.max(0.5,Math.round((parseFloat(orders[i].qty)||0.5)+d*0.5)*10/10);renderOrders();}
+function setOQ(i,v){orders[i].qty=Math.max(0.5,parseFloat(v)||0.5);}
+function delRow(i){orders.splice(i,1);renderOrders();}
+function delCust(c,date){orders=orders.filter(o=>!(o.customer===c&&(o.date||'—')===date));renderOrders();}
+function clearAll(){if(!orders.length)return;confDlg('Clear all orders?',()=>{orders=[];renderOrders();updateBadges();toast('Cleared','ok');});}
+function updateBadges(){
+  const n=orders.length;
+  document.getElementById('navBadge').textContent=n;
+  document.getElementById('ordBadge').textContent=n;
+}
+
+// ── EXPORT / IMPORT ──
+function todayStr(){return new Date().toISOString().slice(0,10);}
+function exportXL(){
+  if(!orders.length){toast('No orders to export','err');return;}
+  const rows=[['Customer','','Product','Qty (kg)','Size (g)','Notes']];
+  orders.forEach(o=>rows.push([o.customer,'',o.product,o.qty,o.size||'',o.note||'']));
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:30},{wch:4},{wch:22},{wch:10},{wch:10},{wch:28}];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Orders');
+  // Generate blob
+  const wbout=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+  const blob=new Blob([wbout],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const file=new File([blob],'orders2026.xlsx',{type:blob.type});
+  // Try Web Share API first (mobile: opens share sheet → OneDrive etc.)
+  if(navigator.canShare&&navigator.canShare({files:[file]})){
+    navigator.share({files:[file],title:'orders2026'})
+      .then(()=>toast('✓ Shared','ok'))
+      .catch(e=>{if(e.name!=='AbortError')fallbackDownload(blob);});
+  } else {
+    fallbackDownload(blob);
+  }
+}
+function fallbackDownload(blob){
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='orders2026.xlsx';a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  toast('✓ Excel downloaded','ok');
+}
+function importXL(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const wb=XLSX.read(ev.target.result,{type:'binary'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      const header=rows[0].map(h=>String(h).toLowerCase());
+      const ci=header.findIndex(h=>h.includes('customer'));
+      const pi=header.findIndex(h=>h.includes('product'));
+      const qi=header.findIndex(h=>h.includes('qty')||h.includes('quantity'));
+      const si=header.findIndex(h=>h.includes('size'));
+      const ni=header.findIndex(h=>h.includes('note'));
+      if(ci<0||pi<0){toast('Cannot find Customer/Product columns','err');return;}
+      const imported=[];
+      for(let r=1;r<rows.length;r++){
+        const row=rows[r];
+        const customer=String(row[ci]||'').trim();
+        const product=String(row[pi]||'').trim();
+        if(!customer||!product)continue;
+        imported.push({customer,product,qty:parseFloat(row[qi])||1,size:si>=0?String(row[si]||''):'',note:ni>=0?String(row[ni]||''):''});
+      }
+      if(!imported.length){toast('No data found','err');return;}
+      // Auto-number: each new customer gets next sequential number starting from 1
+      let numCounter=0;
+      const numMap=new Map();
+      imported.forEach(o=>{
+        if(!numMap.has(o.customer)){numMap.set(o.customer,++numCounter);}
+        o.num=numMap.get(o.customer);
+        if(!o.date)o.date=todayStr();
+      });
+      orders=[...imported];renderOrders();updateBadges();
+      document.getElementById('importInfo').textContent=`✓ ${imported.length} rows from "${file.name}"`;
+      toast(`✓ Loaded ${imported.length} orders`,'ok');
+    }catch(err){toast('Error reading file','err');}
+  };
+  reader.readAsBinaryString(file);e.target.value='';
+}
+
+// ── SETTINGS ──
+function renderSettC(){
+  document.getElementById('cCnt').textContent=customers.length;
+  document.getElementById('custSL').innerHTML=customers.map((c,i)=>`
+    <div class="si" id="csi${i}">
+      <span class="si-n">${c}</span>
+      <div class="si-e"><input type="text" value="${esc2(c)}" onkeydown="if(event.key==='Enter')saveCE(${i})"/></div>
+      <div class="si-btns"><button class="ib" onclick="togCE(${i})">✏️</button><button class="ib del" onclick="delCI(${i})">🗑</button></div>
+    </div>`).join('');
+}
+function togCE(i){document.getElementById('csi'+i).classList.toggle('editing');}
+function saveCE(i){const v=document.getElementById('csi'+i).querySelector('input').value.trim();if(!v)return;customers[i]=v;LS.set('iat_c',customers);renderSettC();toast('✓','ok');}
+function delCI(i){confDlg(`Delete "${customers[i]}"?`,()=>{customers.splice(i,1);LS.set('iat_c',customers);renderSettC();toast('Deleted','ok');});}
+function addCust(){const v=document.getElementById('addCI').value.trim();if(!v)return;if(customers.includes(v)){toast('Exists','err');return;}customers.push(v);LS.set('iat_c',customers);renderSettC();document.getElementById('addCI').value='';toast('✓ Added','ok');}
+
+function renderSettP(){
+  document.getElementById('pCnt').textContent=products.length;
+  document.getElementById('prodSL').innerHTML=sortedProds(products).map(p=>{
+    const i=products.indexOf(p);
+    return `<div class="si" id="psi${i}">
+      <span class="si-n">${p}</span><span class="si-cnt">${freq[p]?freq[p]+'×':''}</span>
+      <div class="si-e"><input type="text" value="${esc2(p)}" onkeydown="if(event.key==='Enter')savePE(${i})"/></div>
+      <div class="si-btns"><button class="ib" onclick="togPE(${i})">✏️</button><button class="ib del" onclick="delPI(${i})">🗑</button></div>
+    </div>`;
+  }).join('');
+}
+function togPE(i){document.getElementById('psi'+i).classList.toggle('editing');}
+function savePE(i){const v=document.getElementById('psi'+i).querySelector('input').value.trim();if(!v)return;products[i]=v;LS.set('iat_p',products);renderSettP();toast('✓','ok');}
+function delPI(i){confDlg(`Delete "${products[i]}"?`,()=>{products.splice(i,1);LS.set('iat_p',products);renderSettP();toast('Deleted','ok');});}
+function addProd(){const v=document.getElementById('addPI').value.trim();if(!v)return;if(products.includes(v)){toast('Exists','err');return;}products.push(v);LS.set('iat_p',products);renderSettP();document.getElementById('addPI').value='';toast('✓ Added','ok');}
+
+function hi(t,q){if(!q)return t;return t.replace(new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi'),'<mark>$1</mark>');}
+function esc(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
+function esc2(s){return String(s).replace(/"/g,'&quot;');}
+let _tt;
+function toast(msg,type=''){const el=document.getElementById('toast');el.textContent=msg;el.className='toast on'+(type?' '+type:'');clearTimeout(_tt);_tt=setTimeout(()=>el.classList.remove('on'),2500);}
+function confDlg(msg,cb){document.getElementById('confMsg').textContent=msg;document.getElementById('confOv').classList.add('on');document.getElementById('confYes').onclick=()=>{closeConf();cb();};}
+function closeConf(){document.getElementById('confOv').classList.remove('on');}
+</script>
+</body>
+</html>
