@@ -606,14 +606,18 @@ function updateBadges(){
 // ── ONEDRIVE CONFIG ──
 const OD_CLIENT_ID='11424af3-de3a-4401-ace9-325149977264';
 const OD_FILE='orders2026.xlsx';
-const msalApp=new msal.PublicClientApplication({
-  auth:{clientId:OD_CLIENT_ID,authority:'https://login.microsoftonline.com/consumers',redirectUri:window.location.origin+window.location.pathname},
-  cache:{cacheLocation:'localStorage'}
-});
-msalApp.initialize();
-let odToken=null;
+let msalApp=null;
+async function initMsal(){
+  if(msalApp)return;
+  msalApp=new msal.PublicClientApplication({
+    auth:{clientId:OD_CLIENT_ID,authority:'https://login.microsoftonline.com/consumers',redirectUri:window.location.origin+window.location.pathname},
+    cache:{cacheLocation:'localStorage'}
+  });
+  await msalApp.initialize();
+}
 
 async function getODToken(){
+  await initMsal();
   const scopes=['Files.ReadWrite'];
   try{
     const acc=msalApp.getAllAccounts();
