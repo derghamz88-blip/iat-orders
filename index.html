@@ -6,6 +6,7 @@
 <title>IAT Orders</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
 <style>
 :root{
   --bg:#080b12;--s1:#0e1220;--s2:#141927;--s3:#1a2035;
@@ -301,7 +302,8 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 16px;displa
   </div>
   <div class="exp-bar">
     <button class="btn btn-red btn-sm" onclick="clearAll()">🗑 Clear All</button>
-    <button class="btn btn-teal" onclick="exportXL()">⬇ Export Excel</button>
+    <button class="btn btn-ghost btn-sm" onclick="exportXL()">⬇ Excel</button>
+    <button class="btn btn-teal" onclick="saveToOneDrive()" id="odBtn">☁ Save to OneDrive</button>
   </div>
 </div>
 
@@ -601,6 +603,57 @@ function updateBadges(){
   document.getElementById('ordBadge').textContent=n;
 }
 
+// ── ONEDRIVE CONFIG ──
+const OD_CLIENT_ID='11424af3-de3a-4401-ace9-325149977264';
+const OD_FILE='orders2026.xlsx';
+const msalApp=new msal.PublicClientApplication({
+  auth:{clientId:OD_CLIENT_ID,authority:'https://login.microsoftonline.com/consumers',redirectUri:window.location.origin+window.location.pathname},
+  cache:{cacheLocation:'localStorage'}
+});
+msalApp.initialize();
+let odToken=null;
+
+async function getODToken(){
+  const scopes=['Files.ReadWrite'];
+  try{
+    const acc=msalApp.getAllAccounts();
+    if(acc.length>0){
+      const res=await msalApp.acquireTokenSilent({scopes,account:acc[0]});
+      return res.accessToken;
+    }
+  }catch(e){}
+  const res=await msalApp.loginPopup({scopes});
+  return res.accessToken;
+}
+
+async function saveToOneDrive(){
+  if(!orders.length){toast('No orders to export','err');return;}
+  const btn=document.getElementById('odBtn');
+  btn.textContent='⏳ Saving...';btn.disabled=true;
+  try{
+    const token=await getODToken();
+    const rows=[['Customer','','Product','Qty (kg)','Size (g)','Notes']];
+    orders.forEach(o=>rows.push([o.customer,'',o.product,o.qty,o.size||'',o.note||'']));
+    const ws=XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols']=[{wch:30},{wch:4},{wch:22},{wch:10},{wch:10},{wch:28}];
+    const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Orders');
+    const wbout=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+    const blob=new Blob([wbout],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    // Upload/replace file on OneDrive
+    const res=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${OD_FILE}:/content`,{
+      method:'PUT',
+      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'},
+      body:blob
+    });
+    if(res.ok){toast('✓ Saved to OneDrive!','ok');}
+    else{throw new Error('Upload failed');}
+  }catch(e){
+    if(e.message!=='user_cancelled')toast('Error: '+e.message,'err');
+  }finally{
+    btn.textContent='☁ Save to OneDrive';btn.disabled=false;
+  }
+}
+
 // ── EXPORT / IMPORT ──
 function todayStr(){return new Date().toISOString().slice(0,10);}
 function exportXL(){
@@ -610,20 +663,8 @@ function exportXL(){
   const ws=XLSX.utils.aoa_to_sheet(rows);
   ws['!cols']=[{wch:30},{wch:4},{wch:22},{wch:10},{wch:10},{wch:28}];
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Orders');
-  // Generate blob
   const wbout=XLSX.write(wb,{bookType:'xlsx',type:'array'});
   const blob=new Blob([wbout],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-  const file=new File([blob],'orders2026.xlsx',{type:blob.type});
-  // Try Web Share API first (mobile: opens share sheet → OneDrive etc.)
-  if(navigator.canShare&&navigator.canShare({files:[file]})){
-    navigator.share({files:[file],title:'orders2026'})
-      .then(()=>toast('✓ Shared','ok'))
-      .catch(e=>{if(e.name!=='AbortError')fallbackDownload(blob);});
-  } else {
-    fallbackDownload(blob);
-  }
-}
-function fallbackDownload(blob){
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');a.href=url;a.download='orders2026.xlsx';a.click();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
