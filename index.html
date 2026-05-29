@@ -903,15 +903,23 @@ async function writeToLoadingSheet(token){
 
   // 2. اكتب البيانات كـ block واحد AI:AQ
   if(n>0){
-    // AI=Driver, AJ='', AK='', AL=Customer, AM=Customer, AN=Product, AO=Qty, AP=Size, AQ=Notes
-    const blockVals=sortedOrd.map(o=>[
-      o.driver||'','','',
-      o.customer||'',o.customer||'',
-      o.product||'',
-      parseFloat(o.qty)||0,
-      o.size||'',
-      o.note||''
-    ]);
+    // AI=Driver, AJ=num, AK=num(no repeat), AL=Customer, AM=Customer, AN=Product, AO=Qty, AP=Size, AQ=Notes
+    const seenNums=new Set();
+    const blockVals=sortedOrd.map(o=>{
+      const num=o.num||'';
+      const akVal=seenNums.has(num)?'':num;
+      seenNums.add(num);
+      return [
+        o.driver||'',
+        num,
+        akVal,
+        o.customer||'',o.customer||'',
+        o.product||'',
+        parseFloat(o.qty)||0,
+        o.size||'',
+        o.note||''
+      ];
+    });
     batchReqs.push({
       id:'2',
       method:'PATCH',
