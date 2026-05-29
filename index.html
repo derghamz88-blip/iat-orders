@@ -491,7 +491,7 @@ let tenderOrders=[];
 let tSelCust=null;
 let tSelProds=new Map();
 let tCOpen=false;
-let orders=[];
+let orders=LS.get('iat_orders',[]);
 let selCust=null;
 let selProds=new Map();
 let cOpen=false,pOpen=false;
@@ -504,6 +504,7 @@ function sortedProds(list){return[...list].sort((a,b)=>(freq[b]||0)-(freq[a]||0)
   renderCustDL(customers);
   renderPDropList('');
   renderSettC();renderSettP();renderSettD();renderSettTP();
+  if(orders.length)renderOrders();
 })();
 
 async function syncDriversFromProduction(){
@@ -698,6 +699,7 @@ function addToOrder(){
 }
 
 // ── ORDERS ──
+function saveOrders(){LS.set('iat_orders',orders);}
 function renderOrders(){
   const el=document.getElementById('olist');
   updateBadges();
@@ -786,11 +788,11 @@ function setGroupNum(date,cust,v){
   orders.forEach(o=>{if((o.date||'—')===date&&o.customer===cust)o.num=n;});
   renderOrders();
 }
-function adjO(i,d){orders[i].qty=Math.max(0.5,Math.round((parseFloat(orders[i].qty)||0.5)+d*0.5)*10/10);renderOrders();}
+function adjO(i,d){orders[i].qty=Math.max(0.5,Math.round((parseFloat(orders[i].qty)||0.5)+d*0.5)*10/10);saveOrders();renderOrders();}
 function setOQ(i,v){orders[i].qty=Math.max(0.5,parseFloat(v)||0.5);}
-function delRow(i){orders.splice(i,1);renderOrders();}
-function delCust(c,date){orders=orders.filter(o=>!(o.customer===c&&(o.date||'—')===date));renderOrders();}
-function clearAll(){if(!orders.length)return;confDlg('Clear all orders?',()=>{orders=[];renderOrders();updateBadges();toast('Cleared','ok');});}
+function delRow(i){orders.splice(i,1);saveOrders();renderOrders();}
+function delCust(c,date){orders=orders.filter(o=>!(o.customer===c&&(o.date||'—')===date));saveOrders();renderOrders();}
+function clearAll(){if(!orders.length)return;confDlg('Clear all orders?',()=>{orders=[];saveOrders();renderOrders();updateBadges();toast('Cleared','ok');});}
 function updateBadges(){
   const n=orders.length;
   document.getElementById('navBadge').textContent=n;
@@ -1032,7 +1034,7 @@ function importXL(e){
         o.num=numMap.get(o.customer);
         if(!o.date)o.date=todayStr();
       });
-      orders=[...imported];renderOrders();updateBadges();
+      orders=[...imported];saveOrders();renderOrders();updateBadges();
       document.getElementById('importInfo').textContent=`✓ ${imported.length} rows from "${file.name}"`;
       toast(`✓ Loaded ${imported.length} orders`,'ok');
     }catch(err){toast('Error reading file','err');}
