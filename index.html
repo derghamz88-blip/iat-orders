@@ -878,52 +878,57 @@ async function saveToOneDrive(){
 }
 
 async function writeToLoadingSheet(token){
-  // جيب workbook ID لـ production.xlsm
+  // جيب workbook ID
   const fileRes=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,{
     headers:{'Authorization':'Bearer '+token}
   });
   if(!fileRes.ok) throw new Error('production.xlsm not found');
-  const fileData=await fileRes.json();
-  const fileId=fileData.id;
+  const fileId=(await fileRes.json()).id;
   const baseUrl=`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/workbook/worksheets/Loading/`;
-
-  // امسح الأعمدة القديمة أولاً
-  const clearCols=['AN','AI','AL','AM','AO','AP','AQ'];
-  const n=orders.length;
-  const endRow=LOADING.startRow+n+10;
-  for(const col of clearCols){
-    try{
-      await fetch(`${baseUrl}range(address='${col}${LOADING.startRow}:${col}${endRow}')`,{
-        method:'PATCH',
-        headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
-        body:JSON.stringify({values:Array(endRow-LOADING.startRow+1).fill([''])})
-      });
-    }catch(e){}
-  }
-
-  // اكتب البيانات عمود عمود
-  // نفس الترتيب حسب رقم الأوردر
   const sortedOrd=[...orders].sort((a,b)=>(a.num||0)-(b.num||0));
-  const colData={
-    'AN': sortedOrd.map(o=>[o.product||'']),
-    'AI': sortedOrd.map(o=>[o.driver||'']),
-    'AL': sortedOrd.map(o=>[o.customer||'']),
-    'AM': sortedOrd.map(o=>[o.customer||'']),
-    'AO': sortedOrd.map(o=>[parseFloat(o.qty)||0]),
-    'AP': sortedOrd.map(o=>[o.size||'']),
-    'AQ': sortedOrd.map(o=>[o.note||''])
-  };
+  const n=sortedOrd.length;
 
-  for(const [col,vals] of Object.entries(colData)){
-    const startAddr=`${col}${LOADING.startRow}`;
-    const endAddr=`${col}${LOADING.startRow+n-1}`;
-    await fetch(`${baseUrl}range(address='${startAddr}:${endAddr}')`,{
+  // Batch: مسح + كتابة في request واحد
+  const clearRows=100;
+  const batchReqs=[
+    // 1. امسح AI:AQ (100 صف) دفعة وحدة
+    {
+      id:'1',
       method:'PATCH',
-      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
-      body:JSON.stringify({values:vals})
+      url:`/me/drive/items/${fileId}/workbook/worksheets/Loading/range(address='AI${LOADING.startRow}:AQ${LOADING.startRow+clearRows-1}')`,
+      headers:{'Content-Type':'application/json'},
+      body:{values:Array(clearRows).fill(Array(9).fill(''))}
+    }
+  ];
+
+  // 2. اكتب البيانات كـ block واحد AI:AQ
+  if(n>0){
+    // AI=Driver, AJ='', AK='', AL=Customer, AM=Customer, AN=Product, AO=Qty, AP=Size, AQ=Notes
+    const blockVals=sortedOrd.map(o=>[
+      o.driver||'','','',
+      o.customer||'',o.customer||'',
+      o.product||'',
+      parseFloat(o.qty)||0,
+      o.size||'',
+      o.note||''
+    ]);
+    batchReqs.push({
+      id:'2',
+      method:'PATCH',
+      url:`/me/drive/items/${fileId}/workbook/worksheets/Loading/range(address='AI${LOADING.startRow}:AQ${LOADING.startRow+n-1}')`,
+      headers:{'Content-Type':'application/json'},
+      body:{values:blockVals},
+      dependsOn:['1']
     });
   }
-  console.log(`✓ Written ${n} rows to Loading sheet`);
+
+  const batchRes=await fetch('https://graph.microsoft.com/v1.0/$batch',{
+    method:'POST',
+    headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+    body:JSON.stringify({requests:batchReqs})
+  });
+  if(!batchRes.ok) throw new Error('Batch write failed');
+  console.log(`✓ Written ${n} rows to Loading (batch)`);
 }
 
 // ── PRINT ──
