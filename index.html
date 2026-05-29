@@ -159,6 +159,14 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
 .pr-qi{width:36px;height:22px;background:var(--s2);border:1.5px solid var(--b2);border-radius:5px;color:var(--txt);font-family:var(--mono);font-size:.72rem;text-align:center;outline:none;}
 .pr-unit{font-family:var(--mono);font-size:.6rem;color:var(--muted);}
 .cc-move{display:flex;flex-direction:column;gap:2px;margin-right:6px;}
+.drv-col{flex-shrink:0;width:160px;background:var(--s2);border-radius:var(--r);border:1.5px solid var(--b1);display:flex;flex-direction:column;gap:0;overflow:hidden}
+.drv-col-head{background:var(--s3);padding:8px 10px;font-size:.75rem;font-weight:700;color:var(--blue2);border-bottom:1.5px solid var(--b1);text-align:center;flex-shrink:0}
+.drv-col-body{flex:1;min-height:60px;padding:6px;display:flex;flex-direction:column;gap:5px;overflow-y:auto}
+.drv-col-body.drag-over{background:rgba(74,215,206,.08);border:2px dashed var(--teal)}
+.drv-card{background:var(--s1);border:1.5px solid var(--b2);border-radius:6px;padding:5px 7px;cursor:grab;user-select:none;transition:all .15s}
+.drv-card:active{cursor:grabbing;opacity:.7;transform:scale(.97)}
+.drv-card .card-num{font-family:var(--mono);font-size:.6rem;color:var(--amber);font-weight:700;margin-bottom:1px}
+.drv-card .card-cust{font-size:.7rem;color:var(--txt);font-weight:600;line-height:1.2}
 .cc-mb{background:var(--s3);border:1px solid var(--b2);border-radius:4px;width:22px;height:18px;color:var(--muted);cursor:pointer;font-size:.6rem;display:flex;align-items:center;justify-content:center;transition:all .15s;}
 .cc-mb:active{border-color:var(--blue2);color:var(--blue2);}
 .cc-mb:disabled{opacity:.2;cursor:default;}
@@ -338,17 +346,16 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
 <!-- ══ DRIVERS PAGE ══ -->
 <div class="page" id="pg-drivers">
   <div class="orders-head">
-    <div>
-      <div style="font-size:.68rem;font-family:var(--mono);color:var(--muted);letter-spacing:.1em;text-transform:uppercase">Assign Drivers</div>
-    </div>
-    <div style="display:flex;align-items:center;gap:8px">
-      <select id="drvFilter" style="background:var(--s2);border:1.5px solid var(--b2);border-radius:8px;padding:5px 10px;color:var(--txt);font-family:var(--sans);font-size:.78rem;outline:none" onchange="renderDriversPage()">
-        <option value="">All Drivers</option>
-        <option value="__num__">By Order #</option>
-      </select>
+    <div><div style="font-size:.68rem;font-family:var(--mono);color:var(--muted);letter-spacing:.1em;text-transform:uppercase">Assign Drivers</div></div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <button class="btn btn-ghost btn-sm" id="drvViewBtn" onclick="toggleDrvView()" style="font-size:.68rem">🗂 Board</button>
+
     </div>
   </div>
+  <!-- List view -->
   <div style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px" id="drvList"></div>
+  <!-- Board view (kanban drag & drop) -->
+  <div style="flex:1;overflow:auto;padding:10px;display:none" id="drvBoard"></div>
 </div>
 
 
@@ -1089,6 +1096,96 @@ function delPI(i){confDlg(`Delete "${products[i]}"?`,()=>{products.splice(i,1);L
 function addProd(){const v=document.getElementById('addPI').value.trim();if(!v)return;if(products.includes(v)){toast('Exists','err');return;}products.push(v);LS.set('iat_p',products);renderSettP();document.getElementById('addPI').value='';toast('✓ Added','ok');}
 
 // ── DRIVERS PAGE ──
+let drvBoardView=false;
+function toggleDrvView(){
+  drvBoardView=!drvBoardView;
+  document.getElementById('drvList').style.display=drvBoardView?'none':'flex';
+  document.getElementById('drvBoard').style.display=drvBoardView?'flex':'none';
+  document.getElementById('drvViewBtn').textContent=drvBoardView?'☰ List':'🗂 Board';
+  if(drvBoardView)renderDrvBoard();
+  else renderDriversPage();
+}
+
+function renderDrvBoard(){
+  const board=document.getElementById('drvBoard');
+  const cols=['', ...drivers];
+  // Unique customers sorted by num
+  const custMap=new Map();
+  [...orders].sort((a,b)=>(a.num||0)-(b.num||0)).forEach(o=>{
+    if(!custMap.has(o.customer))custMap.set(o.customer,{num:o.num||'',driver:o.driver||''});
+  });
+  const numCols=cols.length||1;
+  board.innerHTML=`<div style="display:grid;grid-template-columns:repeat(${numCols},1fr);gap:6px;width:100%;height:100%;align-items:flex-start">
+    ${cols.map(drv=>{
+      const label=drv||'No Driver';
+      const cards=[...custMap.entries()]
+        .filter(([c,info])=>info.driver===drv)
+        .map(([cust,info])=>`
+          <div class="drv-card" draggable="true"
+            ondragstart="drvDragStart(event,'${esc(cust)}')"
+            ontouchstart="drvTouchStart(event,'${esc(cust)}')"
+            ontouchmove="drvTouchMove(event)"
+            ontouchend="drvTouchEnd(event)">
+            <div class="card-num">#${info.num}</div>
+            <div class="card-cust">${cust}</div>
+          </div>`).join('');
+      return `<div class="drv-col"
+        ondragover="event.preventDefault();this.querySelector('.drv-col-body').classList.add('drag-over')"
+        ondragleave="this.querySelector('.drv-col-body').classList.remove('drag-over')"
+        ondrop="drvDrop(event,'${esc(drv)}')">
+        <div class="drv-col-head" style="font-size:.65rem;padding:5px 6px;text-align:center">${drv||'❓ None'}</div>
+        <div class="drv-col-body" data-drv="${esc(drv)}">${cards||'<div style="font-size:.6rem;color:var(--muted);text-align:center;padding:8px">Drop here</div>'}</div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+let _dragCust=null;
+let _touchEl=null,_touchCust=null;
+
+function drvDragStart(e,cust){_dragCust=cust;}
+function drvDrop(e,drv){
+  e.preventDefault();
+  e.currentTarget.querySelector('.drv-col-body').classList.remove('drag-over');
+  if(!_dragCust)return;
+  orders.forEach(o=>{if(o.customer===_dragCust)o.driver=drv;});
+  saveOrders();
+  renderDrvBoard();
+  toast('✓ Driver updated','ok');
+  _dragCust=null;
+}
+
+// Touch drag for mobile
+function drvTouchStart(e,cust){
+  _touchCust=cust;
+  _touchEl=e.currentTarget;
+  _touchEl.style.opacity='.6';
+}
+function drvTouchMove(e){
+  e.preventDefault();
+  const t=e.touches[0];
+  // highlight target col
+  document.querySelectorAll('.drv-col-body').forEach(c=>c.classList.remove('drag-over'));
+  const el=document.elementFromPoint(t.clientX,t.clientY);
+  const col=el?.closest('.drv-col');
+  if(col)col.querySelector('.drv-col-body').classList.add('drag-over');
+}
+function drvTouchEnd(e){
+  if(_touchEl)_touchEl.style.opacity='1';
+  document.querySelectorAll('.drv-col-body').forEach(c=>c.classList.remove('drag-over'));
+  const t=e.changedTouches[0];
+  const el=document.elementFromPoint(t.clientX,t.clientY);
+  const colBody=el?.closest('.drv-col-body');
+  if(colBody&&_touchCust){
+    const finalDrv=colBody.dataset.drv||'';
+    orders.forEach(o=>{if(o.customer===_touchCust)o.driver=finalDrv;});
+    saveOrders();
+    toast('✓ Driver updated','ok');
+    renderDrvBoard();
+  }
+  _touchCust=null;_touchEl=null;
+}
+
 function renderDriversPage(){
   // Update filter dropdown
   const sel=document.getElementById('drvFilter');
