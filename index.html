@@ -173,7 +173,11 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
 .set-card{background:var(--s1);border:1px solid var(--b1);border-radius:var(--r2);overflow:hidden;}
 .sch{padding:9px 13px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between;background:var(--s2);}
 .sch-t{font-size:.68rem;font-family:var(--mono);color:var(--muted);letter-spacing:.1em;text-transform:uppercase;}
-.slist{max-height:180px;overflow-y:auto;}
+.slist{max-height:calc(100vh - 280px);overflow-y:auto;}
+.stab{padding:8px 12px;font-size:.75rem;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2.5px solid transparent;white-space:nowrap;flex-shrink:0;transition:all .15s;}
+.stab.on{color:var(--blue2);border-bottom-color:var(--blue2);}
+.set-section{display:none;flex-direction:column;gap:12px;}
+.set-section.on{display:flex;}
 .si{padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.04);display:flex;align-items:center;gap:7px;}
 .si:last-child{border-bottom:none;}
 .si-n{font-size:.8rem;flex:1;}
@@ -209,6 +213,9 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
   <div class="ntab on" onclick="showPage('entry',this)">✏️ Entry</div>
   <div class="ntab" onclick="showPage('orders',this)">📋 Orders <span class="nbadge" id="navBadge">0</span></div>
   <div class="ntab" onclick="showPage('drivers',this)">🚗 Drivers</div>
+  <div class="ntab" onclick="showPage('qty',this)">📊 Qty</div>
+  <div class="ntab" onclick="showPage('tender',this)">🏷 Tender</div>
+  <div class="ntab" onclick="showPage('tqty',this)">📊 T.Qty</div>
   <div class="ntab" onclick="showPage('settings',this)">⚙️ Settings</div>
 </nav>
 
@@ -305,10 +312,28 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     <button class="btn btn-red btn-sm" onclick="clearAll()">🗑 Clear All</button>
     <button class="btn btn-ghost btn-sm" onclick="exportXL()">⬇ Excel</button>
     <button class="btn btn-blue btn-sm" onclick="showPrintDlg()">🖨 Print</button>
+    <button class="btn btn-purple btn-sm" onclick="printDrivers()">🚗 Drivers</button>
     <button class="btn btn-teal" onclick="saveToOneDrive()" id="odBtn">☁ Save to OneDrive</button>
   </div>
 </div>
 
+
+
+<!-- ══ QTY PAGE ══ -->
+<div class="page" id="pg-qty">
+  <div class="orders-head">
+    <div>
+      <div style="font-size:.68rem;font-family:var(--mono);color:var(--muted);letter-spacing:.1em;text-transform:uppercase">Total Quantities</div>
+    </div>
+    <div style="display:flex;gap:7px">
+      <select id="qtyDrvFilter" style="background:var(--s2);border:1.5px solid var(--b2);border-radius:8px;padding:5px 8px;color:var(--txt);font-family:var(--sans);font-size:.75rem;outline:none" onchange="renderQtyPage()">
+        <option value="">All Drivers</option>
+      </select>
+      <button class="btn btn-teal btn-sm" onclick="printQtyPDF()">⬇ PDF</button>
+    </div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:12px" id="qtyList"></div>
+</div>
 
 <!-- ══ DRIVERS PAGE ══ -->
 <div class="page" id="pg-drivers">
@@ -326,11 +351,63 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
   <div style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px" id="drvList"></div>
 </div>
 
+
+<!-- ══ TENDER PAGE ══ -->
+<div class="page" id="pg-tender">
+  <!-- Top: customer picker -->
+  <div style="padding:10px 12px;border-bottom:1px solid var(--b1);flex-shrink:0">
+    <div class="pick-wrap">
+      <button class="pick-btn" id="tCustBtn" onclick="togTCDrop()">
+        <span id="tCustLabel" style="color:var(--muted)">Select customer…</span>
+        <span style="font-size:.7rem">▾</span>
+      </button>
+      <div class="pick-drop" id="tCustDrop">
+        <div style="padding:8px"><input type="text" id="tCustSrch" placeholder="Search…" oninput="renderTCustDL(customers.filter(c=>c.toLowerCase().includes(this.value.toLowerCase())))" style="width:100%;background:var(--s3);border:1px solid var(--b2);border-radius:6px;padding:6px 10px;color:var(--txt);font-family:var(--sans);font-size:.8rem;outline:none"/></div>
+        <div id="tCustList" style="max-height:180px;overflow-y:auto"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Middle: split view like Entry -->
+  <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+    <!-- Product search + list -->
+    <div style="padding:8px 12px;border-bottom:1px solid var(--b1);flex-shrink:0">
+      <input type="text" id="tProdSrch" placeholder="Search tender product…" oninput="renderTPList(this.value)" style="width:100%;background:var(--s2);border:1.5px solid var(--b2);border-radius:var(--r);padding:8px 12px;color:var(--txt);font-family:var(--sans);font-size:.82rem;outline:none;box-sizing:border-box"/>
+    </div>
+    <div id="tProdList" style="flex:1;overflow-y:auto;padding:6px 8px;display:flex;flex-direction:column;gap:4px"></div>
+  </div>
+
+  <!-- Bottom: selected rows + add button -->
+  <div style="border-top:1px solid var(--b1);flex-shrink:0;max-height:45vh;overflow-y:auto;padding:8px 12px;display:flex;flex-direction:column;gap:6px" id="tSelRows"></div>
+  <div style="padding:8px 12px;flex-shrink:0">
+    <button class="btn btn-teal" style="width:100%" onclick="addTenderOrder()">➕ Add to Tender</button>
+  </div>
+</div>
+
+<!-- ══ TENDER QTY PAGE ══ -->
+<div class="page" id="pg-tqty">
+  <div class="orders-head">
+    <div><div style="font-size:.68rem;font-family:var(--mono);color:var(--muted);letter-spacing:.1em;text-transform:uppercase">Tender Quantities</div></div>
+    <div style="display:flex;gap:7px">
+      <button class="btn btn-teal btn-sm" onclick="printTQtyPDF()">⬇ PDF</button>
+      <button class="btn btn-amber btn-sm" onclick="mergeTenderToOrders()">➕ Add to Orders</button>
+    </div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:12px" id="tqtyList"></div>
+</div>
+
 <!-- ══ SETTINGS PAGE ══ -->
 <div class="page" id="pg-settings">
+  <div style="background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;flex-shrink:0">
+    <div class="stab on" id="stab-c" onclick="showSTab('c')">👤 Customers</div>
+    <div class="stab" id="stab-p" onclick="showSTab('p')">🍗 Products</div>
+    <div class="stab" id="stab-tp" onclick="showSTab('tp')">🏷 Tender</div>
+    <div class="stab" id="stab-d" onclick="showSTab('d')">🚗 Drivers</div>
+  </div>
   <div class="set-body">
+    <div class="set-section on" id="ss-c">
     <div class="set-card">
-      <div class="sch"><span class="sch-t">Customers</span><span class="badge" id="cCnt">0</span></div>
+      <div class="sch"><span class="sch-t">Customers</span><span class="badge" id="cCnt">0</span><button class="btn btn-ghost btn-sm" style="font-size:.65rem;padding:2px 7px" onclick="sortList('c')">A→Z</button></div>
       <div class="slist" id="custSL"></div>
       <div class="add-row">
         <input type="text" id="addCI" placeholder="New customer..." onkeydown="if(event.key==='Enter')addCust()"/>
@@ -345,13 +422,26 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
         <button class="btn btn-teal btn-sm" onclick="addProd()">Add</button>
       </div>
     </div>
+    </div>
+    <div class="set-section" id="ss-tp">
     <div class="set-card">
-      <div class="sch"><span class="sch-t">Drivers</span><span class="badge" id="dCnt">0</span></div>
+      <div class="sch"><span class="sch-t">Tender Products</span><span class="badge" id="tpCnt">0</span><button class="btn btn-ghost btn-sm" style="font-size:.65rem;padding:2px 7px" onclick="sortList('tp')">A→Z</button></div>
+      <div class="slist" id="tpSL"></div>
+      <div class="add-row">
+        <input type="text" id="addTPI" placeholder="New tender product..." onkeydown="if(event.key==='Enter')addTenderProd()"/>
+        <button class="btn btn-teal btn-sm" onclick="addTenderProd()">Add</button>
+      </div>
+    </div>
+    </div>
+    <div class="set-section" id="ss-d">
+    <div class="set-card">
+      <div class="sch"><span class="sch-t">Drivers</span><span class="badge" id="dCnt">0</span><button class="btn btn-ghost btn-sm" style="font-size:.65rem;padding:2px 7px" onclick="sortList('d')">A→Z</button></div>
       <div class="slist" id="drvSL"></div>
       <div class="add-row">
         <input type="text" id="addDI" placeholder="New driver..." onkeydown="if(event.key='Enter')addDriver()"/>
         <button class="btn btn-teal btn-sm" onclick="addDriver()">Add</button>
       </div>
+    </div>
     </div>
   </div>
 </div>
@@ -395,6 +485,12 @@ let customers=LS.get('iat_c',DC);
 let products=LS.get('iat_p',DP);
 let freq=LS.get('iat_freq',{});
 let drivers=LS.get('iat_d',[]);
+const DTP=["KG","Zaki 400gr","Zaki 450gr","Zaki 500gr","Chickenco 400gr","Chickenco 450gr","Chickenco 500gr"];
+let tenderProds=LS.get('iat_tp',DTP);
+let tenderOrders=[];
+let tSelCust=null;
+let tSelProds=new Map();
+let tCOpen=false;
 let orders=[];
 let selCust=null;
 let selProds=new Map();
@@ -407,9 +503,22 @@ function sortedProds(list){return[...list].sort((a,b)=>(freq[b]||0)-(freq[a]||0)
   document.getElementById('orderDate').value=todayStr();
   renderCustDL(customers);
   renderPDropList('');
-  renderSettC();renderSettP();renderSettD();
+  renderSettC();renderSettP();renderSettD();renderSettTP();
 })();
 
+function sortList(type){
+  if(type==='c'){customers.sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase()));LS.set('iat_c',customers);renderSettC();}
+  else if(type==='p'){products.sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase()));LS.set('iat_p',products);renderSettP();}
+  else if(type==='tp'){tenderProds.sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase()));LS.set('iat_tp',tenderProds);renderSettTP();}
+  else if(type==='d'){drivers.sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase()));LS.set('iat_d',drivers);renderSettD();}
+  toast('✓ Sorted A→Z','ok');
+}
+function showSTab(t){
+  document.querySelectorAll('.stab').forEach(s=>s.classList.remove('on'));
+  document.querySelectorAll('.set-section').forEach(s=>s.classList.remove('on'));
+  document.getElementById('stab-'+t).classList.add('on');
+  document.getElementById('ss-'+t).classList.add('on');
+}
 function showPage(n,t){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.ntab').forEach(x=>x.classList.remove('on'));
@@ -417,7 +526,10 @@ function showPage(n,t){
   if(t)t.classList.add('on');
   if(n==='orders')renderOrders();
   if(n==='drivers')renderDriversPage();
-  if(n==='settings'){renderSettC();renderSettP();renderSettD();}
+  if(n==='qty')renderQtyPage();
+  if(n==='tender'){renderTCustDL(customers);renderTPList('');}
+  if(n==='tqty')renderTQtyPage();
+  if(n==='settings'){renderSettC();renderSettP();renderSettD();renderSettTP();}
 }
 
 
@@ -708,6 +820,26 @@ async function saveToOneDrive(){
 }
 
 // ── PRINT ──
+async function printDrivers(){
+  const btn=event.target;
+  btn.disabled=true;btn.textContent='Sending...';
+  try{
+    const token=await getODToken();
+    const markerContent=JSON.stringify({action:'print_drivers',ts:Date.now()});
+    const blob=new Blob([markerContent],{type:'application/json'});
+    const res=await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',{
+      method:'PUT',
+      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:blob
+    });
+    if(res.ok){toast('✓ Drivers print sent!','ok');}
+    else{throw new Error('Failed');}
+  }catch(e){
+    if(e.message!=='user_cancelled')toast('Error: '+e.message,'err');
+  }finally{
+    btn.disabled=false;btn.textContent='🚗 Drivers';
+  }
+}
 function showPrintDlg(){
   document.getElementById('printOv').classList.add('on');
   document.getElementById('printStatus').textContent='';
@@ -894,6 +1026,287 @@ function togDrvE(i){document.getElementById('dsi'+i).classList.toggle('editing')
 function saveDrvE(i){const v=document.getElementById('dsi'+i).querySelector('input').value.trim();if(!v)return;drivers[i]=v;LS.set('iat_d',drivers);renderSettD();toast('✓','ok');}
 function delDrv(i){confDlg(`Delete "${drivers[i]}"?`,()=>{drivers.splice(i,1);LS.set('iat_d',drivers);renderSettD();toast('Deleted','ok');});}
 function addDriver(){const v=document.getElementById('addDI').value.trim();if(!v)return;if(drivers.includes(v)){toast('Exists','err');return;}drivers.push(v);drivers.sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase()));LS.set('iat_d',drivers);renderSettD();document.getElementById('addDI').value='';toast('✓ Added','ok');}
+
+// ── QTY PAGE ──
+function renderQtyPage(){
+  // Update driver filter
+  const sel=document.getElementById('qtyDrvFilter');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">All Drivers</option>';
+  drivers.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent='🚗 '+d;sel.appendChild(o);});
+  sel.value=cur;
+  const filter=sel.value;
+  // Aggregate quantities
+  const totals=new Map();
+  orders.forEach(o=>{
+    if(filter && o.driver!==filter) return;
+    const key=o.product;
+    totals.set(key,(totals.get(key)||0)+parseFloat(o.qty||0));
+  });
+  const el=document.getElementById('qtyList');
+  if(!totals.size){el.innerHTML='<div class="empty"><div class="ei">📊</div><p>No data.</p></div>';return;}
+  const sorted=[...totals.entries()].sort((a,b)=>b[1]-a[1]);
+  const total=sorted.reduce((s,[,q])=>s+q,0);
+  el.innerHTML=`
+    <div id="qtyPrintArea">
+      <div style="font-family:var(--mono);font-size:.65rem;color:var(--teal);padding:4px 0 10px;letter-spacing:.08em">
+        ${filter?'🚗 '+filter:'ALL DRIVERS'} — ${new Date().toLocaleDateString()}
+      </div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="border-bottom:1.5px solid var(--b2)">
+            <th style="text-align:left;padding:7px 4px;font-size:.72rem;color:var(--muted);font-weight:600">Product</th>
+            <th style="text-align:right;padding:7px 4px;font-size:.72rem;color:var(--muted);font-weight:600">Qty (kg)</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${sorted.map(([p,q])=>`
+            <tr style="border-bottom:1px solid var(--b1)">
+              <td style="padding:8px 4px;font-size:.82rem;color:var(--txt)">${p}</td>
+              <td style="padding:8px 4px;font-size:.82rem;color:var(--blue2);text-align:right;font-family:var(--mono);font-weight:700">${q%1===0?q:q.toFixed(1)}</td>
+            </tr>`).join('')}
+        </tbody>
+        <tfoot>
+          <tr style="border-top:2px solid var(--b2)">
+            <td style="padding:9px 4px;font-size:.82rem;font-weight:700;color:var(--txt)">Total</td>
+            <td style="padding:9px 4px;font-size:.85rem;font-weight:800;color:var(--teal);text-align:right;font-family:var(--mono)">${total%1===0?total:total.toFixed(1)} kg</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>`;
+}
+function printQtyPDF(){
+  const area=document.getElementById('qtyPrintArea');
+  if(!area){toast('No data','err');return;}
+  const filter=document.getElementById('qtyDrvFilter').value;
+  const title=filter?'Qty_'+filter.replace(/\s+/g,'_'):'Qty_All';
+  const win=window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html><head><title>${title}</title>
+    <style>
+      body{font-family:Arial,sans-serif;padding:24px;color:#1a1a2e;font-size:13px}
+      h2{margin:0 0 6px;font-size:16px}
+      p{margin:0 0 16px;color:#666;font-size:11px}
+      table{width:100%;border-collapse:collapse}
+      th{text-align:left;padding:8px 6px;border-bottom:2px solid #ddd;font-size:11px;color:#666;text-transform:uppercase}
+      th:last-child,td:last-child{text-align:right}
+      td{padding:8px 6px;border-bottom:1px solid #eee;font-size:13px}
+      tfoot td{font-weight:bold;border-top:2px solid #ddd;border-bottom:none;font-size:14px}
+      tfoot td:last-child{color:#0a7ea4}
+    </style></head><body>
+    <h2>IAT Orders — ${filter?'🚗 '+filter:'All Drivers'}</h2>
+    <p>${new Date().toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p>
+    ${area.querySelector('table').outerHTML}
+    </body></html>`);
+  win.document.close();
+  win.focus();
+  setTimeout(()=>{win.print();},400);
+}
+
+
+// ── TENDER ──
+let tCOpen2=false;
+function togTCDrop(){
+  tCOpen2=!tCOpen2;
+  document.getElementById('tCustDrop').style.display=tCOpen2?'block':'none';
+  if(tCOpen2){renderTCustDL(customers);setTimeout(()=>document.getElementById('tCustSrch').focus(),50);}
+}
+function renderTCustDL(list){
+  document.getElementById('tCustList').innerHTML=list.map(c=>`
+    <div style="padding:9px 14px;cursor:pointer;font-size:.83rem;color:${tSelCust===c?'var(--blue2)':'var(--txt)'};background:${tSelCust===c?'var(--s3)':'transparent'}" onclick="selTCust('${esc(c)}')">${c}</div>`).join('');
+}
+function selTCust(c){
+  tSelCust=c;
+  document.getElementById('tCustLabel').textContent=c;
+  document.getElementById('tCustLabel').style.color='var(--txt)';
+  document.getElementById('tCustDrop').style.display='none';
+  tCOpen2=false;
+}
+function renderTPList(q){
+  const list=tenderProds.filter(p=>p.toLowerCase().includes((q||'').toLowerCase()));
+  const el=document.getElementById('tProdList');
+  if(!list.length){el.innerHTML='<div style="color:var(--muted);font-size:.8rem;padding:8px">No products found</div>';return;}
+  el.innerHTML=list.map(p=>{
+    const sel=tSelProds.has(p);
+    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;background:${sel?'var(--s3)':'var(--s2)'};border:1.5px solid ${sel?'var(--teal)':'var(--b1)'};cursor:pointer" onclick="togTProd('${esc(p)}')">
+      <div style="width:20px;height:20px;border-radius:5px;border:2px solid ${sel?'var(--teal)':'var(--b2)'};background:${sel?'var(--teal)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        ${sel?'<span style="color:#000;font-size:.7rem;font-weight:900">✓</span>':''}
+      </div>
+      <span style="font-size:.83rem;color:${sel?'var(--teal)':'var(--txt)'};font-weight:${sel?'700':'400'}">${p}</span>
+    </div>`;
+  }).join('');
+}
+function togTProd(name){
+  if(tSelProds.has(name))tSelProds.delete(name);
+  else{
+    // Parse size from name
+    const sizeMatch=name.match(/(\d+)gr/i);
+    const size=sizeMatch?sizeMatch[1]:'';
+    tSelProds.set(name,{qty:0,size});
+    renderTPList(document.getElementById('tProdSrch').value);
+    renderTSelRows();
+    return;
+  }
+  renderTPList(document.getElementById('tProdSrch').value);
+  renderTSelRows();
+}
+function renderTSelRows(){
+  document.getElementById('tSelRows').innerHTML=[...tSelProds.entries()].map(([p,d])=>`
+    <div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:8px 10px;display:flex;align-items:center;gap:8px">
+      <span style="flex:1;font-size:.8rem;color:var(--txt)">${p}</span>
+      <div class="pr-qc">
+        <button class="pr-qb" onclick="adjTQ('${esc(p)}',-1)">−</button>
+        <input class="pr-qi" type="number" min="0" step="1" value="${d.qty}" oninput="setTQ('${esc(p)}',this.value)" style="width:52px"/>
+        <button class="pr-qb" onclick="adjTQ('${esc(p)}',1)">+</button>
+      </div>
+      <span style="font-size:.65rem;color:var(--muted)">pcs</span>
+      <button class="pr-del" onclick="togTProd('${esc(p)}')">✕</button>
+    </div>`).join('');
+}
+function adjTQ(p,d){const o=tSelProds.get(p);if(o){o.qty=Math.max(0,(parseInt(o.qty)||0)+d);renderTSelRows();}}
+function setTQ(p,v){const o=tSelProds.get(p);if(o)o.qty=Math.max(0,parseInt(v)||0);}
+
+function addTenderOrder(){
+  if(!tSelCust){toast('Select customer','err');return;}
+  if(!tSelProds.size){toast('Select products','err');return;}
+  const date=todayStr();
+  // Append "tender" to customer name if not already there
+  const custName=tSelCust.toLowerCase().endsWith(' tender')?tSelCust:tSelCust+' tender';
+  tSelProds.forEach((d,p)=>{
+    if(d.qty>0){
+      const sizeG=parseInt(d.size)||0;
+      const kg=sizeG>0?(d.qty*sizeG/1000):d.qty;
+      tenderOrders.push({customer:custName,product:p,qty:d.qty,size:d.size,kg:parseFloat(kg.toFixed(3)),date});
+    }
+  });
+  // Clear for next customer
+  tSelCust=null;
+  tSelProds=new Map();
+  document.getElementById('tCustLabel').textContent='Select customer…';
+  document.getElementById('tCustLabel').style.color='var(--muted)';
+  document.getElementById('tProdSrch').value='';
+  renderTPList('');
+  renderTSelRows();
+  renderTQtyPage();
+  toast('✓ Added to Tender','ok');
+}
+
+// ── TENDER QTY ──
+function renderTQtyPage(){
+  const el=document.getElementById('tqtyList');
+  if(!tenderOrders.length){el.innerHTML='<div class="empty"><div class="ei">🏷</div><p>No tender orders yet.</p></div>';return;}
+  // Aggregate by product+size
+  const totals=new Map();
+  tenderOrders.forEach(o=>{
+    const key=o.product;
+    const cur=totals.get(key)||{qty:0,kg:0,size:o.size};
+    cur.qty+=parseInt(o.qty)||0;
+    cur.kg+=parseFloat(o.kg)||0;
+    totals.set(key,cur);
+  });
+  const rows=[...totals.entries()];
+  const totalQty=rows.reduce((s,[,v])=>s+v.qty,0);
+  const totalKg=rows.reduce((s,[,v])=>s+v.kg,0);
+  el.innerHTML=`<div id="tqtyPrintArea">
+    <div style="font-family:var(--mono);font-size:.65rem;color:var(--teal);padding:4px 0 10px;letter-spacing:.08em">TENDER — ${new Date().toLocaleDateString()}</div>
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="border-bottom:1.5px solid var(--b2)">
+          <th style="text-align:left;padding:7px 4px;font-size:.7rem;color:var(--muted)">GOODS</th>
+          <th style="text-align:right;padding:7px 4px;font-size:.7rem;color:var(--muted)">SIZE</th>
+          <th style="text-align:right;padding:7px 4px;font-size:.7rem;color:var(--muted)">QTY</th>
+          <th style="text-align:right;padding:7px 4px;font-size:.7rem;color:var(--muted)">KG</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(([p,v])=>`
+          <tr style="border-bottom:1px solid var(--b1)">
+            <td style="padding:8px 4px;font-size:.8rem;color:var(--txt)">${p}</td>
+            <td style="padding:8px 4px;font-size:.8rem;color:var(--muted);text-align:right">${v.size||''}</td>
+            <td style="padding:8px 4px;font-size:.8rem;color:var(--blue2);text-align:right;font-family:var(--mono)">${v.qty}</td>
+            <td style="padding:8px 4px;font-size:.8rem;color:var(--teal);text-align:right;font-family:var(--mono)">${v.kg%1===0?v.kg:v.kg.toFixed(1)}</td>
+          </tr>`).join('')}
+      </tbody>
+      <tfoot>
+        <tr style="border-top:2px solid var(--b2)">
+          <td colspan="2" style="padding:9px 4px;font-size:.82rem;font-weight:700;color:var(--txt)">TOTAL</td>
+          <td style="padding:9px 4px;font-size:.82rem;font-weight:800;color:var(--blue2);text-align:right;font-family:var(--mono)">${totalQty}</td>
+          <td style="padding:9px 4px;font-size:.82rem;font-weight:800;color:var(--teal);text-align:right;font-family:var(--mono)">${totalKg%1===0?totalKg:totalKg.toFixed(1)}</td>
+        </tr>
+      </tfoot>
+    </table>
+    <div style="margin-top:12px;font-size:.7rem;color:var(--muted)">
+      ${[...new Set(tenderOrders.map(o=>o.customer))].map(c=>`<div>👤 ${c}</div>`).join('')}
+    </div>
+  </div>`;
+}
+
+function printTQtyPDF(){
+  const area=document.getElementById('tqtyPrintArea');
+  if(!area){toast('No data','err');return;}
+  const totals=new Map();
+  tenderOrders.forEach(o=>{
+    const key=o.product;
+    const cur=totals.get(key)||{qty:0,kg:0,size:o.size};
+    cur.qty+=parseInt(o.qty)||0;
+    cur.kg+=parseFloat(o.kg)||0;
+    totals.set(key,cur);
+  });
+  const rows=[...totals.entries()];
+  const totalQty=rows.reduce((s,[,v])=>s+v.qty,0);
+  const totalKg=rows.reduce((s,[,v])=>s+v.kg,0);
+  const win=window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html><head><title>Tender</title>
+    <style>
+      body{font-family:Arial,sans-serif;padding:30px;color:#000}
+      h2{text-align:center;font-size:20px;margin-bottom:16px}
+      table{width:100%;border-collapse:collapse;border:1px solid #000}
+      th,td{border:1px solid #999;padding:7px 10px;font-size:13px}
+      th{background:#e0e0e0;font-weight:bold;text-transform:uppercase}
+      td:last-child,td:nth-child(3),td:nth-child(4){text-align:right}
+      tfoot td{font-weight:bold;background:#e8e8e8}
+    </style></head><body>
+    <h2>Tender</h2>
+    <table>
+      <thead><tr><th>GOODS</th><th>SIZE</th><th>QTY</th><th>KG</th></tr></thead>
+      <tbody>
+        ${rows.map(([p,v])=>`<tr><td>${p}</td><td>${v.size||''}</td><td>${v.qty}</td><td>${v.kg%1===0?v.kg:v.kg.toFixed(1)}</td></tr>`).join('')}
+      </tbody>
+      <tfoot><tr><td colspan="2">TOTAL</td><td>${totalQty}</td><td>${totalKg%1===0?totalKg:totalKg.toFixed(1)}</td></tr></tfoot>
+    </table>
+    </body></html>`);
+  win.document.close();
+  setTimeout(()=>win.print(),400);
+}
+
+function mergeTenderToOrders(){
+  if(!tenderOrders.length){toast('No tender orders','err');return;}
+  const date=todayStr();
+  const maxNum=orders.filter(o=>o.date===date).reduce((m,o)=>Math.max(m,o.num||0),0);
+  let num=maxNum;
+  const custNums=new Map();
+  tenderOrders.forEach(o=>{
+    if(!custNums.has(o.customer)){num++;custNums.set(o.customer,num);}
+    orders.push({customer:o.customer,product:o.product,qty:o.kg,size:'',note:'Tender',date,num:custNums.get(o.customer),driver:''});
+  });
+  toast(`✓ ${tenderOrders.length} rows added to Orders`,'ok');
+  tenderOrders=[];
+  renderTQtyPage();
+}
+
+// ── SETTINGS TENDER PRODUCTS ──
+function renderSettTP(){
+  document.getElementById('tpCnt').textContent=tenderProds.length;
+  document.getElementById('tpSL').innerHTML=tenderProds.map((p,i)=>`
+    <div class="si" id="tpsi${i}">
+      <span class="si-n">${p}</span>
+      <div class="si-e"><input type="text" value="${esc2(p)}" onkeydown="if(event.key==='Enter')saveTPE(${i})"/></div>
+      <div class="si-btns"><button class="ib" onclick="togTPE(${i})">✏️</button><button class="ib del" onclick="delTP(${i})">🗑</button></div>
+    </div>`).join('');
+}
+function togTPE(i){document.getElementById('tpsi'+i).classList.toggle('editing');}
+function saveTPE(i){const v=document.getElementById('tpsi'+i).querySelector('input').value.trim();if(!v)return;tenderProds[i]=v;LS.set('iat_tp',tenderProds);renderSettTP();toast('✓','ok');}
+function delTP(i){confDlg(`Delete "${tenderProds[i]}"?`,()=>{tenderProds.splice(i,1);LS.set('iat_tp',tenderProds);renderSettTP();toast('Deleted','ok');});}
+function addTenderProd(){const v=document.getElementById('addTPI').value.trim();if(!v)return;if(tenderProds.includes(v)){toast('Exists','err');return;}tenderProds.push(v);LS.set('iat_tp',tenderProds);renderSettTP();document.getElementById('addTPI').value='';toast('✓ Added','ok');}
 
 function hi(t,q){if(!q)return t;return t.replace(new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi'),'<mark>$1</mark>');}
 function esc(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
