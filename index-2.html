@@ -847,8 +847,10 @@ async function saveToOneDrive(){
     const token=await getODToken();
 
     // 1. حفظ orders2026.xlsx كالعادة
+    // الترتيب حسب رقم الأوردر ثم حسب ترتيب الإدخال
+    const sortedOrders=[...orders].sort((a,b)=>(a.num||0)-(b.num||0));
     const rows=[['Driver','Customer','','Product','Qty (kg)','Size (g)','Notes']];
-    orders.forEach(o=>rows.push([o.driver||'',o.customer,'',o.product,o.qty,o.size||'',o.note||'']));
+    sortedOrders.forEach(o=>rows.push([o.driver||'',o.customer,'',o.product,o.qty,o.size||'',o.note||'']));
     const ws=XLSX.utils.aoa_to_sheet(rows);
     ws['!cols']=[{wch:15},{wch:30},{wch:4},{wch:22},{wch:10},{wch:10},{wch:28}];
     const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Orders');
@@ -898,14 +900,16 @@ async function writeToLoadingSheet(token){
   }
 
   // اكتب البيانات عمود عمود
+  // نفس الترتيب حسب رقم الأوردر
+  const sortedOrd=[...orders].sort((a,b)=>(a.num||0)-(b.num||0));
   const colData={
-    'AN': orders.map(o=>[o.product||'']),
-    'AI': orders.map(o=>[o.driver||'']),
-    'AL': orders.map(o=>[o.customer||'']),
-    'AM': orders.map(o=>[o.customer||'']),
-    'AO': orders.map(o=>[parseFloat(o.qty)||0]),
-    'AP': orders.map(o=>[o.size||'']),
-    'AQ': orders.map(o=>[o.note||''])
+    'AN': sortedOrd.map(o=>[o.product||'']),
+    'AI': sortedOrd.map(o=>[o.driver||'']),
+    'AL': sortedOrd.map(o=>[o.customer||'']),
+    'AM': sortedOrd.map(o=>[o.customer||'']),
+    'AO': sortedOrd.map(o=>[parseFloat(o.qty)||0]),
+    'AP': sortedOrd.map(o=>[o.size||'']),
+    'AQ': sortedOrd.map(o=>[o.note||''])
   };
 
   for(const [col,vals] of Object.entries(colData)){
