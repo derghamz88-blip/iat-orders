@@ -390,7 +390,8 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     <div><div style="font-size:.68rem;font-family:var(--mono);color:var(--muted);letter-spacing:.1em;text-transform:uppercase">Tender Quantities</div></div>
     <div style="display:flex;gap:7px">
       <button class="btn btn-teal btn-sm" onclick="printTQtyPDF()">⬇ PDF</button>
-      <button class="btn btn-amber btn-sm" onclick="mergeTenderToOrders()">➕ Add to Orders</button>
+      <button class="btn btn-purple btn-sm" onclick="printDriversPDF()">⬇ Drivers PDF</button>
+    <button class="btn btn-amber btn-sm" onclick="mergeTenderToOrders()">➕ Add to Orders</button>
     </div>
   </div>
   <div style="flex:1;overflow-y:auto;padding:12px" id="tqtyList"></div>
@@ -910,14 +911,15 @@ async function writeToLoadingSheet(token){
       const akVal=seenNums.has(num)?'':num;
       seenNums.add(num);
       return [
-        o.driver||'',
-        num,
-        akVal,
-        o.customer||'',o.customer||'',
-        o.product||'',
-        parseFloat(o.qty)||0,
-        o.size||'',
-        o.note||''
+        o.driver||'',  // AI
+        num,           // AJ
+        akVal,         // AK
+        o.customer||'',// AL
+        o.customer||'',// AM
+        o.product||'', // AN
+        parseFloat(o.qty)||0, // AO
+        o.size||'',    // AP
+        o.note||''     // AQ
       ];
     });
     batchReqs.push({
@@ -1160,6 +1162,7 @@ function renderQtyPage(){
   const totals=new Map();
   orders.forEach(o=>{
     if(filter && o.driver!==filter) return;
+    if(o.customer&&o.customer.toLowerCase().endsWith(' tender')) return; // exclude tender
     const key=o.product;
     totals.set(key,(totals.get(key)||0)+parseFloat(o.qty||0));
   });
@@ -1196,32 +1199,152 @@ function renderQtyPage(){
     </div>`;
 }
 function printQtyPDF(){
-  const area=document.getElementById('qtyPrintArea');
-  if(!area){toast('No data','err');return;}
+  if(!orders.length){toast('No data','err');return;}
   const filter=document.getElementById('qtyDrvFilter').value;
   const title=filter?'Qty_'+filter.replace(/\s+/g,'_'):'Qty_All';
+  const totals=new Map();
+  orders.forEach(o=>{
+    if(filter && o.driver!==filter) return;
+    if(o.customer&&o.customer.toLowerCase().endsWith(' tender')) return;
+    totals.set(o.product,(totals.get(o.product)||0)+parseFloat(o.qty||0));
+  });
+  const sorted=[...totals.entries()].sort((a,b)=>b[1]-a[1]);
+  const total=sorted.reduce((s,[,q])=>s+q,0);
   const win=window.open('','_blank');
   win.document.write(`<!DOCTYPE html><html><head><title>${title}</title>
     <style>
-      body{font-family:Arial,sans-serif;padding:24px;color:#1a1a2e;font-size:13px}
-      h2{margin:0 0 6px;font-size:16px}
-      p{margin:0 0 16px;color:#666;font-size:11px}
-      table{width:100%;border-collapse:collapse}
-      th{text-align:left;padding:8px 6px;border-bottom:2px solid #ddd;font-size:11px;color:#666;text-transform:uppercase}
+      @page{margin:15mm}
+      body{font-family:Arial,sans-serif;padding:0;color:#000;font-size:16px}
+      .header{border-bottom:3px solid #000;padding-bottom:10px;margin-bottom:16px}
+      .header h1{margin:0;font-size:26px;font-weight:900}
+      .header p{margin:4px 0 0;font-size:14px;color:#444}
+      table{width:100%;border-collapse:collapse;margin-top:8px}
+      th{text-align:left;padding:10px 8px;border-bottom:3px solid #000;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
       th:last-child,td:last-child{text-align:right}
-      td{padding:8px 6px;border-bottom:1px solid #eee;font-size:13px}
-      tfoot td{font-weight:bold;border-top:2px solid #ddd;border-bottom:none;font-size:14px}
+      td{padding:10px 8px;border-bottom:1.5px solid #ddd;font-size:18px}
+      tr:nth-child(even) td{background:#f8f8f8}
+      tfoot td{font-weight:900;border-top:3px solid #000;border-bottom:none;font-size:20px;padding:12px 8px}
       tfoot td:last-child{color:#0a7ea4}
     </style></head><body>
-    <h2>IAT Orders — ${filter?'🚗 '+filter:'All Drivers'}</h2>
-    <p>${new Date().toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p>
-    ${area.querySelector('table').outerHTML}
+    <div class="header">
+      <h1>IAT Orders — ${filter?filter:'All Drivers'}</h1>
+      <p>${new Date().toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p>
+    </div>
+    <table>
+      <thead><tr><th>Product</th><th>Qty (kg)</th></tr></thead>
+      <tbody>${sorted.map(([p,q])=>`<tr><td>${p}</td><td>${q%1===0?q:q.toFixed(1)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td>TOTAL</td><td>${total%1===0?total:total.toFixed(1)} kg</td></tr></tfoot>
+    </table>
     </body></html>`);
   win.document.close();
   win.focus();
   setTimeout(()=>{win.print();},400);
 }
 
+
+// ── DRIVERS PDF ──
+function printDriversSummaryPDF(){
+  if(!orders.length){toast('No data','err');return;}
+  const date=new Date().toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  // Group by driver, then unique customers with their order numbers
+  const driverMap=new Map();
+  [...orders].sort((a,b)=>(a.num||0)-(b.num||0)).forEach(o=>{
+    const drv=o.driver||'No Driver';
+    if(!driverMap.has(drv))driverMap.set(drv,new Map());
+    const cm=driverMap.get(drv);
+    if(!cm.has(o.customer))cm.set(o.customer,o.num||'—');
+  });
+  let html=`<!DOCTYPE html><html><head><title>Drivers Summary</title>
+  <style>
+    @page{margin:12mm;size:A4}
+    body{font-family:Arial,sans-serif;color:#000;font-size:15px}
+    h1{font-size:22px;margin:0 0 4px;font-weight:900}
+    p{margin:0 0 16px;font-size:12px;color:#555}
+    .driver-block{margin-bottom:20px;border:2px solid #000;border-radius:6px;overflow:hidden;page-break-inside:avoid}
+    .driver-head{background:#1a1a2e;color:#fff;padding:10px 14px;font-size:18px;font-weight:900}
+    table{width:100%;border-collapse:collapse}
+    th{padding:8px 12px;border-bottom:2px solid #000;font-size:13px;text-transform:uppercase;background:#f0f0f0;text-align:left}
+    th:last-child{text-align:right}
+    td{padding:10px 12px;border-bottom:1px solid #ddd;font-size:16px}
+    td:first-child{font-weight:700;font-size:15px;color:#1a1a2e;width:50px;text-align:center}
+    .total{font-weight:900;font-size:14px;padding:6px 12px;background:#f8f8f8;text-align:right;border-top:2px solid #000}
+  </style></head><body>
+  <h1>Drivers Summary</h1>
+  <p>${date}</p>`;
+  driverMap.forEach((custMap,drv)=>{
+    html+=`<div class="driver-block">
+      <div class="driver-head">🚗 ${drv} — ${custMap.size} orders</div>
+      <table>
+        <thead><tr><th>#</th><th>Customer</th></tr></thead>
+        <tbody>`;
+    custMap.forEach((num,cust)=>{
+      html+=`<tr><td>${num}</td><td>${cust}</td></tr>`;
+    });
+    html+=`</tbody></table>
+    <div class="total">${custMap.size} customers</div>
+    </div>`;
+  });
+  html+=`</body></html>`;
+  const win=window.open('','_blank');
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(()=>{win.print();},400);
+}
+function printDriversPDF(){
+  if(!orders.length){toast('No data','err');return;}
+  const date=new Date().toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  // Group by driver then customer
+  const driverMap=new Map();
+  [...orders].sort((a,b)=>(a.num||0)-(b.num||0)).forEach(o=>{
+    const drv=o.driver||'No Driver';
+    if(!driverMap.has(drv))driverMap.set(drv,new Map());
+    const cm=driverMap.get(drv);
+    if(!cm.has(o.customer))cm.set(o.customer,[]);
+    cm.get(o.customer).push(o);
+  });
+  let html=`<!DOCTYPE html><html><head><title>Drivers Orders</title>
+  <style>
+    @page{margin:12mm;size:A4}
+    body{font-family:Arial,sans-serif;color:#000;font-size:14px}
+    .driver-section{page-break-after:always;padding:10px 0}
+    .driver-section:last-child{page-break-after:avoid}
+    .driver-header{background:#1a1a2e;color:#fff;padding:12px 16px;border-radius:6px;margin-bottom:14px}
+    .driver-header h1{margin:0;font-size:22px;font-weight:900}
+    .driver-header p{margin:3px 0 0;font-size:12px;opacity:.8}
+    .cust-block{margin-bottom:16px;border:2px solid #000;border-radius:6px;overflow:hidden}
+    .cust-header{background:#f0f0f0;padding:8px 12px;font-weight:700;font-size:16px;border-bottom:2px solid #000}
+    .cust-num{display:inline-block;background:#1a1a2e;color:#fff;padding:2px 8px;border-radius:4px;font-size:13px;margin-right:8px}
+    table{width:100%;border-collapse:collapse}
+    td{padding:8px 12px;border-bottom:1px solid #eee;font-size:15px}
+    td:last-child{text-align:right;font-weight:700;font-size:16px}
+    .total-row td{font-weight:900;font-size:17px;border-top:2px solid #000;background:#f8f8f8}
+  </style></head><body>`;
+  driverMap.forEach((custMap,drv)=>{
+    const totalKg=[...custMap.values()].flat().reduce((s,o)=>s+parseFloat(o.qty||0),0);
+    html+=`<div class="driver-section">
+      <div class="driver-header">
+        <h1>🚗 ${drv}</h1>
+        <p>${date} — Total: ${totalKg%1===0?totalKg:totalKg.toFixed(1)} kg</p>
+      </div>`;
+    custMap.forEach((items,cust)=>{
+      const custTotal=items.reduce((s,o)=>s+parseFloat(o.qty||0),0);
+      html+=`<div class="cust-block">
+        <div class="cust-header"><span class="cust-num">#${items[0].num||'—'}</span>${cust}</div>
+        <table>`;
+      items.forEach(o=>{html+=`<tr><td>${o.product}</td><td>${parseFloat(o.qty||0)%1===0?parseFloat(o.qty||0):parseFloat(o.qty||0).toFixed(1)} kg</td></tr>`;});
+      html+=`<tr class="total-row"><td>Total</td><td>${custTotal%1===0?custTotal:custTotal.toFixed(1)} kg</td></tr>`;
+      html+=`</table></div>`;
+    });
+    html+=`</div>`;
+  });
+  html+=`</body></html>`;
+  const win=window.open('','_blank');
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(()=>{win.print();},400);
+}
 
 // ── TENDER ──
 let tCOpen2=false;
@@ -1377,21 +1500,28 @@ function printTQtyPDF(){
   const win=window.open('','_blank');
   win.document.write(`<!DOCTYPE html><html><head><title>Tender</title>
     <style>
-      body{font-family:Arial,sans-serif;padding:30px;color:#000}
-      h2{text-align:center;font-size:20px;margin-bottom:16px}
-      table{width:100%;border-collapse:collapse;border:1px solid #000}
-      th,td{border:1px solid #999;padding:7px 10px;font-size:13px}
-      th{background:#e0e0e0;font-weight:bold;text-transform:uppercase}
-      td:last-child,td:nth-child(3),td:nth-child(4){text-align:right}
-      tfoot td{font-weight:bold;background:#e8e8e8}
+      @page{margin:15mm}
+      body{font-family:Arial,sans-serif;padding:0;color:#000;font-size:16px}
+      .header{border-bottom:3px solid #000;padding-bottom:10px;margin-bottom:16px}
+      .header h1{margin:0;font-size:28px;font-weight:900;text-align:center}
+      .header p{margin:4px 0 0;font-size:13px;color:#444;text-align:center}
+      table{width:100%;border-collapse:collapse;border:2px solid #000}
+      th{border:1.5px solid #000;padding:10px 12px;font-size:15px;font-weight:900;text-transform:uppercase;background:#e8e8e8;text-align:center}
+      td{border:1px solid #ccc;padding:10px 12px;font-size:18px}
+      td:nth-child(2),td:nth-child(3),td:nth-child(4){text-align:right}
+      tr:nth-child(even) td{background:#f9f9f9}
+      tfoot td{font-weight:900;background:#e8e8e8;font-size:20px;border:2px solid #000;padding:12px}
     </style></head><body>
-    <h2>Tender</h2>
+    <div class="header">
+      <h1>Tender</h1>
+      <p>${new Date().toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p>
+    </div>
     <table>
       <thead><tr><th>GOODS</th><th>SIZE</th><th>QTY</th><th>KG</th></tr></thead>
       <tbody>
         ${rows.map(([p,v])=>`<tr><td>${p}</td><td>${v.size||''}</td><td>${v.qty}</td><td>${v.kg%1===0?v.kg:v.kg.toFixed(1)}</td></tr>`).join('')}
       </tbody>
-      <tfoot><tr><td colspan="2">TOTAL</td><td>${totalQty}</td><td>${totalKg%1===0?totalKg:totalKg.toFixed(1)}</td></tr></tfoot>
+      <tfoot><tr><td colspan="2"><b>TOTAL</b></td><td>${totalQty}</td><td>${totalKg%1===0?totalKg:totalKg.toFixed(1)}</td></tr></tfoot>
     </table>
     </body></html>`);
   win.document.close();
