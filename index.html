@@ -347,15 +347,19 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
 <div class="page" id="pg-drivers">
   <div class="orders-head">
     <div><div style="font-size:.68rem;font-family:var(--mono);color:var(--muted);letter-spacing:.1em;text-transform:uppercase">Assign Drivers</div></div>
-    <div style="display:flex;align-items:center;gap:6px">
-      <button class="btn btn-ghost btn-sm" id="drvViewBtn" onclick="toggleDrvView()" style="font-size:.68rem">🗂 Board</button>
-
+    <div style="display:flex;align-items:center;gap:5px">
+      <select id="drvFilter" style="background:var(--s2);border:1.5px solid var(--b2);border-radius:8px;padding:4px 7px;color:var(--txt);font-family:var(--sans);font-size:.72rem;outline:none;max-width:110px" onchange="renderDriversPage()">
+        <option value="">All</option>
+        <option value="__none__">❌ No Driver</option>
+      </select>
+      <button class="btn btn-ghost btn-sm" id="drvViewBtn" onclick="toggleDrvView()" style="font-size:.68rem;padding:4px 8px">🗂 Board</button>
+      <button class="btn btn-purple btn-sm" onclick="printDriversPDF()" style="padding:4px 8px">⬇ PDF</button>
     </div>
   </div>
   <!-- List view -->
   <div style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px" id="drvList"></div>
-  <!-- Board view (kanban drag & drop) -->
-  <div style="flex:1;overflow:auto;padding:10px;display:none" id="drvBoard"></div>
+  <!-- Board view -->
+  <div style="flex:1;overflow-y:auto;overflow-x:hidden;padding:6px;display:none;box-sizing:border-box;width:100%" id="drvBoard"></div>
 </div>
 
 
@@ -1115,9 +1119,14 @@ function renderDrvBoard(){
     if(!custMap.has(o.customer))custMap.set(o.customer,{num:o.num||'',driver:o.driver||''});
   });
   const numCols=cols.length||1;
-  board.innerHTML=`<div style="display:grid;grid-template-columns:repeat(${numCols},1fr);gap:6px;width:100%;height:100%;align-items:flex-start">
+  // حساب حجم الخط حسب عدد السائقين
+  const hSize=numCols<=4?'.75rem':numCols<=6?'.62rem':numCols<=8?'.52rem':'.44rem';
+  const cardCustSize=numCols<=4?'.72rem':numCols<=6?'.62rem':'.54rem';
+  const cardNumSize=numCols<=4?'.65rem':'.55rem';
+  const gap=numCols<=6?'4px':'2px';
+  const colW=`calc((100% - ${(numCols-1)*parseInt(gap)}px) / ${numCols})`;
+  board.innerHTML=`<div style="display:flex;flex-wrap:nowrap;gap:${gap};width:100%;box-sizing:border-box;align-items:start">
     ${cols.map(drv=>{
-      const label=drv||'No Driver';
       const cards=[...custMap.entries()]
         .filter(([c,info])=>info.driver===drv)
         .map(([cust,info])=>`
@@ -1126,15 +1135,15 @@ function renderDrvBoard(){
             ontouchstart="drvTouchStart(event,'${esc(cust)}')"
             ontouchmove="drvTouchMove(event)"
             ontouchend="drvTouchEnd(event)">
-            <div class="card-num">#${info.num}</div>
-            <div class="card-cust">${cust}</div>
+            <div class="card-num" style="font-size:${cardNumSize}">#${info.num}</div>
+            <div class="card-cust" style="font-size:${cardCustSize}">${cust}</div>
           </div>`).join('');
-      return `<div class="drv-col"
+      return `<div class="drv-col" style="width:${colW};min-width:0;flex-shrink:0"
         ondragover="event.preventDefault();this.querySelector('.drv-col-body').classList.add('drag-over')"
         ondragleave="this.querySelector('.drv-col-body').classList.remove('drag-over')"
         ondrop="drvDrop(event,'${esc(drv)}')">
-        <div class="drv-col-head" style="font-size:.65rem;padding:5px 6px;text-align:center">${drv||'❓ None'}</div>
-        <div class="drv-col-body" data-drv="${esc(drv)}">${cards||'<div style="font-size:.6rem;color:var(--muted);text-align:center;padding:8px">Drop here</div>'}</div>
+        <div class="drv-col-head" style="font-size:${hSize};padding:5px 3px;text-align:center;word-break:break-word;line-height:1.2">${drv||'❓'}</div>
+        <div class="drv-col-body" data-drv="${esc(drv)}">${cards||'<div style="font-size:.55rem;color:var(--muted);text-align:center;padding:6px">+</div>'}</div>
       </div>`;
     }).join('')}
   </div>`;
@@ -1187,12 +1196,14 @@ function drvTouchEnd(e){
 }
 
 function renderDriversPage(){
-  // Update filter dropdown
+  // Update filter dropdown with drivers
   const sel=document.getElementById('drvFilter');
-  const cur=sel.value;
-  sel.innerHTML='<option value="">All Drivers</option><option value="__num__">By Order #</option><option value="__none__">⚠ No Driver</option>';
-  drivers.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent='🚗 '+d;sel.appendChild(o);});
-  sel.value=cur;
+  if(sel){
+    const cur=sel.value;
+    sel.innerHTML='<option value="">All</option><option value="__none__">❌ No Driver</option>';
+    drivers.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent='🚗 '+d;sel.appendChild(o);});
+    sel.value=cur;
+  }
   // Get unique customers from orders
   const dateMap=new Map();
   orders.forEach((o,i)=>{
