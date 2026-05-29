@@ -1172,27 +1172,27 @@ function renderQtyPage(){
   const total=sorted.reduce((s,[,q])=>s+q,0);
   el.innerHTML=`
     <div id="qtyPrintArea">
-      <div style="font-family:var(--mono);font-size:.65rem;color:var(--teal);padding:4px 0 10px;letter-spacing:.08em">
+      <div style="font-family:var(--mono);font-size:.62rem;color:var(--teal);padding:4px 0 8px;letter-spacing:.08em">
         ${filter?'🚗 '+filter:'ALL DRIVERS'} — ${new Date().toLocaleDateString()}
       </div>
       <table style="width:100%;border-collapse:collapse">
         <thead>
-          <tr style="border-bottom:1.5px solid var(--b2)">
-            <th style="text-align:left;padding:7px 4px;font-size:.72rem;color:var(--muted);font-weight:600">Product</th>
-            <th style="text-align:right;padding:7px 4px;font-size:.72rem;color:var(--muted);font-weight:600">Qty (kg)</th>
+          <tr style="border-bottom:2px solid var(--b2)">
+            <th style="text-align:left;padding:6px 8px;font-size:.7rem;color:var(--muted);font-weight:700;text-transform:uppercase">Product</th>
+            <th style="text-align:right;padding:6px 8px;font-size:.7rem;color:var(--muted);font-weight:700;text-transform:uppercase">KG</th>
           </tr>
         </thead>
         <tbody>
           ${sorted.map(([p,q])=>`
             <tr style="border-bottom:1px solid var(--b1)">
-              <td style="padding:8px 4px;font-size:.82rem;color:var(--txt)">${p}</td>
-              <td style="padding:8px 4px;font-size:.82rem;color:var(--blue2);text-align:right;font-family:var(--mono);font-weight:700">${q%1===0?q:q.toFixed(1)}</td>
+              <td style="padding:10px 8px;font-size:1rem;color:var(--txt);font-weight:500">${p}</td>
+              <td style="padding:10px 8px;font-size:1.1rem;color:var(--blue2);text-align:right;font-family:var(--mono);font-weight:800">${q%1===0?q:q.toFixed(1)}</td>
             </tr>`).join('')}
         </tbody>
         <tfoot>
-          <tr style="border-top:2px solid var(--b2)">
-            <td style="padding:9px 4px;font-size:.82rem;font-weight:700;color:var(--txt)">Total</td>
-            <td style="padding:9px 4px;font-size:.85rem;font-weight:800;color:var(--teal);text-align:right;font-family:var(--mono)">${total%1===0?total:total.toFixed(1)} kg</td>
+          <tr style="border-top:2.5px solid var(--b2);background:var(--s2)">
+            <td style="padding:11px 8px;font-size:1rem;font-weight:800;color:var(--txt)">TOTAL</td>
+            <td style="padding:11px 8px;font-size:1.15rem;font-weight:900;color:var(--teal);text-align:right;font-family:var(--mono)">${total%1===0?total:total.toFixed(1)} kg</td>
           </tr>
         </tfoot>
       </table>
@@ -1294,49 +1294,43 @@ function printDriversSummaryPDF(){
 function printDriversPDF(){
   if(!orders.length){toast('No data','err');return;}
   const date=new Date().toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
-  // Group by driver then customer
+  // Group by driver then unique customers
   const driverMap=new Map();
   [...orders].sort((a,b)=>(a.num||0)-(b.num||0)).forEach(o=>{
     const drv=o.driver||'No Driver';
     if(!driverMap.has(drv))driverMap.set(drv,new Map());
     const cm=driverMap.get(drv);
-    if(!cm.has(o.customer))cm.set(o.customer,[]);
-    cm.get(o.customer).push(o);
+    if(!cm.has(o.customer))cm.set(o.customer,o.num||'—');
   });
-  let html=`<!DOCTYPE html><html><head><title>Drivers Orders</title>
+  let html=`<!DOCTYPE html><html><head><title>Drivers</title>
   <style>
     @page{margin:12mm;size:A4}
-    body{font-family:Arial,sans-serif;color:#000;font-size:14px}
-    .driver-section{page-break-after:always;padding:10px 0}
-    .driver-section:last-child{page-break-after:avoid}
-    .driver-header{background:#1a1a2e;color:#fff;padding:12px 16px;border-radius:6px;margin-bottom:14px}
-    .driver-header h1{margin:0;font-size:22px;font-weight:900}
-    .driver-header p{margin:3px 0 0;font-size:12px;opacity:.8}
-    .cust-block{margin-bottom:16px;border:2px solid #000;border-radius:6px;overflow:hidden}
-    .cust-header{background:#f0f0f0;padding:8px 12px;font-weight:700;font-size:16px;border-bottom:2px solid #000}
-    .cust-num{display:inline-block;background:#1a1a2e;color:#fff;padding:2px 8px;border-radius:4px;font-size:13px;margin-right:8px}
+    body{font-family:Arial,sans-serif;color:#000;font-size:15px}
+    h1{font-size:20px;margin:0 0 2px;font-weight:900}
+    .date{font-size:12px;color:#555;margin-bottom:16px}
+    .driver-block{margin-bottom:18px;border:2px solid #000;border-radius:6px;overflow:hidden;page-break-inside:avoid}
+    .driver-head{background:#1a1a2e;color:#fff;padding:10px 14px;font-size:19px;font-weight:900}
     table{width:100%;border-collapse:collapse}
-    td{padding:8px 12px;border-bottom:1px solid #eee;font-size:15px}
-    td:last-child{text-align:right;font-weight:700;font-size:16px}
-    .total-row td{font-weight:900;font-size:17px;border-top:2px solid #000;background:#f8f8f8}
-  </style></head><body>`;
+    th{padding:8px 12px;border-bottom:2px solid #000;font-size:12px;text-transform:uppercase;background:#f0f0f0;text-align:left;letter-spacing:.05em}
+    th:first-child{width:60px;text-align:center}
+    td{padding:11px 12px;border-bottom:1px solid #ddd;font-size:17px}
+    td:first-child{font-weight:900;font-size:16px;color:#1a1a2e;text-align:center;background:#f8f8f8;width:60px}
+    .foot{font-size:12px;padding:6px 12px;background:#f0f0f0;border-top:2px solid #000;text-align:right;font-weight:700}
+  </style></head><body>
+  <h1>Drivers — Orders</h1>
+  <div class="date">${date}</div>`;
   driverMap.forEach((custMap,drv)=>{
-    const totalKg=[...custMap.values()].flat().reduce((s,o)=>s+parseFloat(o.qty||0),0);
-    html+=`<div class="driver-section">
-      <div class="driver-header">
-        <h1>🚗 ${drv}</h1>
-        <p>${date} — Total: ${totalKg%1===0?totalKg:totalKg.toFixed(1)} kg</p>
-      </div>`;
-    custMap.forEach((items,cust)=>{
-      const custTotal=items.reduce((s,o)=>s+parseFloat(o.qty||0),0);
-      html+=`<div class="cust-block">
-        <div class="cust-header"><span class="cust-num">#${items[0].num||'—'}</span>${cust}</div>
-        <table>`;
-      items.forEach(o=>{html+=`<tr><td>${o.product}</td><td>${parseFloat(o.qty||0)%1===0?parseFloat(o.qty||0):parseFloat(o.qty||0).toFixed(1)} kg</td></tr>`;});
-      html+=`<tr class="total-row"><td>Total</td><td>${custTotal%1===0?custTotal:custTotal.toFixed(1)} kg</td></tr>`;
-      html+=`</table></div>`;
+    html+=`<div class="driver-block">
+      <div class="driver-head">🚗 ${drv}</div>
+      <table>
+        <thead><tr><th>#</th><th>Customer</th></tr></thead>
+        <tbody>`;
+    custMap.forEach((num,cust)=>{
+      html+=`<tr><td>${num}</td><td>${cust}</td></tr>`;
     });
-    html+=`</div>`;
+    html+=`</tbody></table>
+    <div class="foot">${custMap.size} customers</div>
+    </div>`;
   });
   html+=`</body></html>`;
   const win=window.open('','_blank');
@@ -1450,30 +1444,30 @@ function renderTQtyPage(){
   const totalQty=rows.reduce((s,[,v])=>s+v.qty,0);
   const totalKg=rows.reduce((s,[,v])=>s+v.kg,0);
   el.innerHTML=`<div id="tqtyPrintArea">
-    <div style="font-family:var(--mono);font-size:.65rem;color:var(--teal);padding:4px 0 10px;letter-spacing:.08em">TENDER — ${new Date().toLocaleDateString()}</div>
+    <div style="font-family:var(--mono);font-size:.62rem;color:var(--teal);padding:4px 0 8px;letter-spacing:.08em">TENDER — ${new Date().toLocaleDateString()}</div>
     <table style="width:100%;border-collapse:collapse">
       <thead>
-        <tr style="border-bottom:1.5px solid var(--b2)">
-          <th style="text-align:left;padding:7px 4px;font-size:.7rem;color:var(--muted)">GOODS</th>
-          <th style="text-align:right;padding:7px 4px;font-size:.7rem;color:var(--muted)">SIZE</th>
-          <th style="text-align:right;padding:7px 4px;font-size:.7rem;color:var(--muted)">QTY</th>
-          <th style="text-align:right;padding:7px 4px;font-size:.7rem;color:var(--muted)">KG</th>
+        <tr style="border-bottom:2px solid var(--b2)">
+          <th style="text-align:left;padding:6px 8px;font-size:.7rem;color:var(--muted);font-weight:700;text-transform:uppercase">GOODS</th>
+          <th style="text-align:right;padding:6px 6px;font-size:.7rem;color:var(--muted);font-weight:700">SIZE</th>
+          <th style="text-align:right;padding:6px 6px;font-size:.7rem;color:var(--muted);font-weight:700">QTY</th>
+          <th style="text-align:right;padding:6px 8px;font-size:.7rem;color:var(--muted);font-weight:700">KG</th>
         </tr>
       </thead>
       <tbody>
         ${rows.map(([p,v])=>`
           <tr style="border-bottom:1px solid var(--b1)">
-            <td style="padding:8px 4px;font-size:.8rem;color:var(--txt)">${p}</td>
-            <td style="padding:8px 4px;font-size:.8rem;color:var(--muted);text-align:right">${v.size||''}</td>
-            <td style="padding:8px 4px;font-size:.8rem;color:var(--blue2);text-align:right;font-family:var(--mono)">${v.qty}</td>
-            <td style="padding:8px 4px;font-size:.8rem;color:var(--teal);text-align:right;font-family:var(--mono)">${v.kg%1===0?v.kg:v.kg.toFixed(1)}</td>
+            <td style="padding:10px 8px;font-size:1rem;color:var(--txt);font-weight:500">${p}</td>
+            <td style="padding:10px 6px;font-size:.95rem;color:var(--muted);text-align:right">${v.size||''}</td>
+            <td style="padding:10px 6px;font-size:1.1rem;color:var(--blue2);text-align:right;font-family:var(--mono);font-weight:800">${v.qty}</td>
+            <td style="padding:10px 8px;font-size:1.1rem;color:var(--teal);text-align:right;font-family:var(--mono);font-weight:800">${v.kg%1===0?v.kg:v.kg.toFixed(1)}</td>
           </tr>`).join('')}
       </tbody>
       <tfoot>
-        <tr style="border-top:2px solid var(--b2)">
-          <td colspan="2" style="padding:9px 4px;font-size:.82rem;font-weight:700;color:var(--txt)">TOTAL</td>
-          <td style="padding:9px 4px;font-size:.82rem;font-weight:800;color:var(--blue2);text-align:right;font-family:var(--mono)">${totalQty}</td>
-          <td style="padding:9px 4px;font-size:.82rem;font-weight:800;color:var(--teal);text-align:right;font-family:var(--mono)">${totalKg%1===0?totalKg:totalKg.toFixed(1)}</td>
+        <tr style="border-top:2.5px solid var(--b2);background:var(--s2)">
+          <td colspan="2" style="padding:11px 8px;font-size:1rem;font-weight:800;color:var(--txt)">TOTAL</td>
+          <td style="padding:11px 6px;font-size:1.1rem;font-weight:900;color:var(--blue2);text-align:right;font-family:var(--mono)">${totalQty}</td>
+          <td style="padding:11px 8px;font-size:1.1rem;font-weight:900;color:var(--teal);text-align:right;font-family:var(--mono)">${totalKg%1===0?totalKg:totalKg.toFixed(1)}</td>
         </tr>
       </tfoot>
     </table>
