@@ -435,7 +435,7 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     </div>
     <div class="set-section" id="ss-d">
     <div class="set-card">
-      <div class="sch"><span class="sch-t">Drivers</span><span class="badge" id="dCnt">0</span><button class="btn btn-ghost btn-sm" style="font-size:.65rem;padding:2px 7px" onclick="sortList('d')">A→Z</button></div>
+      <div class="sch"><span class="sch-t">Drivers</span><span class="badge" id="dCnt">0</span><button class="btn btn-ghost btn-sm" style="font-size:.65rem;padding:2px 7px" onclick="sortList('d')">A→Z</button><button class="btn btn-teal btn-sm" style="font-size:.65rem;padding:2px 7px" id="syncDrvBtn" onclick="syncDriversFromProduction()">↻ Sync</button></div>
       <div class="slist" id="drvSL"></div>
       <div class="add-row">
         <input type="text" id="addDI" placeholder="New driver..." onkeydown="if(event.key='Enter')addDriver()"/>
@@ -506,6 +506,39 @@ function sortedProds(list){return[...list].sort((a,b)=>(freq[b]||0)-(freq[a]||0)
   renderSettC();renderSettP();renderSettD();renderSettTP();
 })();
 
+async function syncDriversFromProduction(){
+  const btn=document.getElementById('syncDrvBtn');
+  btn.textContent='⏳...';btn.disabled=true;
+  try{
+    const token=await getODToken();
+    const fileRes=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,{
+      headers:{'Authorization':'Bearer '+token}
+    });
+    if(!fileRes.ok) throw new Error('production.xlsm not found');
+    const fileData=await fileRes.json();
+    const fileId=fileData.id;
+    // Get O4:O14 from Data sheet
+    const rangeRes=await fetch(
+      `https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/workbook/worksheets/Data/range(address='O4:O14')`,
+      {headers:{'Authorization':'Bearer '+token}}
+    );
+    if(!rangeRes.ok) throw new Error('Could not read Data sheet');
+    const rangeData=await rangeRes.json();
+    const names=rangeData.values
+      .flat()
+      .map(v=>String(v||'').trim())
+      .filter(v=>v&&v!=='0'&&v!=='null');
+    if(!names.length) throw new Error('No drivers found in O4:O14');
+    drivers=[...new Set(names)];
+    LS.set('iat_d',drivers);
+    renderSettD();
+    toast(`✓ Synced ${drivers.length} drivers`,'ok');
+  }catch(e){
+    toast('Error: '+e.message,'err');
+  }finally{
+    btn.textContent='↻ Sync';btn.disabled=false;
+  }
+}
 function sortList(type){
   if(type==='c'){customers.sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase()));LS.set('iat_c',customers);renderSettC();}
   else if(type==='p'){products.sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase()));LS.set('iat_p',products);renderSettP();}
@@ -791,32 +824,100 @@ async function getODToken(){
   return res.accessToken;
 }
 
+// Column mapping: col letter -> Excel col number (A=1)
+function colNum(l){let r=0;for(const c of l.toUpperCase())r=r*26+(c.charCodeAt(0)-64);return r;}
+
+// Loading sheet column mapping (1-based)
+const LOADING={
+  driver:   [colNum('AI')],
+  customer: [colNum('AL'),colNum('AM')],
+  product:  [colNum('AN')],
+  qty:      [colNum('AO')],
+  size:     [colNum('AP')],
+  note:     [colNum('AQ')],
+  startRow: 5
+};
+const PRODUCTION_PATH='production/production.xlsm';
+
 async function saveToOneDrive(){
   if(!orders.length){toast('No orders to export','err');return;}
   const btn=document.getElementById('odBtn');
   btn.textContent='⏳ Saving...';btn.disabled=true;
   try{
     const token=await getODToken();
+
+    // 1. حفظ orders2026.xlsx كالعادة
     const rows=[['Driver','Customer','','Product','Qty (kg)','Size (g)','Notes']];
     orders.forEach(o=>rows.push([o.driver||'',o.customer,'',o.product,o.qty,o.size||'',o.note||'']));
     const ws=XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols']=[{wch:30},{wch:4},{wch:22},{wch:10},{wch:10},{wch:28}];
+    ws['!cols']=[{wch:15},{wch:30},{wch:4},{wch:22},{wch:10},{wch:10},{wch:28}];
     const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Orders');
     const wbout=XLSX.write(wb,{bookType:'xlsx',type:'array'});
     const blob=new Blob([wbout],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-    // Upload/replace file on OneDrive
-    const res=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${OD_FILE}:/content`,{
+    const r1=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${OD_FILE}:/content`,{
       method:'PUT',
       headers:{'Authorization':'Bearer '+token,'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'},
       body:blob
     });
-    if(res.ok){toast('✓ Saved to OneDrive!','ok');}
-    else{throw new Error('Upload failed');}
+    if(!r1.ok) throw new Error('orders2026 upload failed');
+
+    // 2. كتابة البيانات مباشرة لشيت Loading بـ production.xlsm
+    btn.textContent='⏳ Writing Loading...';
+    await writeToLoadingSheet(token);
+
+    toast('✓ Saved to OneDrive + Loading!','ok');
   }catch(e){
     if(e.message!=='user_cancelled')toast('Error: '+e.message,'err');
   }finally{
     btn.textContent='☁ Save to OneDrive';btn.disabled=false;
   }
+}
+
+async function writeToLoadingSheet(token){
+  // جيب workbook ID لـ production.xlsm
+  const fileRes=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,{
+    headers:{'Authorization':'Bearer '+token}
+  });
+  if(!fileRes.ok) throw new Error('production.xlsm not found');
+  const fileData=await fileRes.json();
+  const fileId=fileData.id;
+  const baseUrl=`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/workbook/worksheets/Loading/`;
+
+  // امسح الأعمدة القديمة أولاً
+  const clearCols=['AN','AI','AL','AM','AO','AP','AQ'];
+  const n=orders.length;
+  const endRow=LOADING.startRow+n+10;
+  for(const col of clearCols){
+    try{
+      await fetch(`${baseUrl}range(address='${col}${LOADING.startRow}:${col}${endRow}')`,{
+        method:'PATCH',
+        headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+        body:JSON.stringify({values:Array(endRow-LOADING.startRow+1).fill([''])})
+      });
+    }catch(e){}
+  }
+
+  // اكتب البيانات عمود عمود
+  const colData={
+    'AN': orders.map(o=>[o.product||'']),
+    'AI': orders.map(o=>[o.driver||'']),
+    'AL': orders.map(o=>[o.customer||'']),
+    'AM': orders.map(o=>[o.customer||'']),
+    'AO': orders.map(o=>[parseFloat(o.qty)||0]),
+    'AP': orders.map(o=>[o.size||'']),
+    'AQ': orders.map(o=>[o.note||''])
+  };
+
+  for(const [col,vals] of Object.entries(colData)){
+    const startAddr=`${col}${LOADING.startRow}`;
+    const endAddr=`${col}${LOADING.startRow+n-1}`;
+    await fetch(`${baseUrl}range(address='${startAddr}:${endAddr}')`,{
+      method:'PATCH',
+      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:JSON.stringify({values:vals})
+    });
+  }
+  console.log(`✓ Written ${n} rows to Loading sheet`);
 }
 
 // ── PRINT ──
