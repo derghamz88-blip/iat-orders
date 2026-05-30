@@ -320,6 +320,7 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
   <div class="exp-bar">
     <button class="btn btn-red btn-sm" onclick="clearAll()">🗑 Clear All</button>
     <button class="btn btn-ghost btn-sm" onclick="exportXL()">⬇ Excel</button>
+    <button class="btn btn-ghost btn-sm" onclick="openAIImport()" style="color:var(--teal)">🤖 AI</button>
     <button class="btn btn-blue btn-sm" onclick="showPrintDlg()">🖨 Print</button>
     <button class="btn btn-purple btn-sm" onclick="printDrivers()">🚗 Drivers</button>
     <button class="btn btn-teal" onclick="saveToOneDrive()" id="odBtn">☁ Save to OneDrive</button>
@@ -533,6 +534,42 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
       <div id="custGroupList" style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto"></div>
     </div>
     </div>
+  </div>
+</div>
+
+<!-- ══ AI IMPORT OVERLAY ══ -->
+<div class="ov" id="aiImportOv" onclick="closeAIImport()">
+  <div class="cb2" onclick="event.stopPropagation()" style="max-height:85vh;overflow-y:auto;display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:.85rem;font-weight:700;color:var(--blue2)">🤖 AI Import Orders</div>
+      <button class="btn btn-ghost btn-sm" onclick="closeAIImport()">✕</button>
+    </div>
+    <!-- Tabs -->
+    <div style="display:flex;gap:4px;background:var(--s3);border-radius:8px;padding:3px">
+      <button id="aiTab-text" class="btn btn-teal btn-sm" style="flex:1;font-size:.72rem" onclick="switchAITab('text')">📝 Text</button>
+      <button id="aiTab-img" class="btn btn-ghost btn-sm" style="flex:1;font-size:.72rem" onclick="switchAITab('img')">🖼 Image</button>
+    </div>
+    <!-- Text input -->
+    <div id="aiTextSection">
+      <textarea id="aiTextInput" placeholder="Paste WhatsApp order text here...&#10;&#10;Example:&#10;UNION Barsha&#10;Chicken 20kg&#10;Breast 5kg" style="width:100%;height:140px;background:var(--s3);border:1.5px solid var(--b2);border-radius:8px;padding:10px;color:var(--txt);font-family:var(--sans);font-size:.82rem;outline:none;resize:none;box-sizing:border-box"></textarea>
+    </div>
+    <!-- Image input -->
+    <div id="aiImgSection" style="display:none">
+      <input type="file" id="aiImgInput" accept="image/*" style="display:none" onchange="previewAIImg(this)"/>
+      <div onclick="document.getElementById('aiImgInput').click()" style="border:2px dashed var(--b2);border-radius:8px;padding:20px;text-align:center;cursor:pointer;color:var(--muted);font-size:.8rem">
+        📷 Tap to upload image
+      </div>
+      <img id="aiImgPreview" style="display:none;width:100%;border-radius:8px;margin-top:8px;max-height:200px;object-fit:contain"/>
+    </div>
+    <!-- Extract button -->
+    <button class="btn btn-teal" id="aiExtractBtn" onclick="extractOrdersAI()">🤖 Extract Orders</button>
+    <!-- Results -->
+    <div id="aiResults" style="display:none">
+      <div style="font-size:.72rem;color:var(--muted);font-family:var(--mono);margin-bottom:6px">EXTRACTED ORDERS — Review & Edit</div>
+      <div id="aiResultItems" style="display:flex;flex-direction:column;gap:5px"></div>
+      <button class="btn btn-teal" style="margin-top:8px;width:100%" onclick="addAIOrdersToEntry()">➕ Add to Orders</button>
+    </div>
+    <div id="aiStatus" style="font-size:.75rem;color:var(--muted);text-align:center"></div>
   </div>
 </div>
 
@@ -2174,6 +2211,138 @@ function renderCustGroupList(){
     </div>`).join('');
 }
 function setCustGroup(c,gid){custGroups[c]=gid;LS.set('iat_cg',custGroups);}
+
+// ══ AI IMPORT ══
+let aiImgData=null;
+let aiImgType=null;
+let aiExtracted=[];
+
+function openAIImport(){document.getElementById('aiImportOv').classList.add('on');}
+function closeAIImport(){document.getElementById('aiImportOv').classList.remove('on');}
+
+function switchAITab(tab){
+  document.getElementById('aiTextSection').style.display=tab==='text'?'block':'none';
+  document.getElementById('aiImgSection').style.display=tab==='img'?'block':'none';
+  document.getElementById('aiTab-text').className=tab==='text'?'btn btn-teal btn-sm':'btn btn-ghost btn-sm';
+  document.getElementById('aiTab-img').className=tab==='img'?'btn btn-teal btn-sm':'btn btn-ghost btn-sm';
+  document.getElementById('aiTab-text').style.flex='1';
+  document.getElementById('aiTab-text').style.fontSize='.72rem';
+  document.getElementById('aiTab-img').style.flex='1';
+  document.getElementById('aiTab-img').style.fontSize='.72rem';
+}
+
+function previewAIImg(input){
+  const file=input.files[0];
+  if(!file)return;
+  aiImgType=file.type;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    aiImgData=e.target.result.split(',')[1];
+    const preview=document.getElementById('aiImgPreview');
+    preview.src=e.target.result;
+    preview.style.display='block';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function extractOrdersAI(){
+  const btn=document.getElementById('aiExtractBtn');
+  const status=document.getElementById('aiStatus');
+  btn.disabled=true;btn.textContent='⏳ Analyzing...';
+  status.textContent='';
+  document.getElementById('aiResults').style.display='none';
+
+  const isImg=document.getElementById('aiImgSection').style.display!=='none';
+  const text=document.getElementById('aiTextInput').value.trim();
+
+  if(!isImg&&!text){toast('Enter text or upload image','err');btn.disabled=false;btn.textContent='🤖 Extract Orders';return;}
+  if(isImg&&!aiImgData){toast('Upload an image first','err');btn.disabled=false;btn.textContent='🤖 Extract Orders';return;}
+
+  try{
+    const custList=customers.join(', ');
+    const prodList=products.join(', ');
+    const systemPrompt=`You are an order extraction assistant. Extract orders from the provided text or image.
+Known customers: ${custList}
+Known products: ${prodList}
+
+Return ONLY a JSON array, no markdown, no explanation:
+[{"customer":"exact customer name","product":"exact product name","qty":number,"note":"optional note"}]
+
+Rules:
+- Match customer names to the known list (closest match)
+- Match product names to the known list (closest match)  
+- qty must be a number (kg)
+- If multiple products for same customer, create separate entries
+- Return [] if nothing found`;
+
+    let messages;
+    if(isImg){
+      messages=[{role:'user',content:[
+        {type:'image',source:{type:'base64',media_type:aiImgType,data:aiImgData}},
+        {type:'text',text:'Extract all orders from this image. Return JSON only.'}
+      ]}];
+    } else {
+      messages=[{role:'user',content:`Extract orders from this text:\n\n${text}\n\nReturn JSON only.`}];
+    }
+
+    const response=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        system:systemPrompt,
+        messages
+      })
+    });
+    const data=await response.json();
+    const raw=data.content?.map(i=>i.text||'').join('').trim();
+    const clean=raw.replace(/```json|```/g,'').trim();
+    aiExtracted=JSON.parse(clean);
+
+    if(!aiExtracted.length){status.textContent='No orders found. Try again.';btn.disabled=false;btn.textContent='🤖 Extract Orders';return;}
+
+    renderAIResults();
+    document.getElementById('aiResults').style.display='block';
+    status.textContent=`✓ Found ${aiExtracted.length} items`;
+  }catch(e){
+    status.textContent='Error: '+e.message;
+  }finally{
+    btn.disabled=false;btn.textContent='🤖 Extract Orders';
+  }
+}
+
+function renderAIResults(){
+  document.getElementById('aiResultItems').innerHTML=aiExtracted.map((item,i)=>`
+    <div style="background:var(--s3);border:1px solid var(--b2);border-radius:8px;padding:8px 10px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      <input value="${esc2(item.customer)}" style="flex:2;min-width:100px;background:var(--s2);border:1px solid var(--b2);border-radius:5px;padding:4px 7px;color:var(--blue2);font-size:.78rem;outline:none" onchange="aiExtracted[${i}].customer=this.value" placeholder="Customer"/>
+      <input value="${esc2(item.product)}" style="flex:2;min-width:80px;background:var(--s2);border:1px solid var(--b2);border-radius:5px;padding:4px 7px;color:var(--txt);font-size:.78rem;outline:none" onchange="aiExtracted[${i}].product=this.value" placeholder="Product"/>
+      <input type="number" value="${item.qty}" min="0" step="0.5" style="width:55px;background:var(--s2);border:1px solid var(--b2);border-radius:5px;padding:4px 6px;color:var(--amber);font-size:.78rem;outline:none;text-align:center" onchange="aiExtracted[${i}].qty=parseFloat(this.value)||0"/>
+      <button class="pr-del" onclick="aiExtracted.splice(${i},1);renderAIResults()">✕</button>
+    </div>`).join('');
+}
+
+function addAIOrdersToEntry(){
+  if(!aiExtracted.length){toast('No items','err');return;}
+  const date=todayStr();
+  const maxNum=orders.filter(o=>o.date===date).reduce((m,o)=>Math.max(m,o.num||0),0);
+  const custNums=new Map();
+  let num=maxNum;
+  aiExtracted.forEach(item=>{
+    if(!custNums.has(item.customer)){num++;custNums.set(item.customer,num);}
+    orders.push({customer:item.customer,product:item.product,qty:item.qty||1,size:'',note:item.note||'',date,num:custNums.get(item.customer),driver:''});
+  });
+  saveOrders();
+  renderOrders();
+  updateBadges();
+  closeAIImport();
+  toast(`✓ Added ${aiExtracted.length} items to Orders`,'ok');
+  // Switch to orders tab
+  document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  document.getElementById('pg-orders').classList.add('on');
+  document.querySelector('[onclick*="orders"]').classList.add('on');
+}
 
 function hi(t,q){if(!q)return t;return t.replace(new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi'),'<mark>$1</mark>');}
 function esc(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
