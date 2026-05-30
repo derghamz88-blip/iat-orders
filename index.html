@@ -224,6 +224,7 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
   <div class="ntab" onclick="showPage('qty',this)">📊 Qty</div>
   <div class="ntab" onclick="showPage('tender',this)">🏷 Tender</div>
   <div class="ntab" onclick="showPage('tqty',this)">📊 T.Qty</div>
+  <div class="ntab" onclick="showPage('invoice',this)">🧾 Invoice</div>
   <div class="ntab" onclick="showPage('settings',this)">⚙️ Settings</div>
 </nav>
 
@@ -408,6 +409,75 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
   <div style="flex:1;overflow-y:auto;padding:12px" id="tqtyList"></div>
 </div>
 
+
+<!-- ══ INVOICE PAGE ══ -->
+<div class="page" id="pg-invoice">
+  <div style="flex:1;overflow-y:auto;padding:0;display:flex;flex-direction:column">
+    <!-- Tabs inside invoice -->
+    <div style="display:flex;border-bottom:1px solid var(--b1);background:var(--s1);flex-shrink:0">
+      <div class="stab on" id="itab-new" onclick="showInvTab('new')" style="font-size:.72rem;padding:8px 14px">➕ New</div>
+      <div class="stab" id="itab-list" onclick="showInvTab('list')" style="font-size:.72rem;padding:8px 14px">📋 Invoices</div>
+      <div class="stab" id="itab-pricing" onclick="showInvTab('pricing')" style="font-size:.72rem;padding:8px 14px">💰 Pricing</div>
+    </div>
+
+    <!-- New Invoice - Orders list -->
+    <div id="inv-new" style="flex:1;overflow-y:auto;padding:0;display:flex;flex-direction:column">
+      <!-- Orders list -->
+      <div id="invOrdersView" style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:6px">
+        <div style="font-size:.65rem;font-family:var(--mono);color:var(--muted);letter-spacing:.1em;margin-bottom:4px">SELECT ORDER TO INVOICE</div>
+        <div id="invOrdersList"></div>
+      </div>
+      <!-- Invoice detail -->
+      <div id="invDetailView" style="flex:1;overflow-y:auto;padding:12px;display:none;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <button class="btn btn-ghost btn-sm" onclick="backToOrders()" style="font-size:.7rem">← Back</button>
+          <div style="font-size:.68rem;color:var(--muted);font-family:var(--mono);flex:1" id="invNumLabel"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="font-size:.85rem;font-weight:700;color:var(--blue2);flex:1" id="invCustTitle"></div>
+          <select id="invGroupSel" style="background:var(--s3);border:1.5px solid var(--amber);border-radius:7px;padding:5px 8px;color:var(--amber);font-family:var(--sans);font-size:.75rem;outline:none;max-width:120px" onchange="applyGroupToInv(this.value)">
+            <option value="">No group</option>
+          </select>
+        </div>
+        <div id="invItems" style="display:flex;flex-direction:column;gap:4px"></div>
+        <div style="background:var(--s2);border-radius:var(--r);padding:10px 12px;margin-top:4px">
+          <div style="display:flex;justify-content:space-between;font-size:.82rem;color:var(--muted);margin-bottom:4px">
+            <span>Subtotal</span><span id="invSubtotal">0.00 AED</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:.82rem;color:var(--muted);margin-bottom:6px">
+            <span>VAT 5%</span><span id="invVat">0.00 AED</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:1rem;font-weight:800;color:var(--teal)">
+            <span>TOTAL</span><span id="invTotal">0.00 AED</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-teal" style="flex:1" onclick="previewInvoice()">👁 Preview & Print</button>
+          <button class="btn btn-blue btn-sm" onclick="saveInvoice()">💾 Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Invoices List -->
+    <div id="inv-list" style="flex:1;overflow-y:auto;padding:12px;display:none;flex-direction:column;gap:8px">
+      <div style="display:flex;gap:7px;margin-bottom:8px">
+        <button class="btn btn-teal btn-sm" style="flex:1" onclick="exportAllInvoicesPDF()">⬇ All Invoices PDF</button>
+        <button class="btn btn-blue btn-sm" onclick="saveAllInvoicesOneDrive()">☁ Save to OneDrive</button>
+      </div>
+      <div id="invListContent"></div>
+    </div>
+
+    <!-- Pricing -->
+    <div id="inv-pricing" style="flex:1;overflow-y:auto;padding:12px;display:none;flex-direction:column;gap:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:.65rem;font-family:var(--mono);color:var(--muted)">PRICE GROUPS</div>
+        <button class="btn btn-teal btn-sm" onclick="addPriceGroup()">+ Add Group</button>
+      </div>
+      <div id="pgList" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ══ SETTINGS PAGE ══ -->
 <div class="page" id="pg-settings">
   <div style="background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;flex-shrink:0">
@@ -415,6 +485,7 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     <div class="stab" id="stab-p" onclick="showSTab('p')">🍗 Products</div>
     <div class="stab" id="stab-tp" onclick="showSTab('tp')">🏷 Tender</div>
     <div class="stab" id="stab-d" onclick="showSTab('d')">🚗 Drivers</div>
+    <div class="stab" id="stab-pg" onclick="showSTab('pg')">💰 Pricing</div>
   </div>
   <div class="set-body">
     <div class="set-section on" id="ss-c">
@@ -453,6 +524,13 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
         <input type="text" id="addDI" placeholder="New driver..." onkeydown="if(event.key='Enter')addDriver()"/>
         <button class="btn btn-teal btn-sm" onclick="addDriver()">Add</button>
       </div>
+    </div>
+    </div>
+    <div class="set-section" id="ss-pg">
+    <div class="set-card">
+      <div class="sch"><span class="sch-t">Customer Groups</span></div>
+      <div style="font-size:.75rem;color:var(--muted);margin-bottom:8px">Assign each customer to a price group</div>
+      <div id="custGroupList" style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto"></div>
     </div>
     </div>
   </div>
@@ -497,6 +575,9 @@ let customers=LS.get('iat_c',DC);
 let products=LS.get('iat_p',DP);
 let freq=LS.get('iat_freq',{});
 let drivers=LS.get('iat_d',[]);
+let priceGroups=LS.get('iat_pg',[]); // [{id,name,prices:{product:price},unit:{product:'kg'|'tray'}}]
+let custGroups=LS.get('iat_cg',{});  // {customer: groupId}
+let invoices=LS.get('iat_inv',[]);   // saved invoices
 const DTP=["KG","Zaki 400gr","Zaki 450gr","Zaki 500gr","Chickenco 400gr","Chickenco 450gr","Chickenco 500gr"];
 let tenderProds=LS.get('iat_tp',DTP);
 let tenderOrders=[];
@@ -573,9 +654,10 @@ function showPage(n,t){
   if(n==='orders')renderOrders();
   if(n==='drivers')renderDriversPage();
   if(n==='qty')renderQtyPage();
+  if(n==='invoice'){renderInvOrdersList();renderPricingPage();renderInvoiceList();}
   if(n==='tender'){renderTCustDL(customers);renderTPList('');}
   if(n==='tqty')renderTQtyPage();
-  if(n==='settings'){renderSettC();renderSettP();renderSettD();renderSettTP();}
+  if(n==='settings'){renderSettC();renderSettP();renderSettD();renderSettTP();renderCustGroupList();}
 }
 
 
@@ -1684,6 +1766,414 @@ function togTPE(i){document.getElementById('tpsi'+i).classList.toggle('editing')
 function saveTPE(i){const v=document.getElementById('tpsi'+i).querySelector('input').value.trim();if(!v)return;tenderProds[i]=v;LS.set('iat_tp',tenderProds);renderSettTP();toast('✓','ok');}
 function delTP(i){confDlg(`Delete "${tenderProds[i]}"?`,()=>{tenderProds.splice(i,1);LS.set('iat_tp',tenderProds);renderSettTP();toast('Deleted','ok');});}
 function addTenderProd(){const v=document.getElementById('addTPI').value.trim();if(!v)return;if(tenderProds.includes(v)){toast('Exists','err');return;}tenderProds.push(v);LS.set('iat_tp',tenderProds);renderSettTP();document.getElementById('addTPI').value='';toast('✓ Added','ok');}
+
+
+// ══ INVOICE SYSTEM ══
+
+let invSelCust=null;
+let invSelOrder=null;
+let invItems=[];
+let invCOpen=false;
+
+function showInvTab(t){
+  document.querySelectorAll('[id^="itab-"]').forEach(s=>s.classList.remove('on'));
+  document.getElementById('itab-'+t).classList.add('on');
+  document.getElementById('inv-new').style.display=t==='new'?'flex':'none';
+  document.getElementById('inv-list').style.display=t==='list'?'flex':'none';
+  document.getElementById('inv-pricing').style.display=t==='pricing'?'flex':'none';
+  if(t==='list')renderInvoiceList();
+  if(t==='pricing')renderPricingPage();
+}
+
+
+
+// ── Orders list for invoice ──
+function renderInvOrdersList(){
+  const el=document.getElementById('invOrdersList');
+  if(!orders.length){el.innerHTML='<div class="empty"><div class="ei">📋</div><p>No orders yet.</p></div>';return;}
+  // Group by customer+num
+  const seen=new Map();
+  [...orders].sort((a,b)=>(a.num||0)-(b.num||0)).forEach(o=>{
+    const key=`${o.num}_${o.customer}`;
+    if(!seen.has(key))seen.set(key,{num:o.num,date:o.date,customer:o.customer,items:[]});
+    seen.get(key).items.push(o);
+  });
+  el.innerHTML=[...seen.values()].map(ord=>{
+    const grpId=custGroups[ord.customer]||'';
+    const grp=priceGroups.find(g=>g.id===grpId);
+    const hasPrice=grp&&Object.keys(grp.prices||{}).length>0;
+    return `<div style="background:var(--s2);border:1.5px solid var(--b1);border-radius:var(--r);padding:10px 12px;cursor:pointer;margin-bottom:5px" onclick="selInvOrder('${esc(ord.customer)}',${ord.num})">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+        <span style="font-family:var(--mono);font-size:.75rem;color:var(--amber);font-weight:700">#${ord.num}</span>
+        <span style="font-size:.68rem;color:var(--muted)">${ord.date||''}</span>
+        ${hasPrice?'<span style="font-size:.65rem;color:var(--teal);background:var(--s3);padding:1px 6px;border-radius:4px">✓ Priced</span>':'<span style="font-size:.65rem;color:var(--muted)">No price</span>'}
+      </div>
+      <div style="font-size:.85rem;font-weight:700;color:var(--txt)">👤 ${ord.customer}</div>
+      <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${ord.items.length} items</div>
+    </div>`;
+  }).join('');
+}
+
+function backToOrders(){
+  document.getElementById('invOrdersView').style.display='flex';
+  document.getElementById('invDetailView').style.display='none';
+}
+
+function selInvOrder(cust,num){
+  invSelCust=cust;
+  invSelOrder=num;
+  // Populate group selector
+  const sel=document.getElementById('invGroupSel');
+  if(sel){
+    const curGrp=custGroups[cust]||'';
+    sel.innerHTML='<option value="">No group</option>'+
+      priceGroups.map(g=>`<option value="${g.id}"${curGrp===g.id?' selected':''}>${g.name}</option>`).join('');
+  }
+  buildInvItems();
+  document.getElementById('invCustTitle').textContent='👤 '+cust;
+  document.getElementById('invOrdersView').style.display='none';
+  document.getElementById('invDetailView').style.display='flex';
+}
+
+function applyGroupToInv(gid){
+  // Save group for this customer
+  custGroups[invSelCust]=gid;
+  LS.set('iat_cg',custGroups);
+  // Reload prices
+  buildInvItems();
+  toast('✓ Group applied & saved','ok');
+}
+
+// ── Build invoice items ──
+function buildInvItems(){
+  const custOrd=orders.filter(o=>o.customer===invSelCust&&o.num===invSelOrder);
+  if(!custOrd.length){toast('No items found','err');return;}
+  const grpId=custGroups[invSelCust]||'';
+  const grp=priceGroups.find(g=>g.id===grpId)||null;
+  invItems=custOrd.map(o=>({
+    product:o.product,
+    qty:parseFloat(o.qty)||0,
+    unit:grp?.unit?.[o.product]||'kg',
+    price:grp?.prices?.[o.product]||0,
+    total:0
+  }));
+  invItems.forEach(i=>i.total=parseFloat((i.qty*i.price).toFixed(2)));
+  const d=new Date();
+  const invNum=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}-${invSelOrder}`;
+  const lbl=document.getElementById('invNumLabel');
+  if(lbl)lbl.textContent='INV# '+invNum;
+  renderInvItems();
+}
+
+function renderInvItems(){
+  document.getElementById('invItems').innerHTML=invItems.map((item,i)=>`
+    <div style="background:var(--s2);border:1px solid var(--b1);border-radius:8px;padding:8px 10px">
+      <div style="font-size:.82rem;font-weight:700;color:var(--txt);margin-bottom:5px">${item.product}</div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <div style="flex:1">
+          <div style="font-size:.6rem;color:var(--muted);margin-bottom:2px">QTY</div>
+          <input type="number" value="${item.qty}" min="0" step="0.5" style="width:100%;background:var(--s3);border:1px solid var(--b2);border-radius:5px;padding:4px 6px;color:var(--txt);font-size:.8rem;outline:none" oninput="updInvQty(${i},this.value)"/>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:.6rem;color:var(--muted);margin-bottom:2px">UNIT</div>
+          <select style="width:100%;background:var(--s3);border:1px solid var(--b2);border-radius:5px;padding:4px;color:var(--txt);font-size:.75rem;outline:none" onchange="updInvUnit(${i},this.value)">
+            <option value="kg"${item.unit==='kg'?' selected':''}>kg</option>
+            <option value="tray"${item.unit==='tray'?' selected':''}>tray</option>
+          </select>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:.6rem;color:var(--muted);margin-bottom:2px">PRICE</div>
+          <input type="number" value="${item.price}" min="0" step="0.01" style="width:100%;background:var(--s3);border:1px solid var(--b2);border-radius:5px;padding:4px 6px;color:var(--amber);font-size:.8rem;outline:none" oninput="updInvPrice(${i},this.value)"/>
+        </div>
+        <div style="min-width:56px;text-align:right">
+          <div style="font-size:.6rem;color:var(--muted);margin-bottom:2px">TOTAL</div>
+          <div style="font-size:.85rem;font-weight:700;color:var(--teal);font-family:var(--mono)">${item.total.toFixed(2)}</div>
+        </div>
+      </div>
+    </div>`).join('');
+  updateInvTotals();
+}
+
+function updInvQty(i,v){invItems[i].qty=parseFloat(v)||0;invItems[i].total=parseFloat((invItems[i].qty*invItems[i].price).toFixed(2));renderInvItems();}
+function updInvPrice(i,v){invItems[i].price=parseFloat(v)||0;invItems[i].total=parseFloat((invItems[i].qty*invItems[i].price).toFixed(2));renderInvItems();}
+function updInvUnit(i,v){invItems[i].unit=v;}
+
+function updateInvTotals(){
+  const sub=invItems.reduce((s,i)=>s+i.total,0);
+  const vat=sub*0.05;
+  const tot=sub+vat;
+  document.getElementById('invSubtotal').textContent=sub.toFixed(2)+' AED';
+  document.getElementById('invVat').textContent=vat.toFixed(2)+' AED';
+  document.getElementById('invTotal').textContent=tot.toFixed(2)+' AED';
+}
+
+// ── Preview & Save ──
+function getInvData(){
+  const d=new Date();
+  return {
+    num:`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}-${invSelOrder}`,
+    date:d.toLocaleDateString('en-GB'),
+    customer:invSelCust,
+    orderNum:invSelOrder,
+    items:[...invItems],
+    sub:invItems.reduce((s,i)=>s+i.total,0)
+  };
+}
+
+function previewInvoice(){
+  if(!invItems.length){toast('No items','err');return;}
+  const inv=getInvData();
+  const vat=inv.sub*0.05;
+  const tot=inv.sub+vat;
+  const win=window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html><head><title>Invoice ${inv.num}</title>
+  <style>
+    @page{margin:15mm;size:A4}
+    body{font-family:Arial,sans-serif;color:#000;font-size:14px}
+    .header{display:flex;justify-content:space-between;border-bottom:3px solid #000;padding-bottom:12px;margin-bottom:16px}
+    .header h1{margin:0;font-size:24px;font-weight:900}
+    .header .inv-info{text-align:right;font-size:13px}
+    .inv-info p{margin:2px 0}
+    .cust-box{background:#f5f5f5;border-radius:6px;padding:10px 14px;margin-bottom:16px}
+    .cust-box strong{font-size:16px}
+    table{width:100%;border-collapse:collapse;margin-bottom:16px}
+    th{padding:9px 10px;background:#1a1a2e;color:#fff;text-align:left;font-size:13px}
+    th:last-child,th:nth-child(2),th:nth-child(3),th:nth-child(4){text-align:right}
+    td{padding:9px 10px;border-bottom:1px solid #eee;font-size:14px}
+    td:last-child,td:nth-child(2),td:nth-child(3),td:nth-child(4){text-align:right}
+    tr:nth-child(even) td{background:#fafafa}
+    .totals{width:250px;margin-left:auto}
+    .totals tr td{padding:6px 10px;font-size:14px}
+    .totals tr:last-child td{font-weight:900;font-size:16px;border-top:2px solid #000;color:#0a5c7a}
+    .footer{margin-top:20px;font-size:11px;color:#888;text-align:center;border-top:1px solid #ddd;padding-top:10px}
+  </style></head><body>
+  <div class="header">
+    <div>
+      <h1>INVOICE</h1>
+      <p style="margin:4px 0 0;color:#555;font-size:13px">IAT Production</p>
+    </div>
+    <div class="inv-info">
+      <p><strong>INV# ${inv.num}</strong></p>
+      <p>${inv.date}</p>
+      <p>Order #${inv.orderNum}</p>
+    </div>
+  </div>
+  <div class="cust-box">
+    <strong>${inv.customer}</strong>
+  </div>
+  <table>
+    <thead><tr><th>Product</th><th>Qty</th><th>Unit</th><th>Price</th><th>Total</th></tr></thead>
+    <tbody>
+      ${inv.items.map(i=>`<tr>
+        <td>${i.product}</td>
+        <td>${i.qty}</td>
+        <td>${i.unit}</td>
+        <td>${i.price.toFixed(2)} AED</td>
+        <td>${i.total.toFixed(2)} AED</td>
+      </tr>`).join('')}
+    </tbody>
+  </table>
+  <table class="totals">
+    <tr><td>Subtotal</td><td>${inv.sub.toFixed(2)} AED</td></tr>
+    <tr><td>VAT 5%</td><td>${vat.toFixed(2)} AED</td></tr>
+    <tr><td>TOTAL</td><td>${tot.toFixed(2)} AED</td></tr>
+  </table>
+  <div class="footer">IAT Production — Thank you for your business</div>
+  </body></html>`);
+  win.document.close();
+  win.focus();
+  setTimeout(()=>win.print(),400);
+}
+
+function saveInvoice(){
+  if(!invItems.length){toast('No items','err');return;}
+  const inv=getInvData();
+  inv.savedAt=Date.now();
+  invoices=invoices.filter(i=>i.num!==inv.num);
+  invoices.unshift(inv);
+  LS.set('iat_inv',invoices);
+  toast('✓ Invoice saved','ok');
+}
+
+async function saveAllInvoicesOneDrive(){
+  if(!invoices.length){toast('No invoices','err');return;}
+  const btn=event.target;
+  btn.textContent='⏳...';btn.disabled=true;
+  try{
+    const token=await getODToken();
+    const html=buildAllInvoicesHTML();
+    const blob=new Blob([html],{type:'text/html'});
+    const file=new File([blob],'invoices_all.html',{type:'text/html'});
+    // Try share API first
+    if(navigator.canShare&&navigator.canShare({files:[file]})){
+      await navigator.share({files:[file],title:'All Invoices'});
+      toast('✓ Shared','ok');
+    } else {
+      // Save as HTML to OneDrive
+      const res=await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/invoices_all.html:/content',{
+        method:'PUT',
+        headers:{'Authorization':'Bearer '+token,'Content-Type':'text/html'},
+        body:blob
+      });
+      if(res.ok)toast('✓ Saved to OneDrive!','ok');
+      else throw new Error('Upload failed');
+    }
+  }catch(e){
+    if(e.name!=='AbortError')toast('Error: '+e.message,'err');
+  }finally{
+    btn.textContent='☁ Save to OneDrive';btn.disabled=false;
+  }
+}
+
+function exportAllInvoicesPDF(){
+  if(!invoices.length){toast('No invoices','err');return;}
+  const win=window.open('','_blank');
+  win.document.write(buildAllInvoicesHTML());
+  win.document.close();
+  win.focus();
+  setTimeout(()=>win.print(),400);
+}
+
+function buildAllInvoicesHTML(){
+  const rows=invoices.map(inv=>{
+    const vat=inv.sub*0.05;
+    const tot=inv.sub+vat;
+    const itemRows=inv.items.map(i=>`<tr>
+      <td>${i.product}</td><td>${i.qty}</td><td>${i.unit}</td>
+      <td>${i.price.toFixed(2)}</td><td>${i.total.toFixed(2)}</td>
+    </tr>`).join('');
+    return `<div class="inv-block">
+      <div class="inv-head">
+        <div><strong>INV# ${inv.num}</strong><br><span style="font-size:12px;opacity:.8">${inv.date}</span></div>
+        <div style="text-align:right"><strong>${inv.customer}</strong><br><span style="font-size:12px">Order #${inv.orderNum}</span></div>
+      </div>
+      <table>
+        <thead><tr><th>Product</th><th>Qty</th><th>Unit</th><th>Price</th><th>Total</th></tr></thead>
+        <tbody>${itemRows}</tbody>
+        <tfoot>
+          <tr><td colspan="4">Subtotal</td><td>${inv.sub.toFixed(2)} AED</td></tr>
+          <tr><td colspan="4">VAT 5%</td><td>${vat.toFixed(2)} AED</td></tr>
+          <tr class="total-row"><td colspan="4"><strong>TOTAL</strong></td><td><strong>${tot.toFixed(2)} AED</strong></td></tr>
+        </tfoot>
+      </table>
+    </div>`;
+  }).join('');
+  return `<!DOCTYPE html><html><head><title>All Invoices</title>
+  <style>
+    @page{margin:12mm;size:A4}
+    body{font-family:Arial,sans-serif;color:#000;font-size:13px}
+    .inv-block{margin-bottom:24px;border:2px solid #000;border-radius:6px;overflow:hidden;page-break-after:always}
+    .inv-block:last-child{page-break-after:avoid}
+    .inv-head{background:#1a1a2e;color:#fff;padding:10px 14px;display:flex;justify-content:space-between}
+    table{width:100%;border-collapse:collapse}
+    th{padding:7px 10px;background:#f0f0f0;border-bottom:2px solid #000;font-size:12px;text-align:left}
+    th:nth-child(2),th:nth-child(3),th:nth-child(4),th:nth-child(5){text-align:right}
+    td{padding:7px 10px;border-bottom:1px solid #eee;font-size:13px}
+    td:nth-child(2),td:nth-child(3),td:nth-child(4),td:nth-child(5){text-align:right}
+    tfoot td{background:#f8f8f8;font-size:12px}
+    tfoot tr:last-child td{font-size:15px;font-weight:900;background:#eef8fc;border-top:2px solid #000}
+  </style></head><body>
+  <h2 style="margin:0 0 16px;font-size:20px">All Invoices — IAT Production</h2>
+  ${rows}
+  </body></html>`;
+}
+
+function renderInvoiceList(){
+  const el=document.getElementById('invListContent');
+  if(!invoices.length){el.innerHTML='<div class="empty"><div class="ei">🧾</div><p>No invoices yet.</p></div>';return;}
+  el.innerHTML=invoices.map(inv=>`
+    <div style="background:var(--s2);border:1.5px solid var(--b1);border-radius:var(--r);padding:10px 12px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span style="font-family:var(--mono);font-size:.72rem;color:var(--amber)">INV# ${inv.num}</span>
+        <span style="font-size:.7rem;color:var(--muted)">${inv.date}</span>
+      </div>
+      <div style="font-size:.85rem;font-weight:700;color:var(--txt);margin-bottom:6px">${inv.customer}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:.82rem;color:var(--teal);font-weight:700">${(inv.sub*1.05).toFixed(2)} AED</span>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost btn-sm" style="font-size:.65rem" onclick="reloadInvoice('${inv.num}')">✏️ Edit</button>
+          <button class="btn btn-teal btn-sm" style="font-size:.65rem" onclick="printSavedInvoice('${inv.num}')">⬇ PDF</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function printSavedInvoice(num){
+  const inv=invoices.find(i=>i.num===num);
+  if(!inv)return;
+  invSelCust=inv.customer;invSelOrder=inv.orderNum;invItems=[...inv.items];
+  previewInvoice();
+}
+function reloadInvoice(num){
+  const inv=invoices.find(i=>i.num===num);
+  if(!inv)return;
+  invSelCust=inv.customer;invSelOrder=inv.orderNum;invItems=[...inv.items];
+  document.getElementById('invCustTitle').textContent='👤 '+inv.customer;
+  document.getElementById('invNumLabel').textContent='INV# '+inv.num;
+  renderInvItems();
+  document.getElementById('invOrdersView').style.display='none';
+  document.getElementById('invDetailView').style.display='flex';
+  showInvTab('new');
+}
+
+// ── Pricing ──
+function renderPricingPage(){
+  const el=document.getElementById('pgList');
+  if(!priceGroups.length){
+    el.innerHTML=`<div style="text-align:center;padding:20px;color:var(--muted);font-size:.82rem">No price groups yet.<br>Click "+ Add Group" to start.</div>`;
+    return;
+  }
+  el.innerHTML=priceGroups.map((g,gi)=>`
+    <div style="background:var(--s2);border:1.5px solid var(--b1);border-radius:var(--r);overflow:hidden">
+      <div style="background:var(--s3);padding:8px 12px;display:flex;justify-content:space-between;align-items:center">
+        <input value="${esc2(g.name)}" style="background:transparent;border:none;color:var(--blue2);font-size:.85rem;font-weight:700;outline:none;flex:1" onchange="renameGroup(${gi},this.value)"/>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-teal btn-sm" style="font-size:.6rem" onclick="addPriceRow(${gi})">+ Product</button>
+          <button class="btn btn-ghost btn-sm" style="font-size:.6rem" onclick="delGroup(${gi})">🗑</button>
+        </div>
+      </div>
+      <div style="padding:8px">
+        ${products.map(p=>`
+          <div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--b1)">
+            <span style="flex:1;font-size:.75rem;color:var(--txt)">${p}</span>
+            <select style="background:var(--s3);border:1px solid var(--b2);border-radius:5px;padding:3px 5px;color:var(--muted);font-size:.7rem;outline:none;width:55px" onchange="setUnit(${gi},'${esc(p)}',this.value)">
+              <option value="kg"${(g.unit?.[p]||'kg')==='kg'?' selected':''}>kg</option>
+              <option value="tray"${g.unit?.[p]==='tray'?' selected':''}>tray</option>
+            </select>
+            <input type="number" min="0" step="0.01" value="${g.prices?.[p]||''}" placeholder="0.00"
+              style="width:65px;background:var(--s3);border:1px solid var(--b2);border-radius:5px;padding:3px 6px;color:var(--amber);font-size:.78rem;outline:none;text-align:right"
+              oninput="setPrice(${gi},'${esc(p)}',this.value)"/>
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+function addPriceGroup(){
+  const name=`Group ${priceGroups.length+1}`;
+  priceGroups.push({id:Date.now().toString(),name,prices:{},unit:{}});
+  LS.set('iat_pg',priceGroups);
+  renderPricingPage();
+  renderCustGroupList();
+}
+function renameGroup(gi,v){priceGroups[gi].name=v;LS.set('iat_pg',priceGroups);renderCustGroupList();}
+function delGroup(gi){confDlg(`Delete "${priceGroups[gi].name}"?`,()=>{priceGroups.splice(gi,1);LS.set('iat_pg',priceGroups);renderPricingPage();renderCustGroupList();});}
+function setPrice(gi,p,v){if(!priceGroups[gi].prices)priceGroups[gi].prices={};priceGroups[gi].prices[p]=parseFloat(v)||0;LS.set('iat_pg',priceGroups);}
+function setUnit(gi,p,v){if(!priceGroups[gi].unit)priceGroups[gi].unit={};priceGroups[gi].unit[p]=v;LS.set('iat_pg',priceGroups);}
+
+// ── Customer-Group assignment (Settings) ──
+function renderCustGroupList(){
+  const el=document.getElementById('custGroupList');
+  if(!el)return;
+  el.innerHTML=customers.map(c=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--b1)">
+      <span style="flex:1;font-size:.78rem;color:var(--txt)">${c}</span>
+      <select style="background:var(--s3);border:1px solid var(--b2);border-radius:6px;padding:4px 7px;color:var(--amber);font-size:.72rem;outline:none;max-width:130px" onchange="setCustGroup('${esc(c)}',this.value)">
+        <option value="">No group</option>
+        ${priceGroups.map(g=>`<option value="${g.id}"${custGroups[c]===g.id?' selected':''}>${g.name}</option>`).join('')}
+      </select>
+    </div>`).join('');
+}
+function setCustGroup(c,gid){custGroups[c]=gid;LS.set('iat_cg',custGroups);}
 
 function hi(t,q){if(!q)return t;return t.replace(new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi'),'<mark>$1</mark>');}
 function esc(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
