@@ -2245,86 +2245,77 @@ function previewAIImg(input){
   reader.readAsDataURL(file);
 }
 
-function extractOrdersAI(){
+async function extractOrdersAI(){
   const status=document.getElementById('aiStatus');
   document.getElementById('aiResults').style.display='none';
-  status.textContent='';
+  status.textContent='⏳ Analyzing with AI...';
   const text=document.getElementById('aiTextInput').value.trim();
   if(!text){toast('Enter order text','err');return;}
   aiExtracted=[];
 
-  function similarity(a,b){
-    a=a.toLowerCase().replace(/[^a-z0-9 ]/g,'').trim();
-    b=b.toLowerCase().replace(/[^a-z0-9 ]/g,'').trim();
-    if(!a||!b)return 0;
-    if(a===b)return 100;
-    if(b.includes(a)||a.includes(b))return 80;
-    const aw=a.split(/\s+/);
-    const bw=b.split(/\s+/);
-    const matches=aw.filter(w=>w.length>2&&bw.some(bv=>bv.includes(w)||w.includes(bv)));
-    return matches.length>0?50+matches.length*8:0;
-  }
-  function bestMatch(input,list){
-    if(!input||!list.length)return input;
-    let best=input,bestScore=0;
-    list.forEach(l=>{const s=similarity(input,l);if(s>bestScore){bestScore=s;best=l;}});
-    return bestScore>=40?best:input;
-  }
+  // Strip WhatsApp headers and split into message blocks
+  const msgRe=/\[\d{1,2}\/\d{1,2}(?:\/\d{2,4})?,\s*\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?\]\s*[^:]+:\s*/gi;
+  const stripped=text.replace(msgRe,'\n---MSG---\n').trim();
+  const blocks=stripped.split('\n---MSG---\n').map(b=>b.trim()).filter(b=>b);
 
-  const qtyRe=/^(\d+(?:\.\d+)?)\s*(?:kg|kgs|tray|trays|ctn|whole|pcs?)?\s+(.+)$|^(.+?)\s+(\d+(?:\.\d+)?)\s*(?:kg|kgs|tray|trays)?$/i;
-  const skipRe=/^@|^\s*$|remraam|apartment|community|floor|building|villa/i;
+  const custList=customers.join('\n');
+  const prodList=products.join('\n');
 
-  // Split by WhatsApp message headers [date, time] Sender:
-  const msgRe=/\[\d{1,2}\/\d{1,2}(?:\/\d{2,4})?,\s*\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?\]\s*[^:]+:/gi;
-  const isWhatsApp=msgRe.test(text);
-  msgRe.lastIndex=0;
+  const prompt=`You are an order extraction assistant for a chicken products company in Dubai (UAE).
 
-  if(isWhatsApp){
-    const parts=text.split(msgRe).map(p=>p.trim()).filter(p=>p);
-    parts.forEach(msg=>{
-      const lines=msg.split(/
-/).map(l=>l.replace(/\*([^*]*)\*/g,'$1').replace(/@\S+/g,'').replace(/\([^)]*\)/g,' ').replace(/[📦🍟🚚✅❌🎯🍗]/gu,'').replace(/\s+/g,' ').trim()).filter(l=>l&&!skipRe.test(l));
-      if(!lines.length)return;
-      // First line = customer
-      const custRaw=lines[0].replace(/order\s*\d+/gi,'').trim();
-      const customer=bestMatch(custRaw,customers);
-      // Rest = products
-      for(let i=1;i<lines.length;i++){
-        const line=lines[i];
-        const m=line.match(qtyRe);
-        if(m){
-          let qty,prodRaw;
-          if(m[1]){qty=parseFloat(m[1]);prodRaw=m[2];}
-          else{qty=parseFloat(m[4]);prodRaw=m[3];}
-          prodRaw=(prodRaw||'').replace(/(kg|kgs|tray|trays|ctn|whole)/gi,'').trim();
-          if(prodRaw&&qty>0)aiExtracted.push({customer,product:bestMatch(prodRaw,products),qty,note:''});
-        }
-      }
+INSTRUCTIONS:
+1. Each message block starts with the CUSTOMER NAME on the first line.
+2. Remaining lines are products with quantities.
+3. Match each customer to the CLOSEST entry in CUSTOMER LIST (semantic matching — abbreviations, partial names, different spelling all OK). Examples: "Union barsha" → "UNION Barsha", "GMG geant dubai hills" → "Géant – Dubai hillS", "beast meat" → "BEAST MEAT Dubai hills", "balbaak quoz" → "BAALBAK Alqouz", "jabel lubnan JLT" → "JABAL LUBNAN JLT".
+4. Match each product to CLOSEST in PRODUCT LIST. Examples: "breast" → "Breast", "legs/leg" → "Whole Legs", "drumsticks/drum" → "Drum", "thigh B/L S/L" → "Thigh BL-SL", "liver" → "Liver", "wings" → "Wings", "chicken" → "Chicken", "bone" → "Bone", "minced" → "Minced", "heart" → "Heart", "gizzard" → "Gizzard", "liver 500" → "Liver 500".
+5. For "whole chicken 1100" or similar: product = "Chicken", size = "1100".
+6. For "ctn" quantities (e.g. "33 ctn"): keep qty as the ctn number, add note "ctn".
+7. IGNORE: @mentions, addresses, apartment/floor/community/villa/building lines, emoji-only lines.
+8. Return ONLY a valid JSON array, no explanation, no markdown backticks.
+
+CUSTOMER LIST:
+${custList}
+
+PRODUCT LIST:
+${prodList}
+
+MESSAGE BLOCKS:
+${blocks.map((b,i)=>`[MSG ${i+1}]\n${b}`).join('\n\n')}
+
+Return format: [{"customer":"EXACT FROM LIST","product":"EXACT FROM LIST","qty":number,"size":"","note":""},...]`;
+
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:4000,
+        messages:[{role:'user',content:prompt}]
+      })
     });
-  } else {
-    // Simple format: customer name then products
-    const lines=text.split(/
-/).map(l=>l.trim()).filter(l=>l&&!skipRe.test(l));
-    let currentCust='';
-    lines.forEach(line=>{
-      const m=line.match(qtyRe);
-      if(m){
-        let qty,prodRaw;
-        if(m[1]){qty=parseFloat(m[1]);prodRaw=m[2];}
-        else{qty=parseFloat(m[4]);prodRaw=m[3];}
-        prodRaw=(prodRaw||'').replace(/(kg|kgs)/gi,'').trim();
-        if(currentCust&&qty>0)aiExtracted.push({customer:currentCust,product:bestMatch(prodRaw,products),qty,note:''});
-      } else {
-        currentCust=bestMatch(line,customers)||line;
-      }
-    });
+    if(!res.ok){const e=await res.json();throw new Error(e.error?.message||'API error '+res.status);}
+    const data=await res.json();
+    let raw=data.content.map(c=>c.text||'').join('').trim();
+    raw=raw.replace(/```json|```/g,'').trim();
+    const parsed=JSON.parse(raw);
+    if(!Array.isArray(parsed)||!parsed.length){status.textContent='No orders found.';return;}
+    aiExtracted=parsed.map(item=>({
+      customer:String(item.customer||'').trim(),
+      product:String(item.product||'').trim(),
+      qty:parseFloat(item.qty)||1,
+      size:String(item.size||'').trim(),
+      note:String(item.note||'').trim()
+    })).filter(item=>item.customer&&item.product&&item.qty>0);
+    if(!aiExtracted.length){status.textContent='No orders found.';return;}
+    renderAIResults();
+    document.getElementById('aiResults').style.display='block';
+    const custCount=new Set(aiExtracted.map(i=>i.customer)).size;
+    status.textContent=`✓ Found ${aiExtracted.length} items from ${custCount} customers`;
+  }catch(e){
+    status.textContent='✗ Error: '+e.message;
+    toast('AI error: '+e.message,'err');
   }
-
-  if(!aiExtracted.length){status.textContent='No orders found.';return;}
-  renderAIResults();
-  document.getElementById('aiResults').style.display='block';
-  const custCount=new Set(aiExtracted.map(i=>i.customer)).size;
-  status.textContent=`✓ Found ${aiExtracted.length} items from ${custCount} customers`;
 }
 
 function renderAIResults(){
