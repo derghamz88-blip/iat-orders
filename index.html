@@ -6,6 +6,8 @@
 <title>IAT Orders</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.10.0/lib/msal-browser.min.js"></script>
 <style>
 :root{
@@ -173,7 +175,7 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
 .cc-num{background:var(--s3);border:1.5px solid var(--b2);border-radius:5px;width:34px;height:22px;color:var(--amber);font-family:var(--mono);font-size:.72rem;text-align:center;outline:none;margin-right:4px;}
 .cc-num:focus{border-color:var(--amber);}
 .empty .ei{font-size:2.2rem;opacity:.18;margin-bottom:9px;}
-.exp-bar{padding:10px 14px;border-top:1px solid var(--b1);background:var(--s1);display:flex;gap:7px;justify-content:space-between;align-items:center;flex-shrink:0;}
+.exp-bar{padding:8px 10px;border-top:1px solid var(--b1);background:var(--s1);display:flex;gap:6px;align-items:center;flex-shrink:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;width:100%;box-sizing:border-box;}
 .import-info{font-size:.7rem;color:var(--muted);font-family:var(--mono);}
 
 /* ══ SETTINGS ══ */
@@ -280,7 +282,10 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
 
   <!-- BOTTOM: add button -->
   <div class="entry-bar">
-    <button class="btn btn-teal btn-full" onclick="addToOrder()">＋ Add to Order List</button>
+    <div class="rg">
+      <button class="btn btn-ghost" style="flex-shrink:0;padding:10px 14px;color:var(--teal);border-color:var(--teal)" onclick="openAIImport()">📥 Import</button>
+      <button class="btn btn-teal btn-full" onclick="addToOrder()">＋ Add to Order List</button>
+    </div>
   </div>
 
 </div>
@@ -318,12 +323,12 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     </div>
   </div>
   <div class="exp-bar">
-    <button class="btn btn-red btn-sm" onclick="clearAll()">🗑 Clear All</button>
-    <button class="btn btn-ghost btn-sm" onclick="exportXL()">⬇ Excel</button>
-    <button class="btn btn-ghost btn-sm" onclick="openAIImport()" style="color:var(--teal)">📋 Import</button>
-    <button class="btn btn-blue btn-sm" onclick="showPrintDlg()">🖨 Print</button>
-    <button class="btn btn-purple btn-sm" onclick="printDrivers()">🚗 Drivers</button>
-    <button class="btn btn-teal" onclick="saveToOneDrive()" id="odBtn">☁ Save to OneDrive</button>
+    <button class="btn btn-red btn-sm" style="flex-shrink:0" onclick="clearAll()">🗑 Clear</button>
+    <button class="btn btn-ghost btn-sm" style="flex-shrink:0" onclick="exportXL()">⬇ Excel</button>
+    <button class="btn btn-ghost btn-sm" style="flex-shrink:0;color:var(--teal)" onclick="openAIImport()">📋 Import</button>
+    <button class="btn btn-blue btn-sm" style="flex-shrink:0" onclick="showPrintDlg()">🖨 Print</button>
+    <button class="btn btn-purple btn-sm" style="flex-shrink:0" onclick="printDrivers()">🚗 Drivers</button>
+    <button class="btn btn-teal btn-sm" style="flex-shrink:0" onclick="saveToOneDrive()" id="odBtn">☁ OneDrive</button>
   </div>
 </div>
 
@@ -546,20 +551,22 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     </div>
     <!-- Tabs -->
     <div style="display:flex;gap:4px;background:var(--s3);border-radius:8px;padding:3px">
-      <button id="aiTab-text" class="btn btn-teal btn-sm" style="flex:1;font-size:.72rem" onclick="switchAITab('text')">📝 Text</button>
-      <button id="aiTab-img" class="btn btn-ghost btn-sm" style="flex:1;font-size:.72rem" onclick="switchAITab('img')">🖼 Image</button>
+      <button id="aiTab-text" class="btn btn-teal btn-sm" style="flex:1;font-size:.68rem" onclick="switchAITab('text')">📝 WhatsApp</button>
+      <button id="aiTab-bof" class="btn btn-ghost btn-sm" style="flex:1;font-size:.68rem" onclick="switchAITab('bof')">📄 BOF</button>
     </div>
-    <!-- Text input -->
+    <!-- Text input (WhatsApp) -->
     <div id="aiTextSection">
       <textarea id="aiTextInput" placeholder="Paste WhatsApp order text here...&#10;&#10;Example:&#10;UNION Barsha&#10;30kg chicken&#10;4kg leg&#10;4kg thigh&#10;&#10;Aswaaq JVC&#10;Breast 5kg&#10;Wings 2kg" style="width:100%;height:140px;background:var(--s3);border:1.5px solid var(--b2);border-radius:8px;padding:10px;color:var(--txt);font-family:var(--sans);font-size:.82rem;outline:none;resize:none;box-sizing:border-box"></textarea>
     </div>
-    <!-- Image input -->
-    <div id="aiImgSection" style="display:none">
-      <input type="file" id="aiImgInput" accept="image/*" style="display:none" onchange="previewAIImg(this)"/>
-      <div onclick="document.getElementById('aiImgInput').click()" style="border:2px dashed var(--b2);border-radius:8px;padding:20px;text-align:center;cursor:pointer;color:var(--muted);font-size:.8rem">
-        📷 Tap to upload image
+    <!-- BOF image input -->
+    <div id="aiBofSection" style="display:none;flex-direction:column;gap:8px">
+      <div style="font-size:.72rem;color:var(--muted);text-align:center">📄 Union Coop Branch Order Form</div>
+      <input type="file" id="aiBofInput" accept="image/*,application/pdf" style="display:none" onchange="previewBOF(this)"/>
+      <div onclick="document.getElementById('aiBofInput').click()" style="border:2px dashed var(--teal);border-radius:8px;padding:16px;text-align:center;cursor:pointer;color:var(--teal);font-size:.82rem;font-weight:600">
+        📎 Upload BOF image or PDF
+        <div style="font-size:.68rem;color:var(--muted);font-weight:400;margin-top:4px">JPG · PNG · PDF</div>
       </div>
-      <img id="aiImgPreview" style="display:none;width:100%;border-radius:8px;margin-top:8px;max-height:200px;object-fit:contain"/>
+      <img id="aiBofPreview" style="display:none;width:100%;border-radius:8px;max-height:200px;object-fit:contain"/>
     </div>
     <!-- Extract button -->
     <button class="btn btn-teal" id="aiExtractBtn" onclick="extractOrdersAI()">📋 Extract Orders</button>
@@ -600,6 +607,27 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
   </div>
 </div>
 <div class="toast" id="toast"></div>
+
+<!-- GLOBAL PICKER -->
+<div id="gPickerOv" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.75);z-index:900">
+  <div style="background:var(--s2);border-radius:0 0 14px 14px;width:100%;max-height:78vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--b1);background:var(--s1);flex-shrink:0">
+      <span id="gPickerTitle" style="font-size:.9rem;font-weight:800;color:var(--blue2)"></span>
+      <button onclick="gPickerClose()" style="background:var(--s3);border:none;color:var(--muted);border-radius:8px;padding:6px 14px;cursor:pointer;font-size:.85rem;font-weight:700">✕</button>
+    </div>
+    <div style="padding:8px 10px;border-bottom:1px solid var(--b1);flex-shrink:0">
+      <input type="text" id="gPickerSearch" placeholder="Search..." autocomplete="off"
+        style="width:100%;background:var(--s3);border:1.5px solid var(--b2);border-radius:9px;padding:10px 13px;color:var(--txt);font-family:var(--sans);font-size:.9rem;outline:none;box-sizing:border-box"
+        oninput="gPickerFilter()"/>
+    </div>
+    <div id="gPickerItems" style="overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch"></div>
+    <div id="gPickerAddRow" style="display:none;padding:8px 10px;border-top:1px solid var(--b1);gap:6px;align-items:center;flex-shrink:0">
+      <input type="text" id="gPickerNewVal" placeholder="New name..."
+        style="flex:1;background:var(--s3);border:1.5px solid var(--teal);border-radius:8px;padding:9px 12px;color:var(--txt);font-family:var(--sans);font-size:.85rem;outline:none"/>
+      <button onclick="gPickerAddNew()" style="background:var(--teal);border:none;border-radius:8px;padding:9px 14px;color:#000;font-weight:700;font-size:.85rem;cursor:pointer;flex-shrink:0">Add ✓</button>
+    </div>
+  </div>
+</div>
 
 <script>
 const DC=["Aswaaq – (JVC)","Aswaaq – Al Mizhar","Aswaaq – Al Quoz","Aswaaq – Al Warqa","Aswaaq – Deira","Aswaaq – Nad Al Sheba","Aswaaq – NAD AL HAMAR","Aswaaq– Al Barsha","Aswaaq- UMM SUQEIM","Géant – Al Furjan","Géant – Dubai hillS","Géant – MUDON","Géant – REMRAAM","Géant – Sahara Centre","Géant – Villanova","Monoprix – Creek Beach","(RTA)","9Th cut","Abed Al kader 1","Abed Al kader 2","Abed Al kader 3","Abu adam","Abu zulf","ACC.Bzorayat Sham","Adham Baraka","AGATHA","Akl baytna","Akl baytna catering","Al Ain Oasis","AL BAIT AL HAMAWI","Al bait al soory","AL BAIT ALMASRI","AL BAWADl ALSURlAH","AL EMPRATOR","AL FARAH","Al Haytham","Al hout","AL JOORI","Al kalha restuarant","AL MADINA","Al marjan","Al rabee al shami","AL SADIQ","AL SADIQ (RTA)","Al Sayad","Al shami","Al thouq al shami","Al zulf rest","Alaa aldeen / Arjan","ALAM AL TAWFEER","All spice catering","alrukn alshami","ALTlMAR AL LlBNANlA","ARAMTEC","AROOS DAMASCUS","Askim","Aswaaq - Al Sofouh","AWWAl ALMADINA","Ayham Dawoud","B beita","BAALBAK Abu Dhabi","BAALBAK Alqouz","BAALBAK Hessa","BAALBAK Shikh zaid","Bahaa","BAIT AL MONA","BAIT ALKARM ALAALEI","BAIT ALSHAWARMA","BAIT ELKABAB","BASSMA","BEAST MEAT","BEAST MEAT Dubai hills","Bewaz restaurant","Bustan Al Dayaa","byblos","Bzorayat Al Sham","Carneus","Carni Store","CASH CUSTUMER","CELLO","Cello ( Mohammad )","CHEF EFRANJYEH international","CHEF EFRANJYEH satwa","Chef taher","CREATIVE CUTS","dabbagh almahaba","DAR AL SAJAA","Dergham aldaoud","Dr.Qussai /SAMPLE","Dr.Qussai swead","e Jaby","Etir alsham","Extra Abdulghadir","Extra Habib","FABRIQUE","Farooj Al Madina","Farooj altabiaa","Farsi restaurant ( JLT)","First Crust","FITOUT","Food source","Géant – Serena","Géant – Emaar","Géant – Motor city","GEANT-ONE PARK AVE","george debbaneh","GILANEH","GMG EMAAR SOUTH","GMG Gate Boutik","GOLDEN HEART Al ain","Golden cut","GOLDEN HEART Entaj","GOLDEN HEART Hasad","GOLDEN HEART Khalifa","GOLDEN HEART Shamkha","GOLDEN HEART Zaid","GREEN ROYAL","HABIBULLAH 1","HABIBULLAH 10","HABIBULLAH 2","HABIBULLAH 3","HABIBULLAH 4","HABIBULLAH 5","HABIBULLAH 6","HABIBULLAH 7","HABIBULLAH 8","HABIBULLAH 9","Halal","Hamidiya","Home delivery","Home delivery Abu Dhabi","Home delivery Halal","Home delivery Zabihati 1","Home delivery Zabihati 2","Home delivery Zabihati 3","Home delivery Zabihati 4","Home delivery Zabihati 5","Home delivery Zabihati 6","HOMSI","Hope","Hossam RTA","IMRAN MEAT shop","ISTANBUL","Jabal Lebnan Arjan","JABAL LUBNAN JLT","Jamal and Qasim Al-Halabi","JAMAR WA HAJAR","UNION Jurf","KABAB ARBEL","Kababi","Kanz al madam","KARAMNA AL ARABl","Kaseh Kabab","La vita catering","LE POULAILLER","Lekker meat shop","M L S Abu Dhabi Mushrif mall","M L S Alqouz","M L S Marina","M L S motor city","M L S silicon","Maan / IAT","manazil alshaam","MARYAM RASHID","Mashraqa coffee","Mazarena","meat avenue","Meat Beirut","Meat counter","MEATOLOGY","Mellows Rest","Miran Arbil","MIY foodstuff","Monoprix – Etihad Towers","Monoprix –PALM NAK","Mr . AHMAD GHANNAM","Mr . Mahmoud Ghannam","Mr . Muhannad Shatat","Mr . Obay Swaid","Mr .Ibrahim Al-Daour","Mr. Mohamed Ghanam","NADERANG RESTURANT","NALI","NASEM- JABAL LUBNAN","New day","Night to night","nour kahila","Obaid Sandal","OLIVE","On mart","Order","Qadisya Sharjah","Qasr AL Kabab","Quadrant","Qusay Al-Saifi","Rana Dweek","Rashidiya","Raw cut animal food","RAWABl MARKET","REEF AL MULAIHA","REIF Japanese Kushiyaki","ROBOW AL FARAH","Rocky land foodstuff","union Rumailah","Said salloum","Sharjah slaughterhouse","Soule Cafe","Soule soups","SPRINGBOK","Stouf Bierut","Sultan butchery","TALLAT ALKHAIR","TASTE N TASTE","Tayba","THE CHICKSTER","THE LEBANESE BUTCHER","Three by Eva","THREE STACKS","union TROLLEY'S","True Value","UNION International","UNION Jumeirah Safa","UNION Nad Al Sheba","Union abu hail","UNION Al khawaneej","UNION Al Nahda","UNION Al Warqa","UNION Al Wasl","UNION Aweer","UNION Barsha","Union barsha south","UNION Hamriya","UNION Hessa","UNION Jumeirah First","UNION Mankhool","UNION MOTOR CITY","UNION Nad Al Hamer","UNION NAKHEEL","UNION Rashidiya","UNION RUKAN","Union silicon","UNION Towar","UNION Umm Suqeim","WAFI","Wunderdog","YAGUT (RTA)","Yasmin al sham","zabihati","ZAHRAT","Zeyad Hassan","AL KHALIL","Amr alla","Al shsmi foodstuff","Abu samer","KHAYR MAZARENA","LAHMAH & FAHMAH","Wahat al aman","Centro","Chef Ayman","Shanasheel Restaurant","RUKN ALHLLA","Aswaaq – Al Mizhar tender","Aswaaq – Al Quoz tender","Aswaaq – Al Warqa tender","Aswaaq – Deira tender","Aswaaq – Nad Al Sheba tender","Aswaaq – NAD AL HAMAR tender","Aswaaq– Al Barsha tender","Aswaaq- UMM SUQEIM tender","Géant – Al Furjan tender","Géant – Dubai hillS tender","Géant – MUDON tender","Géant – REMRAAM tender","Géant – Sahara Centre tender","Géant – Villanova tender","Monoprix – Creek Beach tender","(RTA) tender"];
@@ -859,13 +887,21 @@ function renderOrders(){
                 <button class="cc-mb" ${canDn?'':'disabled'} onclick="moveGroup('${esc(date)}','${esc(c)}',1)">▼</button>
               </div>
               <input class="cc-num" type="number" min="1" value="${items[0].num||''}" title="Order #" onchange="setGroupNum('${esc(date)}','${esc(c)}',this.value)" onclick="this.select()"/>
-              👤 ${c}
+              <span style="cursor:pointer;user-select:none"
+                onpointerdown="ordLongPressStart(event,'${esc(c)}','customer','${esc(date)}')"
+                onpointerup="ordLongPressEnd()" onpointerleave="ordLongPressEnd()"
+                oncontextmenu="event.preventDefault();openOrdCustPicker('${esc(c)}','${esc(date)}')">
+                👤 ${c}
+              </span>
             </span>
             <button class="cc-del" onclick="delCust('${esc(c)}','${date}')">Remove ✕</button>
           </div>
           ${items.map(o=>`<div class="pr">
-            <div>
-              <div class="pr-name">${o.product}</div>
+            <div style="cursor:pointer;user-select:none"
+              onpointerdown="ordLongPressStart(event,${o.idx},'product')"
+              onpointerup="ordLongPressEnd()" onpointerleave="ordLongPressEnd()"
+              oncontextmenu="event.preventDefault();openOrdPicker(${o.idx},'product')">
+              <div class="pr-name" title="Hold to change">${o.product}</div>
               <div style="display:flex;gap:4px;margin-top:2px">
                 ${o.size?`<span class="pr-sz">${o.size}g</span>`:''}
                 ${o.note?`<span class="pr-note">📝 ${o.note}</span>`:''}
@@ -2215,20 +2251,39 @@ function setCustGroup(c,gid){custGroups[c]=gid;LS.set('iat_cg',custGroups);}
 // ══ AI IMPORT ══
 let aiImgData=null;
 let aiImgType=null;
+let aiBofData=null;
+let aiBofType=null;
+let aiCurrentTab='text';
 let aiExtracted=[];
 
+// ── LEARNING MAP (remembers your corrections) ──
+let learnMap = LS.get('iat_learn', {c:{}, p:{}}); // {c: {raw: corrected}, p: {raw: corrected}}
+function learnSave(type, raw, corrected) {
+  if (!raw || !corrected || raw === corrected) return;
+  const key = raw.toLowerCase().trim();
+  learnMap[type][key] = corrected;
+  LS.set('iat_learn', learnMap);
+}
+function learnLookup(type, raw) {
+  return learnMap[type][raw.toLowerCase().trim()] || null;
+}
+
+
 function openAIImport(){document.getElementById('aiImportOv').classList.add('on');}
-function closeAIImport(){document.getElementById('aiImportOv').classList.remove('on');}
+function closeAIImport(){document.getElementById('aiImportOv').classList.remove('on');document.getElementById('aiResults').style.display='none';document.getElementById('aiStatus').textContent='';}
 
 function switchAITab(tab){
+  aiCurrentTab=tab;
   document.getElementById('aiTextSection').style.display=tab==='text'?'block':'none';
-  document.getElementById('aiImgSection').style.display=tab==='img'?'block':'none';
+  document.getElementById('aiBofSection').style.display=tab==='bof'?'flex':'none';
   document.getElementById('aiTab-text').className=tab==='text'?'btn btn-teal btn-sm':'btn btn-ghost btn-sm';
-  document.getElementById('aiTab-img').className=tab==='img'?'btn btn-teal btn-sm':'btn btn-ghost btn-sm';
-  document.getElementById('aiTab-text').style.flex='1';
-  document.getElementById('aiTab-text').style.fontSize='.72rem';
-  document.getElementById('aiTab-img').style.flex='1';
-  document.getElementById('aiTab-img').style.fontSize='.72rem';
+  document.getElementById('aiTab-bof').className=tab==='bof'?'btn btn-teal btn-sm':'btn btn-ghost btn-sm';
+  document.getElementById('aiTab-text').style.flex='1';document.getElementById('aiTab-text').style.fontSize='.68rem';
+  document.getElementById('aiTab-bof').style.flex='1';document.getElementById('aiTab-bof').style.fontSize='.68rem';
+  document.getElementById('aiResults').style.display='none';
+  document.getElementById('aiStatus').textContent='';
+  const btn=document.getElementById('aiExtractBtn');
+  btn.textContent=tab==='bof'?'🔍 Scan BOF':'📋 Extract Orders';
 }
 
 function previewAIImg(input){
@@ -2239,8 +2294,32 @@ function previewAIImg(input){
   reader.onload=e=>{
     aiImgData=e.target.result.split(',')[1];
     const preview=document.getElementById('aiImgPreview');
-    preview.src=e.target.result;
-    preview.style.display='block';
+    if(preview){preview.src=e.target.result;preview.style.display='block';}
+  };
+  reader.readAsDataURL(file);
+}
+
+function previewBOF(input){
+  const file=input.files[0];
+  if(!file)return;
+  aiBofType=file.type;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    aiBofData=e.target.result.split(',')[1];
+    const preview=document.getElementById('aiBofPreview');
+    if(file.type==='application/pdf'){
+      // PDF: show file name instead of image preview
+      preview.style.display='none';
+      let pdfLabel=document.getElementById('aiBofPdfLabel');
+      if(!pdfLabel){pdfLabel=document.createElement('div');pdfLabel.id='aiBofPdfLabel';pdfLabel.style.cssText='background:var(--s3);border:1px solid var(--b2);border-radius:8px;padding:10px;text-align:center;font-size:.78rem;color:var(--teal);margin-top:6px';document.getElementById('aiBofPreview').insertAdjacentElement('afterend',pdfLabel);}
+      pdfLabel.textContent='📄 '+file.name;
+      pdfLabel.style.display='block';
+    } else {
+      preview.src=e.target.result;
+      preview.style.display='block';
+      const pdfLabel=document.getElementById('aiBofPdfLabel');
+      if(pdfLabel)pdfLabel.style.display='none';
+    }
   };
   reader.readAsDataURL(file);
 }
@@ -2248,107 +2327,776 @@ function previewAIImg(input){
 async function extractOrdersAI(){
   const status=document.getElementById('aiStatus');
   document.getElementById('aiResults').style.display='none';
-  status.textContent='⏳ Analyzing with AI...';
-  const text=document.getElementById('aiTextInput').value.trim();
-  if(!text){toast('Enter order text','err');return;}
   aiExtracted=[];
 
-  // Strip WhatsApp headers and split into message blocks
-  const msgRe=/\[\d{1,2}\/\d{1,2}(?:\/\d{2,4})?,\s*\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?\]\s*[^:]+:\s*/gi;
-  const stripped=text.replace(msgRe,'\n---MSG---\n').trim();
-  const blocks=stripped.split('\n---MSG---\n').map(b=>b.trim()).filter(b=>b);
-
-  const custList=customers.join('\n');
-  const prodList=products.join('\n');
-
-  const prompt=`You are an order extraction assistant for a chicken products company in Dubai (UAE).
-
-INSTRUCTIONS:
-1. Each message block starts with the CUSTOMER NAME on the first line.
-2. Remaining lines are products with quantities.
-3. Match each customer to the CLOSEST entry in CUSTOMER LIST (semantic matching — abbreviations, partial names, different spelling all OK). Examples: "Union barsha" → "UNION Barsha", "GMG geant dubai hills" → "Géant – Dubai hillS", "beast meat" → "BEAST MEAT Dubai hills", "balbaak quoz" → "BAALBAK Alqouz", "jabel lubnan JLT" → "JABAL LUBNAN JLT".
-4. Match each product to CLOSEST in PRODUCT LIST. Examples: "breast" → "Breast", "legs/leg" → "Whole Legs", "drumsticks/drum" → "Drum", "thigh B/L S/L" → "Thigh BL-SL", "liver" → "Liver", "wings" → "Wings", "chicken" → "Chicken", "bone" → "Bone", "minced" → "Minced", "heart" → "Heart", "gizzard" → "Gizzard", "liver 500" → "Liver 500".
-5. For "whole chicken 1100" or similar: product = "Chicken", size = "1100".
-6. For "ctn" quantities (e.g. "33 ctn"): keep qty as the ctn number, add note "ctn".
-7. IGNORE: @mentions, addresses, apartment/floor/community/villa/building lines, emoji-only lines.
-8. Return ONLY a valid JSON array, no explanation, no markdown backticks.
-
-CUSTOMER LIST:
-${custList}
-
-PRODUCT LIST:
-${prodList}
-
-MESSAGE BLOCKS:
-${blocks.map((b,i)=>`[MSG ${i+1}]\n${b}`).join('\n\n')}
-
-Return format: [{"customer":"EXACT FROM LIST","product":"EXACT FROM LIST","qty":number,"size":"","note":""},...]`;
-
-  try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:4000,
-        messages:[{role:'user',content:prompt}]
-      })
-    });
-    if(!res.ok){const e=await res.json();throw new Error(e.error?.message||'API error '+res.status);}
-    const data=await res.json();
-    let raw=data.content.map(c=>c.text||'').join('').trim();
-    raw=raw.replace(/```json|```/g,'').trim();
-    const parsed=JSON.parse(raw);
-    if(!Array.isArray(parsed)||!parsed.length){status.textContent='No orders found.';return;}
-    aiExtracted=parsed.map(item=>({
-      customer:String(item.customer||'').trim(),
-      product:String(item.product||'').trim(),
-      qty:parseFloat(item.qty)||1,
-      size:String(item.size||'').trim(),
-      note:String(item.note||'').trim()
-    })).filter(item=>item.customer&&item.product&&item.qty>0);
-    if(!aiExtracted.length){status.textContent='No orders found.';return;}
-    renderAIResults();
-    document.getElementById('aiResults').style.display='block';
-    const custCount=new Set(aiExtracted.map(i=>i.customer)).size;
-    status.textContent=`✓ Found ${aiExtracted.length} items from ${custCount} customers`;
-  }catch(e){
-    status.textContent='✗ Error: '+e.message;
-    toast('AI error: '+e.message,'err');
+  if(aiCurrentTab==='bof'){
+    await extractBOF(status);
+  } else {
+    await extractWhatsApp(status);
   }
 }
 
-function renderAIResults(){
-  document.getElementById('aiResultItems').innerHTML=aiExtracted.map((item,i)=>`
-    <div style="background:var(--s3);border:1px solid var(--b2);border-radius:8px;padding:8px 10px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-      <input value="${esc2(item.customer)}" style="flex:2;min-width:100px;background:var(--s2);border:1px solid var(--b2);border-radius:5px;padding:4px 7px;color:var(--blue2);font-size:.78rem;outline:none" onchange="aiExtracted[${i}].customer=this.value" placeholder="Customer"/>
-      <input value="${esc2(item.product)}" style="flex:2;min-width:80px;background:var(--s2);border:1px solid var(--b2);border-radius:5px;padding:4px 7px;color:var(--txt);font-size:.78rem;outline:none" onchange="aiExtracted[${i}].product=this.value" placeholder="Product"/>
-      <input type="number" value="${item.qty}" min="0" step="0.5" style="width:55px;background:var(--s2);border:1px solid var(--b2);border-radius:5px;padding:4px 6px;color:var(--amber);font-size:.78rem;outline:none;text-align:center" onchange="aiExtracted[${i}].qty=parseFloat(this.value)||0"/>
-      <button class="pr-del" onclick="aiExtracted.splice(${i},1);renderAIResults()">✕</button>
+// ── CUSTOMER ALIASES ──
+const CUST_ALIASES = [
+  [/\bunion\s*barsha\s*south\b/i, 'Union barsha south'],
+  [/\bunion\s*barsha\b/i, 'UNION Barsha'],
+  [/\bunion\s*(al\s*)?warqa\b/i, 'UNION Al Warqa'],
+  [/\bunion\s*motor\s*city\b/i, 'UNION MOTOR CITY'],
+  [/\bunion\s*(jumeirah\s*)?safa\b/i, 'UNION Jumeirah Safa'],
+  [/\bunion\s*jumeirah\s*first\b|\bunion\s*jumeirah\s*1\b/i, 'UNION Jumeirah First'],
+  [/\bunion\s*jumeirah\b/i, 'UNION Jumeirah First'],
+  [/\bunion\s*nad\s*al\s*sheba\b/i, 'UNION Nad Al Sheba'],
+  [/\bunion\s*nad\s*(al\s*)?hamer?\b/i, 'UNION Nad Al Hamer'],
+  [/\bunion\s*nad\s*hamar\b/i, 'UNION Nad Al Hamer'],
+  [/\bunion\s*hamriya\b/i, 'UNION Hamriya'],
+  [/\bunion\s*mankhool\b/i, 'UNION Mankhool'],
+  [/\bunion\s*rashidiy/i, 'UNION Rashidiya'],
+  [/\bunion\s*nakheel\b/i, 'UNION NAKHEEL'],
+  [/\bunion\s*silicon\b/i, 'Union silicon'],
+  [/\bunion\s*aweer\b/i, 'UNION Aweer'],
+  [/\bunion\s*hessa\b/i, 'UNION Hessa'],
+  [/\bunion\s*towar\b/i, 'UNION Towar'],
+  [/\bunion\s*rukan\b/i, 'UNION RUKAN'],
+  [/\bunion\s*abu\s*hail\b/i, 'Union abu hail'],
+  [/\bunion\s*(al\s*)?nahda\b/i, 'UNION Al Nahda'],
+  [/\bunion\s*(al\s*)?khawaneej\b/i, 'UNION Al khawaneej'],
+  [/\bunion\s*umm\s*suqeim\b/i, 'UNION Umm Suqeim'],
+  [/\bunion\s*(al\s*)?wasl\b/i, 'UNION Al Wasl'],
+  [/\bunion\s*rumailah\b/i, 'union Rumailah'],
+  [/\bunion\s*jurf\b/i, 'UNION Jurf'],
+  [/\bunion\s*(al\s*)?warqa\b/i, 'UNION Al Warqa'],
+  [/\bunion\s*mankhool\b/i, 'UNION Mankhool'],
+  [/\bbaalbak\s*shikh?\s*zaid\b|\bbalbaak\s*shikh?\b/i, 'BAALBAK Shikh zaid'],
+  [/\bbaalbak\s*quoz\b|\bbalbaak\s*quoz\b/i, 'BAALBAK Alqouz'],
+  [/\bbaalbak\s*hessa\b|\bbalbaak\s*hessa\b/i, 'BAALBAK Hessa'],
+  [/\bbaalbak\b|\bbalbaak\b|\bbaalbek\b|\bbalbak\b/i, 'BAALBAK Shikh zaid'],
+  [/\bjabal\s*lubnan\s*jlt\b|\bjabel\s*lubnan\s*jlt\b/i, 'JABAL LUBNAN JLT'],
+  [/\bjabal\s*lubnan\s*arjan\b|\bjabel\s*lubnan\s*arjan\b/i, 'Jabal Lebnan Arjan'],
+  [/\bjabal\s*lubnan\b|\bjabel\s*lubnan\b/i, 'JABAL LUBNAN JLT'],
+  [/\bm\.?l\.?s\.?\s*motor\s*city\b|\bmls\s*motor\b/i, 'M L S motor city'],
+  [/\bm\.?l\.?s\.?\s*marina\b|\bmls\s*marina\b/i, 'M L S Marina'],
+  [/\bm\.?l\.?s\.?\s*quoz\b|\bmls\s*quoz\b/i, 'M L S Alqouz'],
+  [/\bm\.?l\.?s\.?\s*silicon\b|\bmls\s*silicon\b/i, 'M L S silicon'],
+  [/\bm\.?l\.?s\b|\bmls\b/i, 'M L S motor city'],
+  [/\bgmg\s*geant\s*express\s*emaar\b|\bgmg\s*emaar\b/i, 'GMG EMAAR SOUTH'],
+  [/\bgmg\s*geant\s*express\s*one\s*park\b|\bgmg\s*one\s*park\b/i, 'GEANT-ONE PARK AVE'],
+  [/\bgmg\s*geant\s*(express\s*)?villanova\b|\bgmg\s*villanova\b/i, 'Géant – Villanova'],
+  [/\bgmg\s*geant\s*(super\s*)?al\s*furjan\b|\bgmg\s*furjan\b/i, 'Géant – Al Furjan'],
+  [/\bgmg\s*geant\s*dubai\s*hills\b|\bgmg\s*dubai\s*hills\b/i, 'Géant – Dubai hillS'],
+  [/\bgmg\s*aswaaq\s*hyper\s*umm\s*suqeim\b/i, 'Aswaaq- UMM SUQEIM'],
+  [/\bgmg\s*aswaaq\s*(exp|express)\s*jvc\b/i, 'Aswaaq – (JVC)'],
+  [/\bgmg\s*aswaaq\b/i, 'Aswaaq – (JVC)'],
+  [/\bgmg\b/i, 'Géant – Dubai hillS'],
+  [/\beast\s*meat\s*dubai\s*hills\b/i, 'BEAST MEAT Dubai hills'],
+  [/\beast\s*meat\b/i, 'BEAST MEAT Dubai hills'],
+  [/\bmeat\s*avenue\b/i, 'meat avenue'],
+  [/\bfabrique\b/i, 'FABRIQUE'],
+  [/\bkanz\s*al\s*madam\b|\bkanz\b/i, 'Kanz al madam'],
+  [/\bal\s*madina\b/i, 'AL MADINA'],
+  [/\balam\s*al\s*tawfeer\b|\balam\s*altawfeer\b/i, 'ALAM AL TAWFEER'],
+  [/\bmaryam\s*rash(i|e)d\b/i, 'MARYAM RASHID'],
+  [/\bon\s*mart\b/i, 'On mart'],
+  [/\bnew\s*day\b/i, 'New day'],
+  [/\bhome\s*delivery\b/i, 'Home delivery'],
+];
+
+// ── GMG GROUP: same company, different branch ──
+// Strip brand prefix and match by branch name only
+const GMG_BRANDS = /^(gmg[\s\-]*)?((géant|geant|giant|aswaaq|aswaak|aswaak|aswaaq)[\s\-]*(express|super|hyper|exp)?[\s\-]*)/i;
+const GMG_LIST_BRANDS = /^(géant|geant|aswaaq|aswaak|gmg)[\s–\-\s]*/i;
+
+function extractBranch(s) {
+  // Remove brand prefix from input or list entry, return remaining branch name
+  return s.replace(GMG_BRANDS, '').replace(GMG_LIST_BRANDS, '').replace(/[-–\s]+/g, ' ').trim();
+}
+
+function isGMGBrand(s) {
+  return /(gmg|géant|geant|aswaaq|aswaak)/i.test(s);
+}
+
+function matchCustomer(raw) {
+  const inp = raw.trim();
+  if (!inp) return inp;
+
+  // 1. Learned corrections (highest priority)
+  const learned = learnLookup('c', inp);
+  if (learned) return learned;
+
+  // 2. Exact match (case-insensitive)
+  const exact = customers.find(c => c.toLowerCase() === inp.toLowerCase());
+  if (exact) return exact;
+
+  // 3. Alias map
+  for (const [re, val] of CUST_ALIASES) {
+    if (re.test(inp)) return val;
+  }
+
+  // 4. GMG GROUP LOGIC — strip brand, match by branch only
+  if (isGMGBrand(inp)) {
+    const inpBranch = extractBranch(inp);
+    if (inpBranch.length > 1) {
+      // Only compare against GMG/Géant/Aswaaq entries
+      const gmgCusts = customers.filter(c => isGMGBrand(c));
+      let best = null, bestScore = 0;
+      gmgCusts.forEach(c => {
+        const cBranch = extractBranch(c);
+        const s = similarity(inpBranch, cBranch);
+        if (s > bestScore) { bestScore = s; best = c; }
+      });
+      if (best && bestScore >= 35) return best;
+    }
+  }
+
+  // 5. Full-name IDF-weighted comparison against entire list
+  let best = null, bestScore = 0, secondScore = 0;
+  customers.forEach(c => {
+    const s = similarity(inp, c);
+    if (s > bestScore) { secondScore = bestScore; bestScore = s; best = c; }
+    else if (s > secondScore) secondScore = s;
+  });
+
+  if (best && bestScore >= 30 && (bestScore - secondScore >= 6 || bestScore >= 55)) {
+    return best;
+  }
+
+  return inp;
+}
+
+// ── PRODUCT MAP ──
+function matchProduct(raw) {
+  raw = raw.replace(/\*/g, '').replace(/\s+/g, ' ').trim();
+  const learned = learnLookup('p', raw);
+  if (learned) return learned;
+  const r = raw.toLowerCase();
+
+  // BL-SL / BL-SO / SL variants first
+  const isBLSL = /\bbl[.\-\s]?sl\b|boneless[.\-\s]?skinless|b\/l[.\-\s]?s\/l/i.test(r);
+  const isBLSO = /\bbl[.\-\s]?so\b|b\/l[.\-\s]?s\/o/i.test(r);
+  const isSL   = /\bskinless\b|\bsl\b/i.test(r) && !isBLSL && !isBLSO;
+  const is500  = /\b500\s*g(m|r)?\b|\b500\b/i.test(r);
+
+  if (isBLSL) {
+    if (/thigh/i.test(r)) return is500 ? 'Thigh BL-SL 500' : 'Thigh BL-SL';
+    if (/leg/i.test(r))   return is500 ? 'Whole legs BL-SL 500' : 'Whole legs BL-SL';
+  }
+  if (isBLSO) {
+    if (/thigh/i.test(r)) return is500 ? 'Thigh BL-SO 500' : 'Thigh BL-SO';
+    if (/leg/i.test(r))   return is500 ? 'Whole legs BL-SO 500' : 'Whole legs BL-SO';
+  }
+  if (isSL) {
+    if (/thigh/i.test(r)) return is500 ? 'Thigh SL 500' : 'Thigh SL';
+    if (/leg/i.test(r))   return is500 ? 'Whole legs SL 500' : 'Whole legs SL';
+    if (/drum/i.test(r))  return 'DRUM SL 500';
+  }
+
+  // Breast variants
+  if (/breast\s*(tender|tenderized|stick|sticks)/i.test(r)) return 'Breast';
+  if (/shish\s*tawook|tawook|shawarma|shawerma/i.test(r)) return 'Breast';
+  if (/frozen.*breast|breast.*frozen/i.test(r)) return 'Breast Frozen';
+  if (/breast\s*with\s*bone/i.test(r)) return 'BREAST WITH BONE';
+  if (/\bbreast\b/i.test(r)) return is500 ? 'Breast 500' : 'Breast';
+
+  // Drumsticks — before drum check
+  if (/drumstick[s]?|drums\b/i.test(r)) return is500 ? 'Drum 500' : 'Drum';
+  if (/\bdrum\b/i.test(r)) return is500 ? 'Drum 500' : 'Drum';
+  if (/drum\s*sl/i.test(r)) return 'DRUM SL 500';
+
+  // Legs
+  if (/\b(whole\s*)?leg[s]?\b/i.test(r)) return is500 ? 'Whole Legs 500' : 'Whole Legs';
+
+  // Thigh
+  if (/\bthigh[s]?\b/i.test(r)) return is500 ? 'Thigh 500' : 'Thigh';
+
+  // Wings
+  if (/\bwing[s]?\b/i.test(r)) return is500 ? 'Wings 500' : 'Wings';
+
+  // Offal
+  if (/\bliver\b/i.test(r)) return is500 ? 'Liver 500' : 'Liver';
+  if (/\bheart\b/i.test(r)) return is500 ? 'Heart 500' : 'Heart';
+  if (/\bgizzard\b/i.test(r)) return is500 ? 'Gizzard 500' : 'Gizzard';
+
+  // Other
+  if (/\bminced\b|\bmince\b/i.test(r)) return 'Minced';
+  if (/\bbone[s]?\b/i.test(r)) return 'Bone';
+  if (/\bneck[s]?\b/i.test(r)) return 'Neck';
+  if (/\bskin\b/i.test(r)) return 'Skin';
+  if (/kashra/i.test(r)) return 'Kashra';
+  if (/\btail\b/i.test(r)) return 'Tail';
+  if (/chicken\s*blw\s*wings?/i.test(r)) return 'Chicken BLW Wings';
+  if (/frozen.*chicken|whole.*chicken.*frozen/i.test(r)) return 'Whole Chicken Frozen';
+  if (/mix.*chicken|chicken.*mix/i.test(r)) return 'Mix Chicken';
+  if (/\bchicken\b|\bchkn\b/i.test(r)) return 'Chicken';
+
+  return bestMatch(r, products);
+}
+
+// ── NORMALIZE: strip noise, lowercase, keep words ──
+function norm(s) {
+  return s.toLowerCase()
+    .replace(/[_\-\/\\|]/g, ' ')      // separators → space
+    .replace(/[^a-z0-9 ]/g, '')         // remove non-alphanumeric
+    .replace(/(express|super|hyper|fresh|market|store|shop|rest|restaurant|catering|branch|coop|the|al|el)/g, '') // noise
+    .replace(/\s+/g, ' ').trim();
+}
+
+// ── TOKEN OVERLAP SCORE (0-100) ──
+function tokenScore(a, b) {
+  const aw = new Set(a.split(/\s+/).filter(w => w.length > 1));
+  const bw = new Set(b.split(/\s+/).filter(w => w.length > 1));
+  if (!aw.size || !bw.size) return 0;
+  let hits = 0, partials = 0;
+  aw.forEach(wa => {
+    if (bw.has(wa)) { hits++; return; }
+    bw.forEach(wb => {
+      if (wa.length > 2 && wb.includes(wa)) partials++;
+      else if (wb.length > 2 && wa.includes(wb)) partials++;
+    });
+  });
+  const total = Math.max(aw.size, bw.size);
+  return Math.round((hits * 2 + partials) / (total * 2) * 100);
+}
+
+// ── CHAR BIGRAM SIMILARITY (catches typos/abbreviations) ──
+function bigramScore(a, b) {
+  if (!a || !b) return 0;
+  const bigrams = s => { const r = new Set(); for (let i = 0; i < s.length - 1; i++) r.add(s[i] + s[i+1]); return r; };
+  const ba = bigrams(a), bb = bigrams(b);
+  let inter = 0;
+  ba.forEach(bg => { if (bb.has(bg)) inter++; });
+  return Math.round(2 * inter / (ba.size + bb.size) * 100) || 0;
+}
+
+// ── FULL NAME SIMILARITY combining both methods ──
+function similarity(rawA, rawB) {
+  const a = norm(rawA), b = norm(rawB);
+  if (!a || !b) return 0;
+  if (a === b) return 100;
+  // Containment bonus — if one fully contains the other
+  if (a.includes(b) || b.includes(a)) return 88;
+  const ts = tokenScore(a, b);
+  const bs = bigramScore(a, b);
+  return Math.round(ts * 0.6 + bs * 0.4);
+}
+
+// ── BEST MATCH: compare full name against full list ──
+function bestMatch(input, list) {
+  if (!input || !list.length) return input;
+  const inp = input.trim();
+  const inpN = norm(inp);
+
+  // 1. Exact (case-insensitive)
+  const exact = list.find(l => l.toLowerCase() === inp.toLowerCase());
+  if (exact) return exact;
+
+  // 2. Score every entry with full name comparison
+  let best = null, bestScore = 0;
+  list.forEach(l => {
+    const s = similarity(inp, l);
+    if (s > bestScore) { bestScore = s; best = l; }
+  });
+
+  // Only return if score is meaningful
+  return bestScore >= 30 ? best : inp;
+}
+
+function parseLine(line) {
+  // Returns {qty, prodRaw, note, size} or null
+  const clean = line.replace(/\*([^*]*)\*/g, '$1').replace(/\s+/g, ' ').trim();
+
+  // Detect ctn/tray/whole
+  const isCtn = /ctn/i.test(clean);
+  const isTray = /tray[s]?/i.test(clean);
+  const note = isCtn ? 'ctn' : '';
+
+  // Size detection: "whole chicken 1100" or "1 ctn 1100"
+  const sizeM = clean.match(/(800|900|1000|1100|1200|1300|1400|1500)/);
+  const size = sizeM ? sizeM[1] : '';
+
+  // Pattern 1: NUMBER [unit] PRODUCT — e.g. "10 kg breast", "5 tray liver", "2 ctn 1100"
+  const p1 = clean.match(/^(\d+(?:\.\d+)?)\s*(?:kg|kgs|tray[s]?|ctn|whole|pcs?)?\s+(.+)$/i);
+  if (p1) {
+    const qty = parseFloat(p1[1]);
+    let prodRaw = p1[2].replace(/(kg|kgs|tray[s]?|ctn|whole|pcs?)/gi, '').trim();
+    if (qty > 0 && prodRaw.length > 0) return { qty, prodRaw, note, size };
+  }
+
+  // Pattern 2: PRODUCT NUMBER [unit] — e.g. "breast 10 kg", "liver 2"
+  const p2 = clean.match(/^(.+?)\s+(\d+(?:\.\d+)?)\s*(?:kg|kgs|tray[s]?|ctn)?$/i);
+  if (p2) {
+    const qty = parseFloat(p2[2]);
+    let prodRaw = p2[1].replace(/(kg|kgs|tray[s]?|ctn|whole|pcs?)/gi, '').trim();
+    // Make sure prodRaw isn't just a number
+    if (qty > 0 && prodRaw.length > 1 && !/^\d+$/.test(prodRaw)) return { qty, prodRaw, note, size };
+  }
+  return null;
+}
+
+function isCustomerLine(line) {
+  // A line is a customer name if it has NO quantity pattern
+  const hasQty = /\d+(?:\.\d+)?\s*(?:kg|kgs|tray[s]?|ctn)?/i.test(line);
+  const parsed = parseLine(line);
+  // If it parses as a product line with a known product keyword, it's a product
+  if (parsed) {
+    const prodKeywords = /breast|leg|drum|thigh|wing|liver|heart|gizzard|chicken|bone|minced|neck|skin|kashra|tail|tawook|shawarma|tender/i;
+    if (prodKeywords.test(parsed.prodRaw)) return false;
+  }
+  return !hasQty || line.split(/\s+/).length <= 3;
+}
+
+function parseOrdersFromText(text) {
+  const results = [];
+  const skipRe = /^@|remraam|apartment|community|floor|building|villa|^\s*$|^https?:|^www\./i;
+
+  const cleanLine = l => l
+    .replace(/\*([^*]*)\*/g, '$1')
+    .replace(/@\S+/g, '')
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/[📦🍟🚚✅❌🎯🍗🐔🥩🍖]/gu, '')
+    .replace(/\s+/g, ' ').trim();
+
+  // Strip WhatsApp headers: [date, time] Sender:
+  const msgRe = /\[\d{1,2}\/\d{1,2}(?:\/\d{2,4})?,\s*\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?\]\s*[^:]+:/gi;
+  const isWhatsApp = msgRe.test(text);
+  msgRe.lastIndex = 0;
+
+  if (isWhatsApp) {
+    const parts = text.split(msgRe).map(p => p.trim()).filter(p => p);
+    parts.forEach(msg => {
+      const lines = msg.split(/\n/).map(cleanLine).filter(l => l && !skipRe.test(l));
+      if (!lines.length) return;
+      // First non-empty line = customer
+      const custRaw = lines[0].replace(/order\s*\d+/gi, '').replace(/^\d+[\.\)]\s*/, '').trim();
+      if (!custRaw) return;
+      const customer = matchCustomer(custRaw);
+      for (let i = 1; i < lines.length; i++) {
+        const parsed = parseLine(lines[i]);
+        if (parsed && parsed.qty > 0) {
+          const product = matchProduct(parsed.prodRaw);
+          results.push({ customer, product, qty: parsed.qty, size: parsed.size, note: parsed.note, _rawC: custRaw, _rawP: parsed.prodRaw });
+        }
+      }
+    });
+  } else {
+    // Plain text: customer then products
+    const lines = text.split(/\n/).map(cleanLine).filter(l => l && !skipRe.test(l));
+    let currentCust = '';
+    lines.forEach(line => {
+      const parsed = parseLine(line);
+      if (parsed && parsed.qty > 0 && currentCust) {
+        const product = matchProduct(parsed.prodRaw);
+        results.push({ customer: currentCust, product, qty: parsed.qty, size: parsed.size, note: parsed.note, _rawC: line, _rawP: parsed.prodRaw });
+      } else if (!parsed || isCustomerLine(line)) {
+        const custRaw = line.replace(/order\s*\d+/gi, '').replace(/^\d+[\.\)]\s*/, '').trim();
+        if (custRaw) currentCust = matchCustomer(custRaw);
+      }
+    });
+  }
+  return results;
+}
+
+function extractWhatsApp(status) {
+  status.textContent = '';
+  const text = document.getElementById('aiTextInput').value.trim();
+  if (!text) { toast('Enter order text', 'err'); return; }
+  aiExtracted = parseOrdersFromText(text);
+  if (!aiExtracted.length) { status.textContent = 'No orders found.'; return; }
+  renderAIResults();
+  document.getElementById('aiResults').style.display = 'block';
+  const custCount = new Set(aiExtracted.map(i => i.customer)).size;
+  status.textContent = `✓ Found ${aiExtracted.length} items from ${custCount} customers`;
+}
+
+async function extractBOF(status) {
+  if (!aiBofData) { toast('Upload a BOF image or PDF first', 'err'); return; }
+  let rawText = '';
+
+  if (aiBofType === 'application/pdf') {
+    status.textContent = '⏳ Reading PDF...';
+    try {
+      const pdfjsLib = window['pdfjs-dist/build/pdf'];
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      const raw = atob(aiBofData);
+      const arr = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+      const pdf = await pdfjsLib.getDocument({ data: arr }).promise;
+      const pages = [];
+      for (let p = 1; p <= pdf.numPages; p++) {
+        const page = await pdf.getPage(p);
+        const tc = await page.getTextContent();
+        pages.push(tc.items.map(i => i.str).join(' '));
+      }
+      rawText = pages.join('\n');
+    } catch (e) { toast('PDF error: ' + e.message, 'err'); status.textContent = '✗ PDF error'; return; }
+  } else {
+    status.textContent = '⏳ Reading image (OCR)...';
+    try {
+      const imgSrc = 'data:' + aiBofType + ';base64,' + aiBofData;
+      const result = await Tesseract.recognize(imgSrc, 'eng', {
+        logger: m => { if (m.status === 'recognizing text') status.textContent = '⏳ OCR: ' + Math.round(m.progress * 100) + '%'; }
+      });
+      rawText = result.data.text;
+    } catch (e) { toast('OCR error: ' + e.message, 'err'); status.textContent = '✗ OCR error'; return; }
+  }
+
+  if (!rawText.trim()) { status.textContent = 'No text found.'; return; }
+  status.textContent = '⏳ Extracting orders...';
+
+  // Find branch name
+  const branchRe = /([A-Za-z][A-Za-z\s]+(?:Branch|BRANCH))/i;
+  const branchM = rawText.match(branchRe);
+  const branchRaw = branchM ? branchM[1].replace(/branch/i, '').trim() : '';
+
+  // Map branch to UNION customer
+  function matchBranch(b) {
+    b = b.toLowerCase().trim();
+    const map = [
+      [/barsha\s*south/, 'Union barsha south'],
+      [/barsha/, 'UNION Barsha'],
+      [/al\s*warqa|warqa/, 'UNION Al Warqa'],
+      [/motor\s*city/, 'UNION MOTOR CITY'],
+      [/jumeirah\s*safa|safa/, 'UNION Jumeirah Safa'],
+      [/jumeirah\s*first|jumeirah\s*1/, 'UNION Jumeirah First'],
+      [/jumeirah/, 'UNION Jumeirah First'],
+      [/nad\s*al\s*sheba|nad\s*alsheba/, 'UNION Nad Al Sheba'],
+      [/nad\s*al\s*hamar|nad\s*alhamer|nad\s*hamar/, 'UNION Nad Al Hamer'],
+      [/hamriya/, 'UNION Hamriya'],
+      [/mankhool/, 'UNION Mankhool'],
+      [/rashidiy/, 'UNION Rashidiya'],
+      [/nakheel/, 'UNION NAKHEEL'],
+      [/silicon/, 'Union silicon'],
+      [/aweer/, 'UNION Aweer'],
+      [/hessa/, 'UNION Hessa'],
+      [/towar/, 'UNION Towar'],
+      [/rukan/, 'UNION RUKAN'],
+      [/abu\s*hail/, 'Union abu hail'],
+      [/al\s*nahda|nahda/, 'UNION Al Nahda'],
+      [/al\s*khawaneej|khawaneej/, 'UNION Al khawaneej'],
+      [/umm\s*suqeim/, 'UNION Umm Suqeim'],
+      [/al\s*wasl|wasl/, 'UNION Al Wasl'],
+      [/mankhool/, 'UNION Mankhool'],
+      [/rumailah/, 'union Rumailah'],
+      [/jurf/, 'UNION Jurf'],
+    ];
+    for (const [re, val] of map) { if (re.test(b)) return val; }
+    return bestMatch('UNION ' + b, customers);
+  }
+
+  const customer = branchRaw ? matchBranch(branchRaw) : '';
+  if (!customer) { status.textContent = 'Could not find branch name.'; return; }
+
+  // Parse BOF table — find product rows and their quantities
+  const lines = rawText.split(/[\n\r]/).map(l => l.trim()).filter(l => l);
+  const bofProductRe = /fresh|chicken|breast|leg|thigh|drum|wing|liver|gizzard|heart|minced|neck|skin|bone|tender/i;
+  const skipBofRe = /branch|order|form|supplier|union\s*coop|delivery|barcode|description|quantity|brand|item|packing|uom|fact|cost|amount|vat|reqd|kindly|arrange|please|quote|approved|prepared|checked|signature|head\s*office|tel|fax|website|email|penalty/i;
+
+  lines.forEach(line => {
+    if (!bofProductRe.test(line)) return;
+    if (skipBofRe.test(line)) return;
+    // Extract all numbers from line
+    const nums = [...line.matchAll(/(\d+(?:\.\d+)?)/g)].map(m => parseFloat(m[1]));
+    if (!nums.length) return;
+    // Qty Reqd is typically a small integer (1-300), not a barcode/code
+    // Barcodes are usually 6+ digits
+    const validNums = nums.filter(n => n > 0 && n <= 500 && !String(Math.round(n)).match(/^\d{5,}$/));
+    if (!validNums.length) return;
+    const qty = validNums[validNums.length - 1]; // last valid number = qty reqd
+    if (!qty) return;
+    // Clean product name
+    const prodRaw = line
+      .replace(/\d+(?:\.\d+)?/g, '')
+      .replace(/(kg|kgs|KG|fresh|FRESH|al\s*balad|AL\s*BALAD|qassab\s*go|QASSAB|safi|SAFI)/gi, '')
+      .replace(/[^\w\s]/g, ' ')
+      .replace(/\s+/g, ' ').trim();
+    if (prodRaw.length < 3) return;
+    const product = matchProduct(prodRaw);
+    if (product) aiExtracted.push({ customer, product, qty, size: '', note: 'BOF' });
+  });
+
+  // Remove duplicates (same customer+product)
+  const seen = new Set();
+  aiExtracted = aiExtracted.filter(i => {
+    const k = i.customer + '|' + i.product;
+    if (seen.has(k)) return false;
+    seen.add(k); return true;
+  });
+
+  if (!aiExtracted.length) { status.textContent = 'No items found.'; return; }
+  renderAIResults();
+  document.getElementById('aiResults').style.display = 'block';
+  status.textContent = `✓ Found ${aiExtracted.length} items for ${customer}`;
+}
+
+// Long-press for AI results
+let _lpTimer = null;
+function aiLongPressStart(e, idx, type) {
+  _lpTimer = setTimeout(() => { openAIPicker(idx, type); }, 500);
+}
+function aiLongPressEnd() { clearTimeout(_lpTimer); }
+
+function openAIPicker(idx, type) {
+  const list = type === 'customer' ? customers : products;
+  const current = type === 'customer' ? aiExtracted[idx].customer : aiExtracted[idx].product;
+  const title = type === 'customer' ? '👤 Select Customer' : '🍗 Select Product';
+  _showPicker(list, current, title, val => {
+    if (type === 'customer') aiExtracted[idx].customer = val;
+    else aiExtracted[idx].product = val;
+    renderAIResults();
+  });
+}
+
+// Apply correction to ALL items with same value + save learning
+function aiApplyCorrection(type, oldVal, newVal, rawVal) {
+  if (!newVal) return;
+  learnSave(type, rawVal || oldVal, newVal);
+  // Apply to all matching items
+  let count = 0;
+  aiExtracted.forEach((item, i) => {
+    if (type === 'customer' && item.customer === oldVal) {
+      item.customer = newVal;
+      if (item._rawC) learnSave('c', item._rawC, newVal);
+      count++;
+      // Update DOM directly — fast and no flicker
+      const el = document.querySelector(`#aiResultItems > div:nth-child(${i+1}) [data-ai-customer]`);
+      if (el) el.textContent = '👤 ' + newVal;
+    }
+    if (type === 'product' && item.product === oldVal) {
+      item.product = newVal;
+      if (item._rawP) learnSave('p', item._rawP, newVal);
+      count++;
+      const el = document.querySelector(`#aiResultItems > div:nth-child(${i+1}) [data-ai-product]`);
+      if (el) el.textContent = '🍗 ' + newVal;
+    }
+  });
+  if (count === 0 && newVal !== oldVal) renderAIResults();
+  toast('✓ ' + (count > 1 ? count + ' rows updated' : 'Updated'), 'ok');
+}
+
+// Open picker for AI results edit
+function aiEditPicker(idx, type) {
+  const item = aiExtracted[idx];
+  const current = type === 'customer' ? item.customer : item.product;
+  const list = type === 'customer' ? customers : products;
+  const title = type === 'customer' ? '👤 Select Customer' : '🍗 Select Product';
+  const rawVal = type === 'customer' ? item._rawC : item._rawP;
+
+  _showPickerWithAdd(list, current, title,
+    val => aiApplyCorrection(type, current, val, rawVal),
+    type
+  );
+}
+
+// Extended picker with "Add new" option
+// ── GLOBAL PICKER (static HTML, no dynamic creation) ──
+let _gPickerCallback = null;
+let _gPickerList = [];
+let _gPickerType = '';
+let _gPickerCurrent = '';
+
+function _showPickerWithAdd(list, current, title, onSelect, type) {
+  _gPickerCallback = onSelect;
+  _gPickerList = list;
+  _gPickerType = type || '';
+  _gPickerCurrent = current;
+  document.getElementById('gPickerTitle').textContent = title;
+  document.getElementById('gPickerSearch').value = '';
+  document.getElementById('gPickerAddRow').style.display = 'none';
+  document.getElementById('gPickerNewVal').value = '';
+  document.getElementById('gPickerOv').style.display = 'block';
+  gPickerFilter();
+  setTimeout(() => document.getElementById('gPickerSearch').focus(), 100);
+}
+
+function _showPicker(list, current, title, onSelect, type) {
+  _showPickerWithAdd(list, current, title, onSelect, type || '');
+}
+
+function gPickerClose() {
+  document.getElementById('gPickerOv').style.display = 'none';
+  _gPickerCallback = null;
+}
+
+function gPickerFilter() {
+  const q = document.getElementById('gPickerSearch').value.toLowerCase();
+  const filtered = q ? _gPickerList.filter(i => i.toLowerCase().includes(q)) : _gPickerList;
+  const container = document.getElementById('gPickerItems');
+  container.innerHTML = '';
+
+  // Add new button
+  const addBtn = document.createElement('div');
+  addBtn.textContent = '➕ Add new';
+  addBtn.style.cssText = 'padding:12px 14px;font-size:.83rem;color:var(--teal);font-weight:600;cursor:pointer;border-bottom:1px solid var(--b1);background:rgba(45,212,191,.05)';
+  addBtn.addEventListener('touchend', e => { e.preventDefault(); gPickerToggleAdd(); });
+  addBtn.addEventListener('click', gPickerToggleAdd);
+  container.appendChild(addBtn);
+
+  filtered.forEach(item => {
+    const div = document.createElement('div');
+    div.textContent = item;
+    const isCur = item === _gPickerCurrent;
+    div.style.cssText = `padding:13px 14px;font-size:.87rem;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04);color:${isCur?'var(--blue2)':'var(--txt)'};font-weight:${isCur?'700':'400'};background:${isCur?'rgba(77,124,254,.15)':'transparent'}`;
+    // Use both touchend and click for maximum compatibility
+    div.addEventListener('touchend', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      gPickerDone(item);
+    });
+    div.addEventListener('click', e => {
+      e.stopPropagation();
+      gPickerDone(item);
+    });
+    container.appendChild(div);
+  });
+}
+
+function gPickerDone(val) {
+  const cb = _gPickerCallback;
+  _gPickerCallback = null;
+  document.getElementById('gPickerOv').style.display = 'none';
+  // Use rAF to ensure DOM is updated before callback fires
+  requestAnimationFrame(() => { if (cb) cb(val); });
+}
+
+function gPickerToggleAdd() {
+  const row = document.getElementById('gPickerAddRow');
+  const showing = row.style.display === 'flex';
+  row.style.display = showing ? 'none' : 'flex';
+  if (!showing) setTimeout(() => document.getElementById('gPickerNewVal').focus(), 50);
+}
+
+function gPickerAddNew() {
+  const val = document.getElementById('gPickerNewVal').value.trim();
+  if (!val) return;
+  if (_gPickerType === 'customer') {
+    if (!customers.includes(val)) { customers.push(val); _idfCache = null; LS.set('iat_c', customers); }
+    _gPickerList = customers;
+  } else if (_gPickerType === 'product') {
+    if (!products.includes(val)) { products.push(val); LS.set('iat_p', products); }
+    _gPickerList = products;
+  }
+  gPickerDone(val);
+}
+
+// Close on backdrop tap
+document.addEventListener('DOMContentLoaded', () => {
+  const ov = document.getElementById('gPickerOv');
+  if (ov) {
+    ov.addEventListener('click', e => { if (e.target === ov) gPickerClose(); });
+    ov.addEventListener('touchend', e => { if (e.target === ov) { e.preventDefault(); gPickerClose(); } });
+  }
+});
+
+// Legacy aliases
+function renderGPickerList() { gPickerFilter(); }
+function gPickerSelect(val) { gPickerDone(val); }
+
+function renderAIResults() {
+  document.getElementById('aiResultItems').innerHTML = aiExtracted.map((item, i) => `
+    <div style="background:var(--s3);border:1px solid var(--b2);border-radius:10px;padding:9px 11px;display:flex;flex-direction:column;gap:6px">
+      <div style="display:flex;gap:8px;align-items:flex-start">
+        <!-- Customer + Product stacked -->
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px">
+          <!-- Customer — tap to edit -->
+          <div data-ai-customer onclick="aiEditPicker(${i},'customer')"
+            style="background:rgba(77,124,254,.12);border:1.5px solid var(--blue);border-radius:7px;padding:7px 10px;color:var(--blue2);font-size:.82rem;font-weight:700;line-height:1.4;cursor:pointer;word-break:break-word">
+            👤 ${esc2(item.customer)}
+          </div>
+          <!-- Product — tap to edit -->
+          <div data-ai-product onclick="aiEditPicker(${i},'product')"
+            style="background:rgba(45,212,191,.08);border:1.5px solid var(--teal);border-radius:7px;padding:7px 10px;color:var(--teal);font-size:.82rem;font-weight:700;line-height:1.4;cursor:pointer;word-break:break-word">
+            🍗 ${esc2(item.product)}
+          </div>
+        </div>
+        <!-- Qty + delete -->
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;flex-shrink:0">
+          <input type="number" value="${item.qty}" min="0" step="0.5"
+            style="width:52px;background:var(--s2);border:1.5px solid var(--b2);border-radius:7px;padding:6px 4px;color:var(--amber);font-size:.88rem;font-weight:700;outline:none;text-align:center"
+            onchange="aiExtracted[${i}].qty=parseFloat(this.value)||0"/>
+          <span style="font-size:.6rem;color:var(--muted)">kg</span>
+          <button onclick="aiExtracted.splice(${i},1);renderAIResults()"
+            style="background:transparent;border:none;color:var(--faint);font-size:.85rem;cursor:pointer;padding:2px">✕</button>
+        </div>
+      </div>
     </div>`).join('');
 }
 
-function addAIOrdersToEntry(){
-  if(!aiExtracted.length){toast('No items','err');return;}
-  const date=todayStr();
-  const maxNum=orders.filter(o=>o.date===date).reduce((m,o)=>Math.max(m,o.num||0),0);
-  const custNums=new Map();
-  let num=maxNum;
-  aiExtracted.forEach(item=>{
-    if(!custNums.has(item.customer)){num++;custNums.set(item.customer,num);}
-    orders.push({customer:item.customer,product:item.product,qty:item.qty||1,size:'',note:item.note||'',date,num:custNums.get(item.customer),driver:''});
+function addAIOrdersToEntry() {
+  if (!aiExtracted.length) { toast('No items', 'err'); return; }
+  const date = todayStr();
+  const maxNum = orders.filter(o => o.date === date).reduce((m, o) => Math.max(m, o.num || 0), 0);
+  const custNums = new Map();
+  let num = maxNum;
+  aiExtracted.forEach(item => {
+    if (!custNums.has(item.customer)) { num++; custNums.set(item.customer, num); }
+    orders.push({ customer: item.customer, product: item.product, qty: item.qty || 1, size: item.size || '', note: item.note || '', date, num: custNums.get(item.customer), driver: '' });
+    // Save learning: if raw differs from matched, remember it
+    if (item._rawC && item._rawC !== item.customer) learnSave('c', item._rawC, item.customer);
+    if (item._rawP && item._rawP !== item.product) learnSave('p', item._rawP, item.product);
   });
-  saveOrders();
-  renderOrders();
-  updateBadges();
-  closeAIImport();
-  toast(`✓ Added ${aiExtracted.length} items to Orders`,'ok');
-  // Switch to orders tab
-  document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('on'));
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  saveOrders(); renderOrders(); updateBadges(); closeAIImport();
+  toast(`✓ Added ${aiExtracted.length} items to Orders`, 'ok');
+  document.querySelectorAll('.ntab').forEach(t => t.classList.remove('on'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
   document.getElementById('pg-orders').classList.add('on');
   document.querySelector('[onclick*="orders"]').classList.add('on');
 }
+
+
+// ── ORDER LIST LONG PRESS ──
+let _ordLpTimer = null;
+function ordLongPressStart(e, idx, type, extra) {
+  _ordLpTimer = setTimeout(() => {
+    if (type === 'customer') openOrdCustPicker(idx, extra);
+    else openOrdPicker(idx, type);
+  }, 500);
+}
+function ordLongPressEnd() { clearTimeout(_ordLpTimer); }
+
+function openOrdPicker(idx, type) {
+  const list = type === 'product' ? products : customers;
+  const current = orders[idx] ? (type === 'product' ? orders[idx].product : orders[idx].customer) : '';
+  _showPicker(list, current, type === 'product' ? '🍗 Change Product' : '👤 Change Customer', val => {
+    if (!orders[idx]) return;
+    if (type === 'product') orders[idx].product = val;
+    else orders[idx].customer = val;
+    saveOrders(); renderOrders();
+    toast('✓ Updated', 'ok');
+  });
+}
+
+function openOrdCustPicker(custName, date) {
+  _showPicker(customers, custName, '👤 Change Customer', val => {
+    orders.forEach(o => { if (o.customer === custName && (o.date || '—') === date) o.customer = val; });
+    saveOrders(); renderOrders();
+    toast('✓ Customer updated', 'ok');
+  });
+}
+
+function _showPicker(list, current, title, onSelect, type) {
+  _showPickerWithAdd(list, current, title, onSelect, type || '');
+}
+
+function renderGPickerList() {
+  const ov = document.getElementById('globalPickerOv');
+  if (!ov) return;
+  const q = (document.getElementById('gPickerSrch')?.value || '').toLowerCase();
+  const filtered = q ? ov._list.filter(i => i.toLowerCase().includes(q)) : ov._list;
+  document.getElementById('gPickerList').innerHTML = filtered.map(item => `
+    <div onclick="gPickerSelect('${esc(item)}')"
+      style="padding:9px 12px;border-radius:7px;cursor:pointer;font-size:.83rem;
+      background:${item === ov._current ? 'rgba(77,124,254,.2)' : 'var(--s3)'};
+      color:${item === ov._current ? 'var(--blue2)' : 'var(--txt)'};
+      font-weight:${item === ov._current ? '700' : '400'}">
+      ${item}
+    </div>`).join('');
+}
+
+function gPickerSelect(val) {
+  const ov = document.getElementById('globalPickerOv');
+  if (!ov) return;
+  ov._onSelect(val);
+  ov.remove();
+}
+
 
 function hi(t,q){if(!q)return t;return t.replace(new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi'),'<mark>$1</mark>');}
 function esc(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
