@@ -326,7 +326,9 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     <button class="btn btn-red btn-sm" style="flex-shrink:0" onclick="clearAll()">🗑 Clear</button>
     <button class="btn btn-ghost btn-sm" style="flex-shrink:0" onclick="exportXL()">⬇ Excel</button>
     <button class="btn btn-ghost btn-sm" style="flex-shrink:0;color:var(--teal)" onclick="openAIImport()">📋 Import</button>
-    <button class="btn btn-blue btn-sm" style="flex-shrink:0" onclick="showPrintDlg()">🖨 Print</button>
+    <button class="btn btn-blue btn-sm" style="flex-shrink:0" onclick="showOrdersPrintDlg()">🖨 Orders</button>
+    <button class="btn btn-amber btn-sm" style="flex-shrink:0" onclick="showLabelsPrintDlg()">🏷 Labels</button>
+    <button class="btn btn-ghost btn-sm" style="flex-shrink:0;color:var(--purple)" onclick="saveProductionDaily()">💾 Archive</button>
     <button class="btn btn-purple btn-sm" style="flex-shrink:0" onclick="printDrivers()">🚗 Drivers</button>
     <button class="btn btn-teal btn-sm" style="flex-shrink:0" onclick="saveToOneDrive()" id="odBtn">☁ OneDrive</button>
   </div>
@@ -580,24 +582,45 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
   </div>
 </div>
 
-<div class="ov" id="printOv" onclick="hidePrintDlg()">
+<div class="ov" id="ordersPrintOv" onclick="hideOrdersPrintDlg()">
   <div class="cb2" onclick="event.stopPropagation()">
     <div class="lbl" style="margin-bottom:10px">🖨 Print Orders</div>
     <div style="display:flex;gap:8px;margin-bottom:12px">
       <div style="flex:1">
         <div style="font-size:.65rem;color:var(--muted);margin-bottom:4px">From #</div>
-        <input type="number" min="1" id="printFrom" class="inp-f" style="text-align:center" placeholder="1"/>
+        <input type="number" min="1" id="ordersFrom" class="inp-f" style="text-align:center" placeholder="1"/>
       </div>
       <div style="flex:1">
         <div style="font-size:.65rem;color:var(--muted);margin-bottom:4px">To #</div>
-        <input type="number" min="1" id="printTo" class="inp-f" style="text-align:center" placeholder="10"/>
+        <input type="number" min="1" id="ordersTo" class="inp-f" style="text-align:center" placeholder="10"/>
       </div>
     </div>
     <div class="rg" style="justify-content:center">
-      <button class="btn btn-teal btn-sm" id="printConfirmBtn" onclick="confirmPrint()">🖨 Send to Printer</button>
-      <button class="btn btn-ghost btn-sm" onclick="hidePrintDlg()">Cancel</button>
+      <button class="btn btn-teal btn-sm" id="ordersPrintBtn" onclick="confirmOrdersPrint()">🖨 Send to Printer</button>
+      <button class="btn btn-ghost btn-sm" onclick="hideOrdersPrintDlg()">Cancel</button>
     </div>
-    <div id="printStatus" style="font-size:.7rem;color:var(--teal);margin-top:8px;text-align:center"></div>
+    <div id="ordersPrintStatus" style="font-size:.7rem;color:var(--teal);margin-top:8px;text-align:center"></div>
+  </div>
+</div>
+
+<div class="ov" id="labelsPrintOv" onclick="hideLabelsPrintDlg()">
+  <div class="cb2" onclick="event.stopPropagation()">
+    <div class="lbl" style="margin-bottom:10px">🏷 Print Labels</div>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <div style="flex:1">
+        <div style="font-size:.65rem;color:var(--muted);margin-bottom:4px">From #</div>
+        <input type="number" min="1" id="labelsFrom" class="inp-f" style="text-align:center" placeholder="1"/>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:.65rem;color:var(--muted);margin-bottom:4px">To #</div>
+        <input type="number" min="1" id="labelsTo" class="inp-f" style="text-align:center" placeholder="10"/>
+      </div>
+    </div>
+    <div class="rg" style="justify-content:center">
+      <button class="btn btn-amber btn-sm" id="labelsPrintBtn" onclick="confirmLabelsPrint()">🏷 Send to Printer</button>
+      <button class="btn btn-ghost btn-sm" onclick="hideLabelsPrintDlg()">Cancel</button>
+    </div>
+    <div id="labelsPrintStatus" style="font-size:.7rem;color:var(--amber);margin-top:8px;text-align:center"></div>
   </div>
 </div>
 <div class="ov" id="confOv">
@@ -904,9 +927,9 @@ function renderOrders(){
               <div class="pr-name" title="Hold to change">${o.product}</div>
               <div style="display:flex;gap:4px;margin-top:2px">
                 ${o.size?`<span class="pr-sz">${o.size}g</span>`:''}
-                ${o.note?`<span class="pr-note">📝 ${o.note}</span>`:''}
               </div>
             </div>
+            <input class="note-inp" type="text" placeholder="Note..." value="${esc2(o.note||'')}" oninput="setOrdNote(${o.idx},this.value)"/>
             <div class="pr-qc">
               <button class="pr-qb" onclick="adjO(${o.idx},-1)">−</button>
               <input class="pr-qi" type="number" min="0.5" step="0.5" value="${o.qty}" oninput="setOQ(${o.idx},this.value)"/>
@@ -955,6 +978,7 @@ function setGroupNum(date,cust,v){
   orders.forEach(o=>{if((o.date||'—')===date&&o.customer===cust)o.num=n;});
   renderOrders();
 }
+function setOrdNote(i,v){orders[i].note=v;saveOrders();}
 function adjO(i,d){orders[i].qty=Math.max(0.5,Math.round((parseFloat(orders[i].qty)||0.5)+d*0.5)*10/10);saveOrders();renderOrders();}
 function setOQ(i,v){orders[i].qty=Math.max(0.5,parseFloat(v)||0.5);}
 function delRow(i){orders.splice(i,1);saveOrders();renderOrders();}
@@ -1108,6 +1132,27 @@ async function writeToLoadingSheet(token){
 }
 
 // ── PRINT ──
+async function saveProductionDaily(){
+  const btn=event.target;
+  btn.disabled=true;btn.textContent='Saving...';
+  try{
+    const token=await getODToken();
+    const markerContent=JSON.stringify({action:'archive_production',ts:Date.now()});
+    const blob=new Blob([markerContent],{type:'application/json'});
+    const res=await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',{
+      method:'PUT',
+      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:blob
+    });
+    if(res.ok){
+      toast('✓ Production file archived!','ok');
+    }else{throw new Error('Failed');}
+  }catch(e){
+    if(e.message!=='user_cancelled')toast('Error: '+e.message,'err');
+  }finally{
+    btn.disabled=false;btn.textContent='💾 Archive';
+  }
+}
 async function printDrivers(){
   const btn=event.target;
   btn.disabled=true;btn.textContent='Sending...';
@@ -1128,24 +1173,23 @@ async function printDrivers(){
     btn.disabled=false;btn.textContent='🚗 Drivers';
   }
 }
-function showPrintDlg(){
-  document.getElementById('printOv').classList.add('on');
-  document.getElementById('printStatus').textContent='';
-  setTimeout(()=>document.getElementById('printFrom').focus(),100);
+// ══ PRINT ORDERS ══
+function showOrdersPrintDlg(){
+  document.getElementById('ordersPrintOv').classList.add('on');
+  document.getElementById('ordersPrintStatus').textContent='';
+  setTimeout(()=>document.getElementById('ordersFrom').focus(),100);
 }
-function hidePrintDlg(){document.getElementById('printOv').classList.remove('on');}
-async function confirmPrint(){
-  const from=document.getElementById('printFrom').value;
-  const to=document.getElementById('printTo').value;
+function hideOrdersPrintDlg(){document.getElementById('ordersPrintOv').classList.remove('on');}
+async function confirmOrdersPrint(){
+  const from=document.getElementById('ordersFrom').value;
+  const to=document.getElementById('ordersTo').value;
   if(!from||!to){toast('Enter both numbers','err');return;}
-  const btn=document.getElementById('printConfirmBtn');
-  const status=document.getElementById('printStatus');
+  const btn=document.getElementById('ordersPrintBtn');
+  const status=document.getElementById('ordersPrintStatus');
   btn.disabled=true;btn.textContent='Sending...';
   status.textContent='';
   try{
     const token=await getODToken();
-    // Read existing workbook and add print range to Loading sheet
-    // We use a special marker file to signal the print range
     const markerContent=JSON.stringify({from:parseInt(from),to:parseInt(to),ts:Date.now()});
     const blob=new Blob([markerContent],{type:'application/json'});
     const res=await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',{
@@ -1154,16 +1198,60 @@ async function confirmPrint(){
       body:blob
     });
     if(res.ok){
-      status.textContent=`✓ Print signal sent: ${from} → ${to}`;
+      status.textContent=`✓ Orders sent: ${from} → ${to}`;
       status.style.color='var(--teal)';
-      toast(`✓ Print ${from}→${to} sent!`,'ok');
-      setTimeout(hidePrintDlg,1500);
-    } else {throw new Error('Failed');}
+      toast(`✓ Print Orders ${from}→${to}!`,'ok');
+      setTimeout(()=>hideOrdersPrintDlg(),1500);
+    }else{
+      throw new Error(`HTTP ${res.status}`);
+    }
   }catch(e){
-    status.textContent='✗ Error: '+e.message;
+    status.textContent=`✗ ${e.message}`;
     status.style.color='var(--red)';
+    toast(`Print error: ${e.message}`,'err');
   }finally{
     btn.disabled=false;btn.textContent='🖨 Send to Printer';
+  }
+}
+
+// ══ PRINT LABELS ══
+function showLabelsPrintDlg(){
+  document.getElementById('labelsPrintOv').classList.add('on');
+  document.getElementById('labelsPrintStatus').textContent='';
+  setTimeout(()=>document.getElementById('labelsFrom').focus(),100);
+}
+function hideLabelsPrintDlg(){document.getElementById('labelsPrintOv').classList.remove('on');}
+async function confirmLabelsPrint(){
+  const from=document.getElementById('labelsFrom').value;
+  const to=document.getElementById('labelsTo').value;
+  if(!from||!to){toast('Enter both numbers','err');return;}
+  const btn=document.getElementById('labelsPrintBtn');
+  const status=document.getElementById('labelsPrintStatus');
+  btn.disabled=true;btn.textContent='Sending...';
+  status.textContent='';
+  try{
+    const token=await getODToken();
+    const markerContent=JSON.stringify({from:parseInt(from),to:parseInt(to),action:'print_labels',ts:Date.now()});
+    const blob=new Blob([markerContent],{type:'application/json'});
+    const res=await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',{
+      method:'PUT',
+      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:blob
+    });
+    if(res.ok){
+      status.textContent=`✓ Labels sent: ${from} → ${to}`;
+      status.style.color='var(--amber)';
+      toast(`✓ Print Labels ${from}→${to}!`,'ok');
+      setTimeout(()=>hideLabelsPrintDlg(),1500);
+    }else{
+      throw new Error(`HTTP ${res.status}`);
+    }
+  }catch(e){
+    status.textContent=`✗ ${e.message}`;
+    status.style.color='var(--red)';
+    toast(`Print error: ${e.message}`,'err');
+  }finally{
+    btn.disabled=false;btn.textContent='🏷 Send to Printer';
   }
 }
 
