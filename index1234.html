@@ -6,6 +6,7 @@
 <title>IAT Orders</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.10.0/lib/msal-browser.min.js"></script>
@@ -129,6 +130,12 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
 .btn-blue{background:var(--blue);color:#fff;}
 .btn-blue:active{background:var(--blue2);}
 .btn-ghost{background:transparent;border:1.5px solid var(--b2);color:var(--muted);}
+.btn-amber{background:var(--amber);color:#080b12;}
+.btn-amber:active{filter:brightness(1.1);}
+.btn-purple{background:#8b5cf6;color:#fff;}
+.btn-purple:active{filter:brightness(1.1);}
+.btn-green{background:#22c55e;color:#080b12;}
+.btn-green:active{filter:brightness(1.1);}
 .btn-ghost:active{border-color:var(--blue);color:var(--blue2);}
 .btn-full{width:100%;}
 .btn-sm{padding:6px 12px;font-size:.75rem;border-radius:7px;}
@@ -204,6 +211,16 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
 .add-row input{flex:1;background:var(--s3);border:1.5px solid var(--b2);border-radius:6px;padding:7px 10px;color:var(--txt);font-family:var(--sans);font-size:.8rem;outline:none;}
 .add-row input:focus{border-color:var(--teal);}
 
+/* ══ T.ORDERS PAGE — Clear line colors ══ */
+#pg-tender-orders .cc-name { color: var(--blue2) !important; }
+#pg-tender-orders .cc-h { background: linear-gradient(90deg,rgba(251,191,36,.18),transparent); border-bottom-color: rgba(251,191,36,.25); }
+#pg-tender-orders .pr-del,
+#pg-tender-orders button[onclick*="delTRow"] { color: var(--red) !important; border-color: var(--red) !important; }
+#pg-tender-orders .pr-qb { border-color: var(--b2); color: var(--txt); }
+#pg-tender-orders .pr-qb:hover, #pg-tender-orders .pr-qb:active { border-color: var(--amber); color: var(--amber); }
+#pg-tender-orders input[type="number"] { color: var(--amber) !important; }
+#pg-tender-orders span[style*="trays"] { color: var(--teal) !important; font-family: var(--mono); font-size: .7rem; }
+
 /* TOAST */
 .toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%) translateY(12px);background:var(--s3);border:1px solid var(--b2);border-radius:var(--r);padding:8px 16px;font-size:.76rem;opacity:0;transition:all .22s;z-index:999;pointer-events:none;white-space:nowrap;}
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
@@ -228,6 +245,7 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
   <div class="ntab" onclick="showPage('tender',this)">🏷 Tender</div>
   <div class="ntab" onclick="showPage('tender-orders',this)">📋 T.Orders</div>
   <div class="ntab" onclick="showPage('tqty',this)">📊 T.Qty</div>
+  <div class="ntab" onclick="showPage('combined-qty',this)">📊 All Qty</div>
   <div class="ntab" onclick="showPage('report',this)">📄 Report</div>
   <div class="ntab" onclick="showPage('invoice',this)">🧾 Invoice</div>
   <div class="ntab" onclick="showPage('settings',this)">⚙️ Settings</div>
@@ -328,7 +346,6 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
   <div class="exp-bar">
     <button class="btn btn-red btn-sm" style="flex-shrink:0" onclick="clearAll()">🗑 Clear</button>
     <button class="btn btn-ghost btn-sm" style="flex-shrink:0" onclick="openAIImport()">📋 Import</button>
-    <button class="btn btn-teal btn-sm" style="flex-shrink:0" onclick="saveToOneDrive()" id="odBtn">☁ OneDrive</button>
   </div>
 </div>
 
@@ -345,14 +362,15 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     </div>
   </div>
   <div class="exp-bar">
-    <div style="display:flex;gap:8px;align-items:center">
-      <label style="font-size:.7rem;color:var(--muted);min-width:fit-content">📍 Print Range:</label>
-      <input type="text" id="printRangeFrom" placeholder="From (A1)" style="width:80px;padding:6px;border:1px solid var(--b2);border-radius:3px;font-size:.75rem;font-family:monospace" value="A1"/>
+    <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
+      <label style="font-size:.7rem;color:var(--muted);white-space:nowrap">📍 Orders:</label>
+      <input type="number" id="printRangeFrom" placeholder="From" style="width:70px;padding:6px;border:1px solid var(--b2);border-radius:3px;font-size:.75rem;font-family:monospace;text-align:center" value="1"/>
       <span style="color:var(--muted);font-size:.7rem">→</span>
-      <input type="text" id="printRangeTo" placeholder="To (Z100)" style="width:80px;padding:6px;border:1px solid var(--b2);border-radius:3px;font-size:.75rem;font-family:monospace" value="Z100"/>
+      <input type="number" id="printRangeTo" placeholder="To" style="width:70px;padding:6px;border:1px solid var(--b2);border-radius:3px;font-size:.75rem;font-family:monospace;text-align:center" value="100"/>
     </div>
-    <button class="btn btn-blue btn-sm" style="flex-shrink:0" onclick="showOrdersPrintDlg()">🖨 Orders</button>
-    <button class="btn btn-amber btn-sm" style="flex-shrink:0" onclick="showLabelsPrintDlg()">🏷 Labels</button>
+    <button class="btn btn-teal btn-sm" style="flex-shrink:0" onclick="manualSaveRange()" id="odBtn">☁ Save</button>
+    <button class="btn btn-blue btn-sm" style="flex-shrink:0" onclick="directPrintOrders()">🖨 Orders</button>
+    <button class="btn btn-amber btn-sm" style="flex-shrink:0" onclick="directPrintLabels()">🏷 Labels</button>
     <button class="btn btn-ghost btn-sm" style="flex-shrink:0;color:var(--purple)" onclick="saveProductionDaily()">💾 Archive</button>
     <button class="btn btn-purple btn-sm" style="flex-shrink:0" onclick="printDrivers()">🚗 Drivers</button>
     <button class="btn btn-ghost btn-sm" style="flex-shrink:0" onclick="exportXL()">⬇ Excel</button>
@@ -395,52 +413,73 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
 </div>
 
 
-<!-- ══ TENDER PAGE ══ -->
+<!-- ══ TENDER PAGE (like Entry) ══ -->
 <div class="page" id="pg-tender">
-  <!-- Top: customer picker -->
-  <div style="padding:10px 12px;border-bottom:1px solid var(--b1);flex-shrink:0">
-    <div style="display:flex;gap:8px;margin-bottom:10px">
-      <button class="btn btn-ghost btn-sm" style="flex:1;color:var(--teal)" onclick="openTenderImport()">📥 AI Import</button>
-    </div>
-    <div class="pick-wrap">
-      <button class="pick-btn" id="tCustBtn" onclick="togTCDrop()">
-        <span id="tCustLabel" style="color:var(--muted)">Select customer…</span>
-        <span style="font-size:.7rem">▾</span>
-      </button>
-      <div class="pick-drop" id="tCustDrop">
-        <div style="padding:8px"><input type="text" id="tCustSrch" placeholder="Search…" oninput="renderTCustDL(customers.filter(c=>c.toLowerCase().includes(this.value.toLowerCase())))" style="width:100%;background:var(--s3);border:1px solid var(--b2);border-radius:6px;padding:6px 10px;color:var(--txt);font-family:var(--sans);font-size:.8rem;outline:none"/></div>
-        <div id="tCustList" style="max-height:180px;overflow-y:auto"></div>
+
+  <div class="entry-top">
+
+    <div class="cust-row">
+      <span class="cust-label">Customer</span>
+      <div class="t-pick-wrap" style="position:relative;flex:1">
+        <button class="pick-btn" id="tCustBtn" onclick="togTCDrop()">
+          <span id="tCustLbl" class="ph">Choose...</span>
+          <span class="arr">▼</span>
+        </button>
+        <div class="cdrop" id="tCustDrop">
+          <div class="drop-s">
+            <span style="color:var(--muted)">🔍</span>
+            <input type="text" id="tCustSrch" placeholder="Search customer..." oninput="filterTCust()" autocomplete="off"/>
+          </div>
+          <div class="dl" id="tCustDL"></div>
+        </div>
       </div>
     </div>
-  </div>
 
-  <!-- Middle: split view like Entry -->
-  <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
-    <!-- Product search + list -->
-    <div style="padding:8px 12px;border-bottom:1px solid var(--b1);flex-shrink:0">
-      <input type="text" id="tProdSrch" placeholder="Search tender product…" oninput="renderTPList(this.value)" style="width:100%;background:var(--s2);border:1.5px solid var(--b2);border-radius:var(--r);padding:8px 12px;color:var(--txt);font-family:var(--sans);font-size:.82rem;outline:none;box-sizing:border-box"/>
+    <div class="prod-row">
+      <span class="prod-label">Product</span>
+      <div class="t-psrch-wrap" style="position:relative;flex:1">
+        <span class="psrch-ico">🔍</span>
+        <input type="text" id="tProdSrch" placeholder="Search tender products..." oninput="filterTPDrop()" onfocus="openTPDrop()" autocomplete="off" style="width:100%;background:var(--s2);border:1.5px solid var(--b2);border-radius:8px;padding:8px 11px 8px 30px;color:var(--txt);font-family:var(--sans);font-size:.85rem;outline:none"/>
+        <div class="pdrop" id="tProdDrop">
+          <div class="pdrop-list" id="tProdDL"></div>
+        </div>
+      </div>
     </div>
-    <div id="tProdList" style="flex:1;overflow-y:auto;padding:6px 8px;display:flex;flex-direction:column;gap:4px"></div>
+
   </div>
 
-  <!-- Bottom: Add button only -->
-  <div style="padding:8px 12px;flex-shrink:0;border-top:1px solid var(--b1)">
-    <button class="btn btn-teal" style="width:100%" onclick="addTenderOrder()">➕ Add to Tender</button>
+  <div class="entry-mid" id="tenderMid">
+    <div class="empty-hint">👆 Select a customer and products above</div>
   </div>
+
+  <div class="entry-bar">
+    <div class="rg">
+      <button class="btn btn-ghost" style="flex-shrink:0;padding:10px 14px;color:var(--teal);border-color:var(--teal)" onclick="openTenderImport()">📥 Import</button>
+      <button class="btn btn-teal btn-full" onclick="addTenderOrder()">＋ Add to Tender</button>
+    </div>
+  </div>
+
 </div>
 
-<!-- ══ TENDER ORDERS PAGE ══ -->
+<!-- ══ TENDER ORDERS PAGE (like Orders) ══ -->
 <div class="page" id="pg-tender-orders">
   <div class="orders-head">
-    <div style="font-size:.8rem;font-weight:700;color:var(--teal)">📋 Tender Orders</div>
-    <div style="display:flex;gap:7px">
+    <div>
+      <div style="font-size:.68rem;font-family:var(--mono);color:var(--muted);letter-spacing:.1em;text-transform:uppercase">Tender Orders</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
       <span class="badge" id="tOrdersBadge">0</span>
     </div>
   </div>
-  <div style="flex:1;overflow-y:auto;padding:6px 8px;display:flex;flex-direction:column;gap:3px" id="tenderOrdersList"></div>
+  <div style="flex:1;overflow-y:auto">
+    <div class="olist" id="tOrdersList">
+      <div class="empty"><div class="ei">🏷</div><p>No tender orders yet.</p></div>
+    </div>
+  </div>
+  <div class="exp-bar">
+    <button class="btn btn-red btn-sm" style="flex-shrink:0" onclick="clearAllTender()">🗑 Clear</button>
+  </div>
 </div>
-
-<!-- ══ TENDER VIEW PAGE ══
 <div class="page" id="pg-tender-view">
   <div class="orders-head">
     <div>
@@ -465,12 +504,28 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     <div style="display:flex;gap:7px">
       <button class="btn btn-teal btn-sm" onclick="printTQtyPDF()">⬇ PDF</button>
       <button class="btn btn-purple btn-sm" onclick="printDriversPDF()">⬇ Drivers PDF</button>
-    <button class="btn btn-amber btn-sm" onclick="mergeTenderToOrders()">➕ Add to Orders</button>
+      <button class="btn btn-amber btn-sm" onclick="mergeTenderToOrders()">➕ Add to Orders</button>
+      <button class="btn btn-red btn-sm" onclick="clearAllTender()">🗑️ Clear All</button>
     </div>
   </div>
   <div style="flex:1;overflow-y:auto;padding:12px" id="tqtyList"></div>
 </div>
 
+
+
+<!-- ══ COMBINED QTY PAGE ══ -->
+<div class="page" id="pg-combined-qty">
+  <div class="orders-head">
+    <div><div style="font-size:.68rem;font-family:var(--mono);color:var(--muted);letter-spacing:.1em;text-transform:uppercase">📊 All Quantities</div></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-teal btn-sm" id="btnDownloadImg" onclick="downloadCombinedImage()">⬇ Save Image</button>
+      <button class="btn btn-green btn-sm" id="btnShareWA" onclick="shareCombinedImageWhatsApp()">💬 WhatsApp</button>
+    </div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:10px" id="combinedQtyScroll">
+    <div id="combinedQtyList" style="display:flex;flex-direction:column;gap:12px;padding-bottom:16px"></div>
+  </div>
+</div>
 
 <!-- ══ REPORT PAGE ══ -->
 <div class="page" id="pg-report">
@@ -721,6 +776,31 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     <div class="rg"><button class="btn btn-red btn-sm" id="confYes">Delete</button><button class="btn btn-ghost btn-sm" onclick="closeConf()">Cancel</button></div>
   </div>
 </div>
+
+<!-- ✅ Global Customer Change Modal -->
+<div id="gCustModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.75);z-index:900;flex-direction:column" onclick="if(event.target===this)closeGCustModal()">
+  <div style="background:var(--s1);border-radius:0 0 14px 14px;width:100%;max-height:82vh;display:flex;flex-direction:column;overflow:hidden">
+    <!-- Header -->
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--b1);flex-shrink:0">
+      <span style="font-size:.8rem;font-weight:800;color:var(--blue2)">👤 Change Customer</span>
+      <button onclick="closeGCustModal()" style="background:var(--s3);border:none;color:var(--muted);border-radius:8px;padding:4px 12px;cursor:pointer;font-weight:700">✕</button>
+    </div>
+    <!-- Search -->
+    <div style="padding:8px 10px;border-bottom:1px solid var(--b1);flex-shrink:0">
+      <input type="text" id="gCustSearch" placeholder="🔍 Search customers..." autocomplete="off"
+        oninput="filterGCustModal(this.value)"
+        style="width:100%;background:var(--s3);border:1.5px solid var(--b2);border-radius:8px;padding:9px 12px;color:var(--txt);font-family:var(--sans);font-size:.85rem;outline:none;box-sizing:border-box"/>
+    </div>
+    <!-- Add new customer -->
+    <div style="padding:6px 10px;border-bottom:1px solid var(--b1);flex-shrink:0;display:flex;gap:6px">
+      <input type="text" id="gCustNewName" placeholder="New customer name..." autocomplete="off"
+        style="flex:1;background:var(--s3);border:1.5px solid var(--b2);border-radius:8px;padding:7px 10px;color:var(--txt);font-family:var(--sans);font-size:.8rem;outline:none"/>
+      <button onclick="addNewCustFromModal()" style="padding:7px 12px;background:var(--teal);color:#000;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:.8rem;flex-shrink:0">+ Add</button>
+    </div>
+    <!-- List -->
+    <div id="gCustList" style="flex:1;overflow-y:auto"></div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <!-- GLOBAL PICKER -->
@@ -761,13 +841,14 @@ let invoices=LS.get('iat_inv',[]);   // saved invoices
 const DTP=["KG","Zaki 400gr","Zaki 450gr","Zaki 500gr","Chickenco 400gr","Chickenco 450gr","Chickenco 500gr"];
 let tenderProds=LS.get('iat_tp',DTP);
 let tenderOrders=LS.get('iat_to',[]);
-let tSelCust=null;
-let tSelProds=new Map();
-let tCOpen=false;
 let orders=LS.get('iat_orders',[]);
 let selCust=null;
 let selProds=new Map();
 let cOpen=false,pOpen=false;
+
+// ✅ دوال الحفظ المركزية
+function saveOrders(){LS.set('iat_orders',orders);}
+function saveTenderOrders(){LS.set('iat_to',tenderOrders);}
 
 function todayStr(){const d=new Date();return d.toISOString().slice(0,10);}
 function sortedProds(list){return[...list].sort((a,b)=>(freq[b]||0)-(freq[a]||0));}
@@ -836,9 +917,25 @@ function showPage(n,t){
   if(n==='drivers')renderDriversPage();
   if(n==='qty')renderQtyPage();
   if(n==='invoice'){renderInvOrdersList();renderPricingPage();renderInvoiceList();}
-  if(n==='tender'){renderTCustDL(customers);renderTPList('');renderTenderOrdersList();}
+  if(n==='tender'){
+    tenderProds=LS.get('iat_tp',DTP);   // ✅ تحديث من Settings دائماً
+    customers=LS.get('iat_c',DC);         // ✅ تحديث قائمة الزبائن
+    tCustOpen=false;
+    tSelProds=new Map();
+    tSelCust=null;
+    document.getElementById('tCustLbl').textContent='Choose...';
+    document.getElementById('tCustLbl').style.color='var(--muted)';
+    document.getElementById('tCustSrch').value='';
+    document.getElementById('tProdSrch').value='';
+    renderTCustDL(customers);
+    renderTPDL(tenderProds);
+    renderTSelRows();
+    renderTenderOrdersList();
+  }
+  if(n==='tender-orders'){tenderProds=LS.get('iat_tp',DTP);renderTOrdersPage();}
   if(n==='tender-view'){renderTenderViewList();}
   if(n==='tqty')renderTQtyPage();
+  if(n==='combined-qty')renderCombinedQtyPage();
   if(n==='report')renderReportPage();
   if(n==='settings'){renderSettC();renderSettP();renderSettD();renderSettTP();renderCustGroupList();}
 }
@@ -861,6 +958,8 @@ function closeCDrop(){
 document.addEventListener('click',e=>{
   if(!e.target.closest('.pick-wrap'))closeCDrop();
   if(!e.target.closest('.psrch-wrap'))closePDrop();
+  if(!e.target.closest('.t-pick-wrap'))closeTCDrop();
+  if(!e.target.closest('.t-psrch-wrap'))closeTPDrop();
 });
 function filterCust(){
   const q=document.getElementById('custSrch').value.toLowerCase();
@@ -932,29 +1031,105 @@ function togProd(name){
 function renderSelRows(){
   const el=document.getElementById('entryMid');
   if(!selProds.size){el.innerHTML='<div class="empty-hint">👆 Select a customer and products above</div>';return;}
-  el.innerHTML=[...selProds.entries()].map(([p,d])=>`
-    <div class="sr">
+  
+  const prods=[...selProds.entries()];
+  el.innerHTML=prods.map(([p,d],idx)=>`
+    <div class="sr" data-prod="${idx}">
       <div class="sr-top">
         <span class="sr-name${isCHK(p)?' chk':''}">${p}</span>
         <div class="qc">
-          <button class="qb" onclick="adjQ('${esc(p)}',-1)">−</button>
-          <input class="qi" type="number" min="0.5" step="0.5" value="${d.qty}" oninput="setQ('${esc(p)}',this.value)"/>
-          <button class="qb" onclick="adjQ('${esc(p)}',1)">+</button>
+          <button class="qb entry-minus" data-idx="${idx}">−</button>
+          <input class="qi entry-qty" type="number" min="0.5" step="0.5" value="${d.qty}" data-idx="${idx}"/>
+          <button class="qb entry-plus" data-idx="${idx}">+</button>
         </div>
         <span class="qu">kg</span>
-        <button class="sr-del" onclick="togProd('${esc(p)}')">✕</button>
+        <button class="sr-del entry-del" data-idx="${idx}">✕</button>
       </div>
       ${isCHK(p)?`<div class="sz-row">
-        ${SIZES.map(s=>`<span class="sz-b${d.size===s?' sel':''}" onclick="setSz('${esc(p)}','${s}')">${s}</span>`).join('')}
-        <input class="sz-cust" type="number" placeholder="custom g" value="${!SIZES.includes(d.size)?d.size:''}" oninput="setSz('${esc(p)}',this.value)"/>
+        ${SIZES.map(s=>`<span class="sz-b${d.size===s?' sel':''}" data-size="${s}" data-idx="${idx}">${s}</span>`).join('')}
+        <input class="sz-cust entry-sz" type="number" placeholder="custom g" value="${!SIZES.includes(d.size)?d.size:''}" data-idx="${idx}"/>
       </div>`:''}
-      <input class="note-inp" type="text" placeholder="Note..." value="${esc2(d.note)}" oninput="setNote('${esc(p)}',this.value)"/>
+      <input class="note-inp entry-note" type="text" placeholder="Note..." value="${esc2(d.note)}" data-idx="${idx}"/>
     </div>`).join('');
+  
+  // ✅ Event Listeners
+  const prods_arr=[...selProds.entries()];
+  
+  el.querySelectorAll('.entry-plus').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const idx=parseInt(btn.dataset.idx);
+      if(idx>=0 && idx<prods_arr.length){
+        const [p,o]=prods_arr[idx];
+        o.qty=Math.max(0.5,Math.round((parseFloat(o.qty||0.5)+0.5)*10)/10);
+        renderSelRows();
+      }
+    });
+  });
+  
+  el.querySelectorAll('.entry-minus').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const idx=parseInt(btn.dataset.idx);
+      if(idx>=0 && idx<prods_arr.length){
+        const [p,o]=prods_arr[idx];
+        o.qty=Math.max(0.5,Math.round((parseFloat(o.qty||0.5)-0.5)*10)/10);
+        renderSelRows();
+      }
+    });
+  });
+  
+  el.querySelectorAll('.entry-qty').forEach(inp=>{
+    inp.addEventListener('change',()=>{
+      const idx=parseInt(inp.dataset.idx);
+      if(idx>=0 && idx<prods_arr.length){
+        const [p,o]=prods_arr[idx];
+        o.qty=Math.max(0.5,parseFloat(inp.value||0.5));
+      }
+    });
+  });
+  
+  el.querySelectorAll('.entry-del').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const idx=parseInt(btn.dataset.idx);
+      if(idx>=0 && idx<prods_arr.length){
+        const [p,o]=prods_arr[idx];
+        selProds.delete(p);
+        renderSelRows();
+      }
+    });
+  });
+  
+  el.querySelectorAll('.sz-b').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const idx=parseInt(btn.dataset.idx);
+      const size=btn.dataset.size;
+      if(idx>=0 && idx<prods_arr.length){
+        const [p,o]=prods_arr[idx];
+        o.size=size;
+        renderSelRows();
+      }
+    });
+  });
+  
+  el.querySelectorAll('.entry-sz').forEach(inp=>{
+    inp.addEventListener('change',()=>{
+      const idx=parseInt(inp.dataset.idx);
+      if(idx>=0 && idx<prods_arr.length){
+        const [p,o]=prods_arr[idx];
+        o.size=inp.value;
+      }
+    });
+  });
+  
+  el.querySelectorAll('.entry-note').forEach(inp=>{
+    inp.addEventListener('change',()=>{
+      const idx=parseInt(inp.dataset.idx);
+      if(idx>=0 && idx<prods_arr.length){
+        const [p,o]=prods_arr[idx];
+        o.note=inp.value;
+      }
+    });
+  });
 }
-function adjQ(p,d){const o=selProds.get(p);if(o){o.qty=Math.max(0.5,Math.round((parseFloat(o.qty)||0.5)+(d*0.5))*10/10);renderSelRows();}}
-function setQ(p,v){const o=selProds.get(p);if(o)o.qty=Math.max(0.5,parseFloat(v)||0.5);renderSelRows();}
-function setSz(p,v){const o=selProds.get(p);if(o){o.size=v;renderSelRows();}}
-function setNote(p,v){const o=selProds.get(p);if(o)o.note=v;}
 
 // ── ADD TO ORDER ──
 function addToOrder(){
@@ -975,13 +1150,207 @@ function addToOrder(){
   renderSelRows();renderPDropList('');updateBadges();
 }
 
-// ── ORDERS ──
-function saveOrders(){LS.set('iat_orders',orders);}
+// ── TENDER (same as Entry, but for Tender Products) ──
+let tSelCust=null, tSelProds=new Map(), tCustOpen=false;
+
+function togTCDrop(){tCustOpen?closeTCDrop():openTCDrop();}
+function openTCDrop(){
+  tCustOpen=true;
+  document.getElementById('tCustDrop').classList.add('on');
+  document.getElementById('tCustBtn').classList.add('open');
+  setTimeout(()=>document.getElementById('tCustSrch').focus(),50);
+  renderTCustDL(customers);
+}
+function closeTCDrop(){
+  tCustOpen=false;
+  document.getElementById('tCustDrop').classList.remove('on');
+  document.getElementById('tCustBtn').classList.remove('open');
+}
+function filterTCust(){
+  const q=(document.getElementById('tCustSrch').value||'').toLowerCase();
+  const filtered=q?customers.filter(c=>c.toLowerCase().includes(q)):customers;
+  renderTCustDL(filtered);
+}
+function renderTCustDL(list){
+  const el=document.getElementById('tCustDL');
+  if(!list||!list.length){
+    el.innerHTML='<div style="padding:10px;color:var(--muted);font-size:.75rem">No customers</div>';
+    return;
+  }
+  el.innerHTML=list.map(c=>`
+    <div style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--b1);font-size:.75rem;color:var(--txt);transition:background 0.2s" 
+         onclick="selTCust('${esc(c)}')" 
+         onmouseover="this.style.background='var(--b1)'" 
+         onmouseout="this.style.background='transparent'">
+      ${c}
+    </div>
+  `).join('');
+}
+function selTCust(c){
+  tSelCust=c;
+  document.getElementById('tCustLbl').textContent=c;
+  document.getElementById('tCustLbl').style.color='var(--txt)';
+  closeTCDrop();
+  document.getElementById('tProdSrch').focus();
+}
+
+function openTPDrop(){
+  document.getElementById('tProdDrop').classList.add('on');
+  renderTPDL(tenderProds);
+}
+function closeTPDrop(){
+  document.getElementById('tProdDrop').classList.remove('on');
+}
+function filterTPDrop(){
+  const q=(document.getElementById('tProdSrch').value||'').toLowerCase();
+  renderTPDL(q?tenderProds.filter(p=>p.toLowerCase().includes(q)):tenderProds);
+}
+function renderTPDL(list){
+  const el=document.getElementById('tProdDL');
+  if(!list||!list.length){
+    el.innerHTML='<div style="padding:10px;color:var(--muted);font-size:.75rem">No products</div>';
+    return;
+  }
+  el.innerHTML=list.map(p=>`
+    <div style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--b1);font-size:.75rem;color:var(--txt);transition:background 0.2s" 
+         onclick="selTProd('${esc(p)}')" 
+         onmouseover="this.style.background='var(--b1)'" 
+         onmouseout="this.style.background='transparent'">
+      ${p}
+    </div>
+  `).join('');
+}
+function selTProd(p){
+  if(!tSelCust){toast('Select customer first','err');return;}
+  if(tSelProds.has(p)){toast('Already added','err');return;}
+  tSelProds.set(p,{qty:1,note:''});
+  document.getElementById('tProdSrch').value='';
+  closeTPDrop();
+  renderTPDL(tenderProds);
+  renderTSelRows();
+  toast('✓ '+p,'ok');
+}
+
+function renderTSelRows(){
+  const el=document.getElementById('tenderMid');
+  if(!tSelProds.size){
+    el.innerHTML='<div class="empty-hint">👆 Select a customer and products above</div>';
+    return;
+  }
+  const prods=[...tSelProds.entries()];
+  el.innerHTML=prods.map(([p,d],idx)=>`
+    <div style="display:flex;gap:6px;align-items:center;padding:8px;background:var(--s2);border:1px solid var(--b2);border-radius:4px;margin-bottom:4px">
+      <span style="flex:1;font-size:.78rem;font-weight:600;color:var(--txt)">${p}</span>
+      <div style="display:flex;align-items:center;border:1.5px solid var(--b2);border-radius:4px;overflow:hidden">
+        <button onclick="adjTSelProd(${idx},-1)" style="padding:4px 9px;background:var(--s1);border:none;cursor:pointer;font-weight:700;font-size:.9rem;color:var(--txt)">−</button>
+        <input type="number" value="${d.qty}" min="1" step="1"
+          onchange="setTSelProdQty(${idx},this.value)"
+          style="width:44px;padding:2px;border:none;text-align:center;font-weight:700;font-size:.85rem;background:transparent;color:var(--txt)"/>
+        <button onclick="adjTSelProd(${idx},1)" style="padding:4px 9px;background:var(--s1);border:none;cursor:pointer;font-weight:700;font-size:.9rem;color:var(--txt)">+</button>
+      </div>
+      <span style="font-size:.65rem;color:var(--muted);min-width:22px">trays</span>
+      <button onclick="delTSelProd(${idx})" style="padding:3px 7px;background:#e74c3c;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:700">✕</button>
+    </div>`).join('');
+}
+
+function adjTSelProd(idx,delta){
+  const prods=[...tSelProds.entries()];
+  if(idx<0||idx>=prods.length)return;
+  const [p,o]=prods[idx];
+  o.qty=Math.max(1,Math.round((parseInt(o.qty||1)+delta)));
+  renderTSelRows();
+}
+
+function setTSelProdQty(idx,v){
+  const prods=[...tSelProds.entries()];
+  if(idx<0||idx>=prods.length)return;
+  const [p,o]=prods[idx];
+  o.qty=Math.max(1,parseInt(v)||1);
+  renderTSelRows();
+}
+
+function delTSelProd(idx){
+  const prods=[...tSelProds.entries()];
+  if(idx<0||idx>=prods.length)return;
+  const [p]=prods[idx];
+  tSelProds.delete(p);
+  renderTSelRows();
+}
+
+function setTSelProdNote(idx,v){
+  const prods=[...tSelProds.entries()];
+  if(idx<0||idx>=prods.length)return;
+  prods[idx][1].note=v;
+}
+
+function addTenderOrder(){
+  if(!tSelCust){toast('Select a customer','err');return;}
+  if(!tSelProds.size){toast('Select products','err');return;}
+  
+  tSelProds.forEach((d,p)=>{
+    tenderOrders.push({customer:tSelCust,product:p,qty:d.qty,note:d.note});
+  });
+  
+  LS.set('iat_to',tenderOrders);
+  toast(`✓ ${tSelProds.size} item(s) added for ${tSelCust}`,'ok');
+  
+  // Clear selections only
+  tSelCust=null;
+  tSelProds.clear();
+  document.getElementById('tCustLbl').textContent='Choose...';
+  document.getElementById('tCustLbl').style.color='var(--muted)';
+  document.getElementById('tProdSrch').value='';
+  
+  renderTSelRows();  // يفرغ tenderMid لأن tSelProds فارغة
+  renderTenderOrdersList();  // يعرض الأوردرات المضافة
+}
+
+// ── RENDER TENDER ORDERS (used internally, no display) ──
+function renderTenderOrdersList(){
+  // الأوردرات تُعرض الآن في T.Orders page فقط
+  const el=document.getElementById('tOrdersList');
+  if(el)renderTOrdersPage();
+}
+
+function getCustomersFromSettings(){
+  // خذ الزبائن من Settings (بدل Entry customer list)
+  return customers||[];
+}
+
+function editTenderOrder(idx, field, value){
+  if(idx<0||idx>=tenderOrders.length)return;
+  tenderOrders[idx][field]=value;
+  LS.set('iat_to',tenderOrders);
+  renderTenderOrdersList();
+  renderTQtyPage();
+}
+
+function editTenderQty(idx, delta){
+  if(idx<0||idx>=tenderOrders.length)return;
+  tenderOrders[idx].qty=Math.max(0.5,Math.round((parseFloat(tenderOrders[idx].qty||0.5)+delta)*10)/10);
+  LS.set('iat_to',tenderOrders);
+  renderTenderOrdersList();
+  renderTQtyPage();
+}
+
+function deleteTenderOrder(idx){
+  if(idx<0||idx>=tenderOrders.length)return;
+  confDlg('Remove this order?',()=>{
+    tenderOrders.splice(idx,1);
+    LS.set('iat_to',tenderOrders);
+    renderTenderOrdersList();
+    renderTQtyPage();
+    toast('✓ Removed','ok');
+  });
+}
+
+
 function renderOrders(){
   const el=document.getElementById('olist');
   updateBadges();
   if(!orders.length){el.innerHTML='<div class="empty"><div class="ei">📋</div><p>No orders yet.</p></div>';return;}
-  // Group preserving order
+
+  // تجميع حسب date ثم customer، مع حفظ idx الأصلي
   const dateMap=new Map();
   orders.forEach((o,i)=>{
     const dk=o.date||'—';
@@ -990,7 +1359,17 @@ function renderOrders(){
     if(!cm.has(o.customer))cm.set(o.customer,[]);
     cm.get(o.customer).push({...o,idx:i});
   });
-  el.innerHTML=[...dateMap.entries()].map(([date,custMap])=>{
+
+  // ✅ ترتيب كل date حسب num تصاعدياً
+  const sortedDateMap=new Map();
+  [...dateMap.entries()].forEach(([date,cm])=>{
+    const custArr=[...cm.entries()];
+    // رتّب حسب num أول عنصر في كل مجموعة
+    custArr.sort((a,b)=>(a[1][0].num||0)-(b[1][0].num||0));
+    sortedDateMap.set(date,new Map(custArr));
+  });
+
+  el.innerHTML=[...sortedDateMap.entries()].map(([date,custMap])=>{
     const custKeys=[...custMap.keys()];
     return `<div style="margin-bottom:4px">
       <div style="font-family:var(--mono);font-size:.65rem;color:var(--teal);padding:6px 4px;letter-spacing:.08em">📅 ${date}</div>
@@ -1008,16 +1387,9 @@ function renderOrders(){
               <span style="cursor:pointer;user-select:none;padding:4px 6px;background:var(--b1);border-radius:2px;font-size:.75rem;border:1px solid var(--b2);display:inline-block" onclick="openCustModal('${esc(c)}','${esc(date)}')">
                 👤 ${c}<br/><span style="font-size:.6rem;color:var(--muted)">✏️ Edit</span>
               </span>
-              <div id="custModalOrd${esc(c).replace(/'/g,'')}${date}" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;padding:10px;flex-direction:column" onclick="if(event.target===this)closeCustModal('${esc(c)}','${esc(date)}')">
-                <div style="background:var(--s1);border-radius:4px;padding:12px;margin:auto;max-width:400px;max-height:80vh;overflow-y:auto;display:flex;flex-direction:column">
-                  <div style="font-size:.8rem;font-weight:700;margin-bottom:8px">Select Customer</div>
-                  <input type="text" id="custSearchInput${esc(c).replace(/'/g,'')}${date}" placeholder="Search customers..." oninput="filterCustModal('${esc(c)}','${esc(date)}',this.value)" style="padding:6px;border:1px solid var(--b2);border-radius:2px;margin-bottom:8px;font-size:.75rem"/>
-                  <div id="custModalList${esc(c).replace(/'/g,'')}${date}" style="flex:1;overflow-y:auto"></div>
-                </div>
-              </div>
             </span>
             <button class="cc-del" onclick="addProdToOrder('${esc(c)}','${date}')">+ Add</button>
-            <button class="cc-del" onclick="delCust('${esc(c)}','${date}')')">Remove ✕</button>
+            <button class="cc-del" onclick="delCust('${esc(c)}','${date}')">Remove ✕</button>
           </div>
           ${items.map(o=>`<div style="display:flex;gap:4px;align-items:center;padding:4px;background:var(--s1);border-radius:3px;font-size:.7rem;margin-bottom:2px">
             <button class="pr-del" onclick="delRow(${o.idx})" style="flex-shrink:0;padding:2px 4px">✕</button>
@@ -1035,10 +1407,10 @@ function renderOrders(){
               </div>
             </div>
             
-            <input class="note-inp" type="text" placeholder="Note" value="${esc2(o.note||'')}" oninput="setOrdNote(${o.idx},this.value)" style="flex:1;height:20px;font-size:.65rem;padding:2px 4px"/>
+            <input class="note-inp" type="text" placeholder="Note" value="${esc2(o.note||'')}" onchange="setOrdNote(${o.idx},this.value)" style="flex:1;height:20px;font-size:.65rem;padding:2px 4px"/>
             <div style="display:flex;gap:2px;flex-shrink:0;align-items:center;border:1px solid var(--b2);border-radius:3px;overflow:hidden">
               <button class="pr-qb" onclick="adjO(${o.idx},-1)" style="padding:3px 6px;background:var(--s2);border:none;cursor:pointer;color:var(--txt);font-weight:700">−</button>
-              <input class="pr-qi" type="number" min="1" step="1" value="${o.qty}" oninput="setOQ(${o.idx},this.value)" style="width:45px;height:24px;padding:2px;border:none;text-align:center;font-weight:600;font-size:.8rem;background:transparent"/>
+              <input class="pr-qi" type="number" min="1" step="0.5" value="${o.qty}" onchange="setOQ(${o.idx},this.value)" style="width:45px;height:24px;padding:2px;border:none;text-align:center;font-weight:600;font-size:.8rem;background:transparent"/>
               <button class="pr-qb" onclick="adjO(${o.idx},1)" style="padding:3px 6px;background:var(--s2);border:none;cursor:pointer;color:var(--txt);font-weight:700">+</button>
             </div>
             <span class="pr-unit" style="flex-shrink:0">kg</span>
@@ -1049,36 +1421,6 @@ function renderOrders(){
     </div>`;
   }).join('');
 }
-function moveGroup(date,cust,dir){
-  // Get all indices belonging to this date+cust group and adjacent group
-  const myIdxs=orders.reduce((a,o,i)=>{if((o.date||'—')===date&&o.customer===cust)a.push(i);return a;},[]);
-  if(!myIdxs.length)return;
-  // Find customers for this date in order
-  const seen=[];
-  orders.forEach(o=>{if((o.date||'—')===date&&!seen.includes(o.customer))seen.push(o.customer);});
-  const ci=seen.indexOf(cust);
-  const swapCust=seen[ci+dir];
-  if(!swapCust)return;
-  const swapIdxs=orders.reduce((a,o,i)=>{if((o.date||'—')===date&&o.customer===swapCust)a.push(i);return a;},[]);
-  // Extract groups, swap, rebuild orders
-  const myRows=myIdxs.map(i=>orders[i]);
-  const swapRows=swapIdxs.map(i=>orders[i]);
-  const otherRows=orders.filter((_,i)=>!myIdxs.includes(i)&&!swapIdxs.includes(i));
-  // Reconstruct preserving relative positions
-  const minIdx=Math.min(...myIdxs,...swapIdxs);
-  const newOrders=[...orders];
-  if(dir<0){
-    // my group goes where swap was (earlier), swap goes where my was (later)
-    swapIdxs.forEach((idx,j)=>{newOrders[myIdxs[j]]=swapRows[j];});
-    myIdxs.forEach((idx,j)=>{newOrders[swapIdxs[j]]=myRows[j];});
-  } else {
-    swapIdxs.forEach((idx,j)=>{newOrders[myIdxs[j]]=swapRows[j];});
-    myIdxs.forEach((idx,j)=>{newOrders[swapIdxs[j]]=myRows[j];});
-  }
-  orders=newOrders;
-  renderOrders();
-  toast('✓ Moved','ok');
-}
 function setGroupNum(date,cust,v){
   const n=parseInt(v)||0;
   orders.forEach(o=>{if((o.date||'—')===date&&o.customer===cust)o.num=n;});
@@ -1086,46 +1428,133 @@ function setGroupNum(date,cust,v){
 }
 function setOrdNote(i,v){orders[i].note=v;saveOrders();}
 function setOrdSize(i,v){orders[i].size=v;saveOrders();}
-function adjO(i,d){
-  let current=parseFloat(orders[i].qty)||1;
-  let newQty=current+d;
-  orders[i].qty=Math.max(1,newQty);
+// ✅ إعادة ترقيم الأوردرات (1, 2, 3...)
+function renumberOrders(date){
+  // اجمع الزبائن بالترتيب الحالي حسب num
+  const dateOrders=orders.filter(o=>(o.date||'—')===date);
+  if(!dateOrders.length)return;
+  // رتّب حسب num الحالي أولاً
+  const custSeen=[];
+  [...dateOrders].sort((a,b)=>(a.num||0)-(b.num||0)).forEach(o=>{
+    if(!custSeen.includes(o.customer))custSeen.push(o.customer);
+  });
+  // أعد الترقيم 1,2,3...
+  custSeen.forEach((cust,i)=>{
+    orders.forEach(o=>{
+      if((o.date||'—')===date && o.customer===cust)o.num=i+1;
+    });
+  });
+}
+
+function moveGroup(date,cust,dir){
+  const seen=[];
+  orders.forEach(o=>{if((o.date||'—')===date&&!seen.includes(o.customer))seen.push(o.customer);});
+  seen.sort((a,b)=>{
+    const na=orders.find(o=>(o.date||'—')===date&&o.customer===a)?.num||0;
+    const nb=orders.find(o=>(o.date||'—')===date&&o.customer===b)?.num||0;
+    return na-nb;
+  });
+  const ci=seen.indexOf(cust);
+  const swapCust=seen[ci+dir];
+  if(!swapCust)return;
+  // تبديل الأرقام
+  const numA=orders.find(o=>(o.date||'—')===date&&o.customer===cust)?.num||0;
+  const numB=orders.find(o=>(o.date||'—')===date&&o.customer===swapCust)?.num||0;
+  orders.forEach(o=>{
+    if((o.date||'—')===date&&o.customer===cust)o.num=numB;
+    if((o.date||'—')===date&&o.customer===swapCust)o.num=numA;
+  });
   saveOrders();
-  // تحديث محلي فقط - بدون رسم كل شيء
-  const inputs=document.querySelectorAll('.pr-qi[data-idx="'+i+'"]');
-  inputs.forEach(inp=>inp.value=orders[i].qty);
-}
-function setOQ(i,v){orders[i].qty=Math.max(1,parseFloat(v)||1);saveOrders();}
-function setOrdProduct(i,v){orders[i].product=v;saveOrders();renderOrders();}
-function openCustModal(oldCust,date){
-  const modalId='custModalOrd'+oldCust.replace(/'/g,'')+date;
-  const modal=document.getElementById(modalId);
-  modal.style.display='flex';
-  document.getElementById('custSearchInput'+oldCust.replace(/'/g,'')+date).focus();
-  filterCustModal(oldCust,date,'');
-}
-function closeCustModal(oldCust,date){
-  const modalId='custModalOrd'+oldCust.replace(/'/g,'')+date;
-  document.getElementById(modalId).style.display='none';
-}
-function filterCustModal(oldCust,date,q){
-  const listId='custModalList'+oldCust.replace(/'/g,'')+date;
-  const list=document.getElementById(listId);
-  const filtered=q?customers.filter(c=>c.toLowerCase().includes(q.toLowerCase())):[];
-  list.innerHTML=filtered.map(c=>'<div style="padding:8px;cursor:pointer;border-bottom:1px solid var(--b2);font-size:.75rem" onclick="changeCustName(\''+esc(oldCust)+'\',\''+esc(c)+'\',\''+date+'\')">'+c+'</div>').join('');
-}
-function changeCustName(oldName,newName,date){
-  const orderIdx=orders.findIndex(o=>o.date===date&&o.customer===oldName);
-  if(orderIdx===-1)return;
-  const grouped=groupByDateCust(orders);
-  for(let grp of grouped){
-    if(grp.date===date){
-      for(let item of grp.items){item.customer=newName;}
-    }
-  }
-  saveOrders();
-  closeCustModal(oldName,date);
   renderOrders();
+}
+function adjO(i,d){
+  if(i<0||i>=orders.length)return;
+  const newQty=Math.max(0.5,Math.round((parseFloat(orders[i].qty||1)+d)*10)/10);
+  orders[i].qty=newQty;
+  saveOrders();
+  renderOrders();
+}
+function setOQ(i,v){
+  if(i<0||i>=orders.length)return;
+  const qty=Math.max(0.5,parseFloat(v)||0.5);
+  orders[i].qty=Math.round(qty*10)/10;
+  saveOrders();
+  renumberOrders(orders[i].date||'—');
+  renderOrders();
+}
+function setOrdProduct(i,v){orders[i].product=v;saveOrders();renderOrders();}
+// ── Global Customer Change Modal ──
+let _gCustCtx={oldCust:'',date:''};
+
+function openCustModal(oldCust,date){
+  _gCustCtx={oldCust,date};
+  const modal=document.getElementById('gCustModal');
+  modal.dataset.mode='orders';
+  modal.style.display='flex';
+  const inp=document.getElementById('gCustSearch');
+  inp.value='';
+  document.getElementById('gCustNewName').value='';
+  filterGCustModal('');
+  setTimeout(()=>inp.focus(),80);
+}
+
+function closeGCustModal(){
+  document.getElementById('gCustModal').style.display='none';
+}
+
+function filterGCustModal(q){
+  const list=document.getElementById('gCustList');
+  const {oldCust}=_gCustCtx;
+  const src=q?customers.filter(c=>c.toLowerCase().includes(q.toLowerCase())):customers;
+  if(!src.length){
+    list.innerHTML='<div style="padding:12px;color:var(--muted);font-size:.75rem;text-align:center">No results</div>';
+    return;
+  }
+  list.innerHTML=src.map(c=>{
+    const isCurrent=c===oldCust;
+    return `<div onclick="applyGCustChange('${esc(c)}')"
+      style="padding:11px 14px;cursor:pointer;border-bottom:1px solid var(--b1);font-size:.78rem;
+             color:${isCurrent?'var(--teal)':'var(--txt)'};
+             background:${isCurrent?'rgba(45,212,191,.08)':'transparent'};
+             display:flex;align-items:center;gap:8px"
+      onmouseover="this.style.background='var(--faint)'"
+      onmouseout="this.style.background='${isCurrent?'rgba(45,212,191,.08)':'transparent'}'">
+      ${isCurrent?'<span style="color:var(--teal)">✓</span>':'<span style="width:14px;display:inline-block"></span>'}
+      ${c}
+    </div>`;
+  }).join('');
+}
+
+function applyGCustChange(newName){
+  const mode=document.getElementById('gCustModal').dataset.mode||'orders';
+  if(mode==='tender'){
+    const old=_tOrdersCustCtx;
+    if(newName===old){closeGCustModal();return;}
+    tenderOrders.forEach(o=>{if(o.customer===old)o.customer=newName;});
+    saveTenderOrders();
+    closeGCustModal();
+    renderTOrdersPage();
+  } else {
+    const {oldCust,date}=_gCustCtx;
+    if(newName===oldCust){closeGCustModal();return;}
+    orders.forEach(o=>{if(o.date===date&&o.customer===oldCust)o.customer=newName;});
+    saveOrders();
+    closeGCustModal();
+    renumberOrders(date);
+    renderOrders();
+  }
+  toast('✓ Updated','ok');
+}
+
+function addNewCustFromModal(){
+  const v=document.getElementById('gCustNewName').value.trim();
+  if(!v){toast('Enter a name','err');return;}
+  if(!customers.includes(v)){
+    customers.push(v);
+    LS.set('iat_c',customers);
+  }
+  applyGCustChange(v);
+  toast('✓ Applied','ok');
 }
 function openProdModal(idx){
   const modal=document.getElementById('prodModalOrd'+idx);
@@ -1141,7 +1570,18 @@ function closeProdModal(idx){
 function filterProdModal(idx,q){
   const list=document.getElementById('prodModalList'+idx);
   const filtered=q?products.filter(p=>p.toLowerCase().includes(q.toLowerCase())):products;
-  list.innerHTML=filtered.map(p=>'<div style="padding:8px;cursor:pointer;border-bottom:1px solid var(--b2);font-size:.75rem" onclick="selectProdModal('+idx+',\''+esc(p)+'\')">'+p+'</div>').join('');
+  if(!filtered||!filtered.length){
+    list.innerHTML='<div style="padding:8px;color:var(--muted);font-size:.75rem">No products</div>';
+    return;
+  }
+  list.innerHTML=filtered.map(p=>`
+    <div style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--b2);font-size:.75rem;transition:background 0.2s"
+         onclick="selectProdModal(${idx},'${esc(p)}')"
+         onmouseover="this.style.background='var(--b1)'"
+         onmouseout="this.style.background='transparent'">
+      ${p}
+    </div>
+  `).join('');
 }
 function selectProdModal(idx,prod){
   orders[idx].product=prod;
@@ -1149,7 +1589,14 @@ function selectProdModal(idx,prod){
   closeProdModal(idx);
   renderOrders();
 }
-function delRow(i){orders.splice(i,1);saveOrders();renderOrders();}
+function delRow(i){
+  if(i<0||i>=orders.length)return;
+  const date=orders[i].date||'—';
+  orders.splice(i,1);
+  saveOrders();
+  renumberOrders(date);
+  renderOrders();
+}
 function addProdToOrder(cust,date){
   // عرض قائمة المنتجات مع بحث
   const custData=orders.filter(o=>o.customer===cust&&o.date===date);
@@ -1242,10 +1689,23 @@ function renderViewOrders(){
     </div>`;
   }).join('');
 }
-function delCust(c,date){orders=orders.filter(o=>!(o.customer===c&&(o.date||'—')===date));saveOrders();renderOrders();}
+function delCust(c,date){
+  confDlg(`Remove ${c}?`,()=>{
+    orders=orders.filter(o=>!(o.customer===c&&(o.date||'—')===date));
+    saveOrders();
+    renumberOrders(date);
+    renderOrders();
+    toast('✓ Removed','ok');
+  });
+}
 function clearAll(){if(!orders.length)return;confDlg('Clear all orders?',()=>{orders=[];saveOrders();renderOrders();updateBadges();toast('Cleared','ok');});}
 function updateBadges(){
-  const n=orders.length;
+  // عد عدد الزبائن المختلفين (عدد الأوردرات الفريدة)
+  const today=todayStr();
+  const todayOrders=orders.filter(o=>(o.date||'—')===today);
+  const uniqueCustomers=new Set(todayOrders.map(o=>o.customer));
+  const n=uniqueCustomers.size;  // ✅ عدد الزبائن وليس المنتجات
+  
   document.getElementById('navBadge').textContent=n;
   document.getElementById('ordBadge').textContent=n;
 }
@@ -1292,16 +1752,63 @@ const LOADING={
 };
 const PRODUCTION_PATH='production/production.xlsm';
 
-async function saveToOneDrive(){
+function manualSaveRange(){
+  // ✅ حفظ يدويّ عند الضغط على الزر
+  const from=parseInt(document.getElementById('printRangeFrom').value);
+  const to=parseInt(document.getElementById('printRangeTo').value);
+  if(!from||!to||from>to){toast('Enter valid range','err');return;}
+  
+  saveRangeToOneDrive(from,to);
+}
+
+async function saveRangeToOneDrive(from,to){
+  const btn=document.querySelector('.exp-bar .btn-blue');
+  if(!btn)return;
+  
+  try{
+    const token=await getODToken();
+    const today=todayStr();
+    
+    // كتابة BS1 و BT1 و H1 في Production.xlsm
+    const fileRes=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,{
+      headers:{'Authorization':'Bearer '+token}
+    });
+    if(!fileRes.ok) throw new Error('production.xlsm not found');
+    const fileId=(await fileRes.json()).id;
+    const baseUrl=`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/workbook/`;
+    
+    // كتابة البيانات
+    const patchUrl=baseUrl+'worksheets/Loading/range(address=\'BS1:BT1,H1\')';
+    const patchData={
+      values:[[from,to],[today]]
+    };
+    const r=await fetch(patchUrl,{
+      method:'PATCH',
+      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:JSON.stringify(patchData)
+    });
+    if(!r.ok) throw new Error('Failed to write');
+    
+    console.log(`✓ Auto-saved: BS1=${from}, BT1=${to}, H1=${today}`);
+  }catch(e){
+    console.error('Auto-save error:',e.message);
+  }
+}
+
+async function saveToOneDriveAuto(){
   if(!orders.length){toast('No orders to export','err');return;}
   const btn=document.getElementById('odBtn');
   btn.textContent='⏳ Saving...';btn.disabled=true;
   try{
     const token=await getODToken();
-
-    // 1. حفظ orders2026.xlsx كالعادة
-    // الترتيب حسب رقم الأوردر ثم حسب ترتيب الإدخال
+    
+    // ✅ حدد From و To تلقائياً من الأوردرات
     const sortedOrders=[...orders].sort((a,b)=>(a.num||0)-(b.num||0));
+    const from=sortedOrders[0]?.num||1;
+    const to=sortedOrders[sortedOrders.length-1]?.num||orders.length;
+    const today=todayStr();
+    
+    // 1. حفظ Excel
     const rows=[['Driver','Customer','','Product','Qty (kg)','Size (g)','Notes']];
     sortedOrders.forEach(o=>rows.push([o.driver||'',o.customer,'',o.product,o.qty,o.size||'',o.note||'']));
     const ws=XLSX.utils.aoa_to_sheet(rows);
@@ -1314,81 +1821,35 @@ async function saveToOneDrive(){
       headers:{'Authorization':'Bearer '+token,'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'},
       body:blob
     });
-    if(!r1.ok) throw new Error('orders2026 upload failed');
-
-    // 2. كتابة البيانات مباشرة لشيت Loading بـ production.xlsm
-    btn.textContent='⏳ Writing Loading...';
-    await writeToLoadingSheet(token);
-
-    toast('✓ Saved to OneDrive + Loading!','ok');
+    if(!r1.ok) throw new Error('Excel upload failed');
+    
+    // 2. كتابة BS1 و BT1 و H1 تلقائياً
+    btn.textContent='⏳ Writing to Production...';
+    const fileRes=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,{
+      headers:{'Authorization':'Bearer '+token}
+    });
+    if(!fileRes.ok) throw new Error('production.xlsm not found');
+    const fileId=(await fileRes.json()).id;
+    const baseUrl=`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/workbook/`;
+    
+    // كتابة البيانات (From و To تلقائية)
+    const patchUrl=baseUrl+'worksheets/Loading/range(address=\'BS1:BT1,H1\')';
+    const patchData={
+      values:[[from,to],[today]]
+    };
+    const r2=await fetch(patchUrl,{
+      method:'PATCH',
+      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:JSON.stringify(patchData)
+    });
+    if(!r2.ok) throw new Error('Failed to write to Loading sheet');
+    
+    toast(`✓ Saved to OneDrive!\nFrom ${from} To ${to}\nDate: ${today}`,'ok');
   }catch(e){
     if(e.message!=='user_cancelled')toast('Error: '+e.message,'err');
   }finally{
-    btn.textContent='☁ Save to OneDrive';btn.disabled=false;
+    btn.textContent='☁ OneDrive';btn.disabled=false;
   }
-}
-
-async function writeToLoadingSheet(token){
-  // جيب workbook ID
-  const fileRes=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,{
-    headers:{'Authorization':'Bearer '+token}
-  });
-  if(!fileRes.ok) throw new Error('production.xlsm not found');
-  const fileId=(await fileRes.json()).id;
-  const baseUrl=`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/workbook/worksheets/Loading/`;
-  const sortedOrd=[...orders].sort((a,b)=>(a.num||0)-(b.num||0));
-  const n=sortedOrd.length;
-
-  // Batch: مسح + كتابة في request واحد
-  const clearRows=100;
-  const batchReqs=[
-    // 1. امسح AI:AQ (100 صف) دفعة وحدة
-    {
-      id:'1',
-      method:'PATCH',
-      url:`/me/drive/items/${fileId}/workbook/worksheets/Loading/range(address='AI${LOADING.startRow}:AQ${LOADING.startRow+clearRows-1}')`,
-      headers:{'Content-Type':'application/json'},
-      body:{values:Array(clearRows).fill(Array(9).fill(''))}
-    }
-  ];
-
-  // 2. اكتب البيانات كـ block واحد AI:AQ
-  if(n>0){
-    // AI=Driver, AJ=num, AK=num(no repeat), AL=Customer, AM=Customer, AN=Product, AO=Qty, AP=Size, AQ=Notes
-    const seenNums=new Set();
-    const blockVals=sortedOrd.map(o=>{
-      const num=o.num||'';
-      const akVal=seenNums.has(num)?'':num;
-      seenNums.add(num);
-      return [
-        o.driver||'',  // AI
-        num,           // AJ
-        akVal,         // AK
-        o.customer||'',// AL
-        o.customer||'',// AM
-        o.product||'', // AN
-        parseFloat(o.qty)||0, // AO
-        o.size||'',    // AP
-        o.note||''     // AQ
-      ];
-    });
-    batchReqs.push({
-      id:'2',
-      method:'PATCH',
-      url:`/me/drive/items/${fileId}/workbook/worksheets/Loading/range(address='AI${LOADING.startRow}:AQ${LOADING.startRow+n-1}')`,
-      headers:{'Content-Type':'application/json'},
-      body:{values:blockVals},
-      dependsOn:['1']
-    });
-  }
-
-  const batchRes=await fetch('https://graph.microsoft.com/v1.0/$batch',{
-    method:'POST',
-    headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
-    body:JSON.stringify({requests:batchReqs})
-  });
-  if(!batchRes.ok) throw new Error('Batch write failed');
-  console.log(`✓ Written ${n} rows to Loading (batch)`);
 }
 
 // ── PRINT ──
@@ -1446,13 +1907,58 @@ function showOrdersPrintDlg(){
   setTimeout(()=>document.getElementById('ordersFrom').focus(),100);
 }
 function hideOrdersPrintDlg(){document.getElementById('ordersPrintOv').classList.remove('on');}
+// ── DIRECT PRINT (بدون Dialog) ──
+async function directPrintOrders(){
+  const from=parseInt(document.getElementById('printRangeFrom').value);
+  const to=parseInt(document.getElementById('printRangeTo').value);
+  if(!from||!to||from>to){toast('Set valid range first','err');return;}
+  
+  try{
+    const token=await getODToken();
+    const printRange='A1:Z1000';
+    const markerContent=JSON.stringify({from,to,printRange,action:'',ts:Date.now()});
+    const blob=new Blob([markerContent],{type:'application/json'});
+    const res=await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',{
+      method:'PUT',
+      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:blob
+    });
+    if(res.ok)toast(`✓ Printing Orders ${from}-${to}...`,'ok');
+    else throw new Error('Print failed');
+  }catch(e){
+    if(e.message!=='user_cancelled')toast('Error: '+e.message,'err');
+  }
+}
+
+async function directPrintLabels(){
+  const from=parseInt(document.getElementById('printRangeFrom').value);
+  const to=parseInt(document.getElementById('printRangeTo').value);
+  if(!from||!to||from>to){toast('Set valid range first','err');return;}
+  
+  try{
+    const token=await getODToken();
+    const printRange='A1:Z1000';
+    const markerContent=JSON.stringify({from,to,printRange,action:'print_labels',ts:Date.now()});
+    const blob=new Blob([markerContent],{type:'application/json'});
+    const res=await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',{
+      method:'PUT',
+      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:blob
+    });
+    if(res.ok)toast(`✓ Printing Labels ${from}-${to}...`,'ok');
+    else throw new Error('Print failed');
+  }catch(e){
+    if(e.message!=='user_cancelled')toast('Error: '+e.message,'err');
+  }
+}
+
 async function confirmOrdersPrint(){
   const from=document.getElementById('ordersFrom').value;
   const to=document.getElementById('ordersTo').value;
-  const printRangeFrom=document.getElementById('printRangeFrom')?.value||'A1';
-  const printRangeTo=document.getElementById('printRangeTo')?.value||'Z100';
-  const printRange=printRangeFrom+':'+printRangeTo;
   if(!from||!to){toast('Enter both numbers','err');return;}
+  
+  // ✅ النطاق ثابت (A1:Z1000) - بدون Inputs
+  const printRange='A1:Z1000';
   const btn=document.getElementById('ordersPrintBtn');
   const status=document.getElementById('ordersPrintStatus');
   btn.disabled=true;btn.textContent='Sending...';
@@ -1493,10 +1999,10 @@ function hideLabelsPrintDlg(){document.getElementById('labelsPrintOv').classList
 async function confirmLabelsPrint(){
   const from=document.getElementById('labelsFrom').value;
   const to=document.getElementById('labelsTo').value;
-  const printRangeFrom=document.getElementById('printRangeFrom')?.value||'A1';
-  const printRangeTo=document.getElementById('printRangeTo')?.value||'Z100';
-  const printRange=printRangeFrom+':'+printRangeTo;
   if(!from||!to){toast('Enter both numbers','err');return;}
+  
+  // ✅ النطاق ثابت (A1:Z1000) - بدون Inputs
+  const printRange='A1:Z1000';
   const btn=document.getElementById('labelsPrintBtn');
   const status=document.getElementById('labelsPrintStatus');
   btn.disabled=true;btn.textContent='Sending...';
@@ -1985,92 +2491,9 @@ function printDriversPDF(){
   setTimeout(()=>{win.print();},500);
 }
 
-// ── TENDER ──
-let tCOpen2=false;
-function togTCDrop(){
-  tCOpen2=!tCOpen2;
-  document.getElementById('tCustDrop').style.display=tCOpen2?'block':'none';
-  if(tCOpen2){renderTCustDL(customers);setTimeout(()=>document.getElementById('tCustSrch').focus(),50);}
-}
-function renderTCustDL(list){
-  document.getElementById('tCustList').innerHTML=list.map(c=>`
-    <div style="padding:9px 14px;cursor:pointer;font-size:.83rem;color:${tSelCust===c?'var(--blue2)':'var(--txt)'};background:${tSelCust===c?'var(--s3)':'transparent'}" onclick="selTCust('${esc(c)}')">${c}</div>`).join('');
-}
-function selTCust(c){
-  tSelCust=c;
-  document.getElementById('tCustLabel').textContent=c;
-  document.getElementById('tCustLabel').style.color='var(--txt)';
-  document.getElementById('tCustDrop').style.display='none';
-  tCOpen2=false;
-}
-function renderTPList(q){
-  const list=tenderProds.filter(p=>p.toLowerCase().includes((q||'').toLowerCase()));
-  const el=document.getElementById('tProdList');
-  if(!list.length){el.innerHTML='<div style="color:var(--muted);font-size:.8rem;padding:8px">No products found</div>';return;}
-  el.innerHTML=list.map(p=>{
-    const sel=tSelProds.has(p);
-    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;background:${sel?'var(--s3)':'var(--s2)'};border:1.5px solid ${sel?'var(--teal)':'var(--b1)'};cursor:pointer" onclick="togTProd('${esc(p)}')">
-      <div style="width:20px;height:20px;border-radius:5px;border:2px solid ${sel?'var(--teal)':'var(--b2)'};background:${sel?'var(--teal)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0">
-        ${sel?'<span style="color:#000;font-size:.7rem;font-weight:900">✓</span>':''}
-      </div>
-      <span style="font-size:.83rem;color:${sel?'var(--teal)':'var(--txt)'};font-weight:${sel?'700':'400'}">${p}</span>
-    </div>`;
-  }).join('');
-}
-function togTProd(name){
-  if(tSelProds.has(name))tSelProds.delete(name);
-  else{
-    // Parse size from name
-    const sizeMatch=name.match(/(\d+)gr/i);
-    const size=sizeMatch?sizeMatch[1]:'';
-    tSelProds.set(name,{qty:0,size});
-    renderTPList(document.getElementById('tProdSrch').value);
-    renderTSelRows();
-    return;
-  }
-  renderTPList(document.getElementById('tProdSrch').value);
-  renderTSelRows();
-}
-function renderTSelRows(){
-  document.getElementById('tSelRows').innerHTML=[...tSelProds.entries()].map(([p,d])=>`
-    <div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:8px 10px;display:flex;align-items:center;gap:8px">
-      <span style="flex:1;font-size:.8rem;color:var(--txt)">${p}</span>
-      <div style="display:flex;gap:0;align-items:center;border:1px solid var(--b2);border-radius:3px;overflow:hidden">
-        <button class="pr-qb" onclick="adjTQ('${esc(p)}',-1)" style="padding:3px 6px;background:var(--s1);border:none;cursor:pointer;color:var(--txt);font-weight:700">−</button>
-        <input class="pr-qi" type="number" min="0" step="1" value="${d.qty}" oninput="setTQ('${esc(p)}',this.value)" style="width:50px;border:none;text-align:center;font-weight:600;font-size:.8rem;background:transparent"/>
-        <button class="pr-qb" onclick="adjTQ('${esc(p)}',1)" style="padding:3px 6px;background:var(--s1);border:none;cursor:pointer;color:var(--txt);font-weight:700">+</button>
-      </div>
-      <span style="font-size:.65rem;color:var(--muted)">pcs</span>
-      <button class="pr-del" onclick="togTProd('${esc(p)}')">✕</button>
-    </div>`).join('');
-}
-function adjTQ(p,d){const o=tSelProds.get(p);if(o){o.qty=Math.max(0,(parseInt(o.qty)||0)+d);renderTSelRows();}}
-function setTQ(p,v){const o=tSelProds.get(p);if(o)o.qty=Math.max(0,parseInt(v)||0);}
+// ── Tender helper (duplicate removed) ──
+let tSelOrder=null;
 
-function addTenderOrder(){
-  if(!tSelCust){toast('Select customer','err');return;}
-  if(!tSelProds.size){toast('Select products','err');return;}
-  const date=todayStr();
-  // Append "tender" to customer name if not already there
-  const custName=tSelCust.toLowerCase().endsWith(' tender')?tSelCust:tSelCust+' tender';
-  tSelProds.forEach((d,p)=>{
-    if(d.qty>0){
-      const sizeG=parseInt(d.size)||0;
-      const kg=sizeG>0?(d.qty*sizeG/1000):d.qty;
-      tenderOrders.push({customer:custName,product:p,qty:d.qty,size:d.size,kg:parseFloat(kg.toFixed(3)),date});
-    }
-  });
-  // Clear for next customer
-  tSelCust=null;
-  tSelProds=new Map();
-  document.getElementById('tCustLabel').textContent='Select customer…';
-  document.getElementById('tCustLabel').style.color='var(--muted)';
-  document.getElementById('tProdSrch').value='';
-  renderTPList('');
-  renderTSelRows();
-  renderTQtyPage();
-  toast('✓ Added to Tender','ok');
-}
 
 // ── TENDER QTY ──
 function renderTQtyPage(){
@@ -2397,6 +2820,189 @@ function shareReportWhatsApp(){
   // إرسال إلى واتس اب مباشرة
   const url='https://api.whatsapp.com/send?text='+encodeURIComponent(msg);
   window.open(url,'_blank');
+}
+
+
+// ══ COMBINED QTY PAGE ══
+function renderCombinedQtyPage(){
+  const el=document.getElementById('combinedQtyList');
+  if(!el)return;
+
+  // Orders data
+  const orderTotals=new Map();
+  orders.forEach(o=>{
+    if(o.customer&&o.customer.toLowerCase().endsWith(' tender'))return;
+    const key=o.product;
+    orderTotals.set(key,(orderTotals.get(key)||0)+parseFloat(o.qty||0));
+  });
+  const orderRows=[...orderTotals.entries()].sort((a,b)=>b[1]-a[1]);
+  const orderTotal=orderRows.reduce((s,[,q])=>s+q,0);
+
+  // Tender data
+  const tenderTotals=new Map();
+  tenderOrders.forEach(o=>{
+    const key=o.product;let kg=0;
+    if(key.toUpperCase().includes('KG')){kg=parseInt(o.qty)||0;}
+    else{let g=400;if(key.includes('450'))g=450;else if(key.includes('500'))g=500;kg=(parseInt(o.qty)||0)*(g/1000);}
+    const cur=tenderTotals.get(key)||{qty:0,kg:0};cur.qty+=parseInt(o.qty)||0;cur.kg+=kg;
+    tenderTotals.set(key,cur);
+  });
+  const tenderRows=[...tenderTotals.entries()];
+  const tenderTotalQty=tenderRows.reduce((s,[,v])=>s+v.qty,0);
+  const tenderTotalKg=tenderRows.reduce((s,[,v])=>s+v.kg,0);
+
+  const dateStr=new Date().toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+
+  // Shared table cell styles (dark UI for screen, overridden to white on capture)
+  const rowStyle=(i,tender)=>`background:${i%2===0?(tender?'rgba(251,191,36,.04)':'rgba(77,124,254,.04)'):'transparent'}`;
+
+  let html=`<div style="font-family:'IBM Plex Mono',monospace;font-size:.58rem;color:var(--muted);padding:2px 2px 8px;letter-spacing:.08em">📅 ${dateStr}</div>`;
+
+  // ── Orders section ──
+  if(orderRows.length){
+    html+=`<div style="border:1.5px solid var(--b1);border-radius:10px;overflow:hidden">
+      <div style="background:linear-gradient(90deg,rgba(77,124,254,.18),transparent);padding:9px 12px;display:flex;align-items:center;gap:7px;border-bottom:1px solid var(--b1)">
+        <span style="font-size:.78rem;font-weight:800;color:var(--blue2)">📋 QTY — Orders</span>
+      </div>
+      <table style="border-collapse:collapse;width:100%">
+        <thead><tr style="border-bottom:1.5px solid var(--b2)">
+          <th style="text-align:left;padding:6px 10px;font-size:.65rem;color:var(--muted);font-weight:700;text-transform:uppercase">Product</th>
+          <th style="text-align:right;padding:6px 10px;font-size:.65rem;color:var(--muted);font-weight:700;white-space:nowrap">KG</th>
+        </tr></thead>
+        <tbody>
+          ${orderRows.map(([p,q],i)=>`
+          <tr style="border-bottom:1px solid var(--b1);${rowStyle(i,false)}">
+            <td style="padding:8px 10px;font-size:.92rem;color:var(--txt);font-weight:500">${p}</td>
+            <td style="padding:8px 10px;font-size:1rem;color:var(--blue2);text-align:right;font-family:'IBM Plex Mono',monospace;font-weight:800;white-space:nowrap">${q%1===0?q:q.toFixed(1)}</td>
+          </tr>`).join('')}
+        </tbody>
+        <tfoot><tr style="border-top:2px solid var(--b2);background:var(--s2)">
+          <td style="padding:9px 10px;font-size:.9rem;font-weight:800;color:var(--txt)">🎯 TOTAL</td>
+          <td style="padding:9px 10px;font-size:1rem;font-weight:900;color:var(--teal);text-align:right;font-family:'IBM Plex Mono',monospace;white-space:nowrap">${orderTotal%1===0?orderTotal:orderTotal.toFixed(1)} kg</td>
+        </tr></tfoot>
+      </table>
+    </div>`;
+  } else {
+    html+=`<div style="border:1px solid var(--b1);border-radius:10px;padding:16px;text-align:center;color:var(--muted);font-size:.8rem">📋 No Orders data</div>`;
+  }
+
+  // ── Tender section ──
+  if(tenderRows.length){
+    html+=`<div style="border:1.5px solid rgba(251,191,36,.3);border-radius:10px;overflow:hidden;margin-top:12px">
+      <div style="background:linear-gradient(90deg,rgba(251,191,36,.15),transparent);padding:9px 12px;display:flex;align-items:center;gap:7px;border-bottom:1px solid rgba(251,191,36,.2)">
+        <span style="font-size:.78rem;font-weight:800;color:#fcd34d">🏷 T.QTY — Tender</span>
+      </div>
+      <table style="border-collapse:collapse;width:100%">
+        <thead><tr style="border-bottom:1.5px solid rgba(251,191,36,.3)">
+          <th style="text-align:left;padding:6px 10px;font-size:.65rem;color:var(--muted);font-weight:700;text-transform:uppercase">GOODS</th>
+          <th style="text-align:right;padding:6px 6px;font-size:.65rem;color:var(--muted);font-weight:700">QTY</th>
+          <th style="text-align:right;padding:6px 10px;font-size:.65rem;color:var(--muted);font-weight:700">KG</th>
+        </tr></thead>
+        <tbody>
+          ${tenderRows.map(([p,v],i)=>`
+          <tr style="border-bottom:1px solid var(--b1);${rowStyle(i,true)}">
+            <td style="padding:8px 10px;font-size:.92rem;color:var(--txt);font-weight:500">${p}</td>
+            <td style="padding:8px 6px;font-size:1rem;color:#fcd34d;text-align:right;font-family:'IBM Plex Mono',monospace;font-weight:800">${v.qty}</td>
+            <td style="padding:8px 10px;font-size:1rem;color:var(--teal);text-align:right;font-family:'IBM Plex Mono',monospace;font-weight:800;white-space:nowrap">${v.kg%1===0?v.kg:v.kg.toFixed(2)}</td>
+          </tr>`).join('')}
+        </tbody>
+        <tfoot><tr style="border-top:2px solid rgba(251,191,36,.3);background:var(--s2)">
+          <td style="padding:9px 10px;font-size:.9rem;font-weight:800;color:var(--txt)">🎯 TOTAL</td>
+          <td style="padding:9px 6px;font-size:1rem;font-weight:900;color:#fcd34d;text-align:right;font-family:'IBM Plex Mono',monospace">${tenderTotalQty}</td>
+          <td style="padding:9px 10px;font-size:1rem;font-weight:900;color:var(--teal);text-align:right;font-family:'IBM Plex Mono',monospace;white-space:nowrap">${tenderTotalKg%1===0?tenderTotalKg:tenderTotalKg.toFixed(2)} kg</td>
+        </tr></tfoot>
+      </table>
+    </div>`;
+  } else {
+    html+=`<div style="border:1px solid rgba(251,191,36,.2);border-radius:10px;padding:16px;text-align:center;color:var(--muted);font-size:.8rem;margin-top:12px">🏷 No Tender data</div>`;
+  }
+
+  if(!orderRows.length&&!tenderRows.length){
+    html='<div style="text-align:center;padding:40px;color:var(--muted)">📭 No data yet</div>';
+  }
+  el.innerHTML=html;
+}
+
+function downloadCombinedImage(){
+  const el=document.getElementById('combinedQtyList');
+  if(!el||!el.innerHTML.trim()){toast('No data','err');return;}
+  const btn=document.getElementById('btnDownloadImg');
+  btn.textContent='⏳...';btn.disabled=true;
+  // Light background for capture
+  el.style.background='#fff';
+  el.style.padding='16px';
+  html2canvas(el,{
+    backgroundColor:'#ffffff',
+    scale:2,
+    useCORS:true,
+    logging:false
+  }).then(canvas=>{
+    el.style.background='';el.style.padding='';
+    const link=document.createElement('a');
+    link.download='AllQty_'+new Date().toISOString().slice(0,10)+'.png';
+    link.href=canvas.toDataURL('image/png');
+    link.click();
+    btn.textContent='⬇ Save Image';btn.disabled=false;
+    toast('✓ Image saved','ok');
+  }).catch(e=>{
+    el.style.background='';el.style.padding='';
+    btn.textContent='⬇ Save Image';btn.disabled=false;
+    toast('Error: '+e.message,'err');
+  });
+}
+
+function shareCombinedImageWhatsApp(){
+  const el=document.getElementById('combinedQtyList');
+  if(!el||!el.innerHTML.trim()){toast('No data','err');return;}
+  const btn=document.getElementById('btnShareWA');
+  btn.textContent='⏳...';btn.disabled=true;
+  el.style.background='#fff';
+  el.style.padding='16px';
+  html2canvas(el,{
+    backgroundColor:'#ffffff',
+    scale:2,
+    useCORS:true,
+    logging:false
+  }).then(canvas=>{
+    el.style.background='';el.style.padding='';
+    btn.textContent='💬 WhatsApp';btn.disabled=false;
+    // Try Web Share API first (mobile)
+    canvas.toBlob(blob=>{
+      if(blob&&navigator.share&&navigator.canShare&&navigator.canShare({files:[new File([blob],'AllQty.png',{type:'image/png'})]})){
+        const file=new File([blob],'AllQty_'+new Date().toISOString().slice(0,10)+'.png',{type:'image/png'});
+        navigator.share({
+          title:'All Quantities',
+          files:[file]
+        }).catch(e=>{
+          // fallback: download image
+          const url=URL.createObjectURL(blob);
+          const a=document.createElement('a');a.href=url;a.download='AllQty.png';a.click();
+          setTimeout(()=>URL.revokeObjectURL(url),2000);
+          toast('Saved — share from gallery','ok');
+        });
+      } else {
+        // Fallback: download then user shares manually
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a');a.href=url;a.download='AllQty_'+new Date().toISOString().slice(0,10)+'.png';a.click();
+        setTimeout(()=>URL.revokeObjectURL(url),2000);
+        toast('✓ Saved — open WhatsApp & attach','ok');
+      }
+    },'image/png');
+  }).catch(e=>{
+    el.style.background='';el.style.padding='';
+    btn.textContent='💬 WhatsApp';btn.disabled=false;
+    toast('Error: '+e.message,'err');
+  });
+}
+
+
+function clearAllTender(){
+  confDlg('Clear ALL Tender orders & quantities?',()=>{
+    tenderOrders=[];
+    LS.set('iat_to',tenderOrders);
+    renderTQtyPage();
+    toast('✓ Tender cleared','ok');
+  });
 }
 
 function mergeTenderToOrders(){
@@ -3094,82 +3700,138 @@ function addTenderAIToList(){
     });
   });
   LS.set('iat_to',tenderOrders);
-  renderTenderOrdersList();
+  renderTOrdersPage();
   closeTenderImport();
   toast('✓ Added to tender','ok');
 }
 
-function renderTenderOrdersList(){
-  const el=document.getElementById('tenderOrdersList');
+function renderTOrdersPage(){
+  const el=document.getElementById('tOrdersList');
+  if(!el)return;
   const badge=document.getElementById('tOrdersBadge');
+  if(badge)badge.textContent=tenderOrders.length||'0';
   if(!tenderOrders.length){
-    el.innerHTML='<div style="color:var(--muted);font-size:.75rem;text-align:center;padding:20px;opacity:.6">📭 No orders</div>';
-    if(badge)badge.textContent='0';
+    el.innerHTML='<div class="empty"><div class="ei">🏷</div><p>No tender orders yet.</p></div>';
     return;
   }
-  if(badge)badge.textContent=tenderOrders.length;
-  
-  // جمع الكميات حسب المنتج
-  const quantityMap=new Map();
-  for(let order of tenderOrders){
-    if(!quantityMap.has(order.product)){
-      // استخرج الجرامات من اسم المنتج
-      let grams=400; // default
-      if(order.product.includes('450')) grams=450;
-      else if(order.product.includes('500')) grams=500;
-      quantityMap.set(order.product,{qty:0,grams});
-    }
-    const data=quantityMap.get(order.product);
-    data.qty+=order.qty;
-  }
-  
-  // عرض الأوردرات
-  let html='';
-  tenderOrders.forEach((order,idx)=>{
-    const custColor=idx%2===0?'var(--s2)':'var(--s1)';
-    html+='<div style="display:grid;grid-template-columns:30px 1fr 1fr 50px;gap:4px;align-items:center;padding:6px;background:'+custColor+';border-radius:2px;border:1px solid var(--b2);font-size:.7rem;margin-bottom:3px;width:100%;box-sizing:border-box">';
-    
-    html+='<button onclick="tenderOrders.splice('+idx+',1);LS.set(\'iat_to\',tenderOrders);renderTenderOrdersList();renderTenderViewList()" style="padding:2px;background:#e74c3c;color:white;border:none;border-radius:2px;cursor:pointer;font-weight:700;font-size:.65rem;min-width:30px">✕</button>';
-    
-    html+='<select onchange="tenderOrders['+idx+'].customer=this.value;LS.set(\'iat_to\',tenderOrders);renderTenderOrdersList()" style="padding:4px;border:1px solid var(--b2);border-radius:2px;font-size:.65rem;background:var(--s3);color:var(--txt);min-width:0">';
-    html+='<option value="">Cust</option>';
-    DC.forEach(c=>{html+='<option value="'+c+'" '+(order.customer===c?'selected':'')+'>'+c.substring(0,12)+'</option>'});
-    html+='</select>';
-    
-    html+='<select onchange="tenderOrders['+idx+'].product=this.value;LS.set(\'iat_to\',tenderOrders);renderTenderOrdersList()" style="padding:4px;border:1px solid var(--b2);border-radius:2px;font-size:.65rem;background:var(--s3);color:var(--txt);min-width:0">';
-    html+='<option value="">Prod</option>';
-    tenderProds.forEach(p=>{html+='<option value="'+p+'" '+(order.product===p?'selected':'')+'>'+p+'</option>'});
-    html+='</select>';
-    
-    html+='<input type="number" value="'+order.qty+'" onchange="tenderOrders['+idx+'].qty=Math.max(1,parseInt(this.value)||1);LS.set(\'iat_to\',tenderOrders);renderTenderOrdersList()" style="width:50px;padding:4px;border:1px solid var(--b2);border-radius:2px;font-size:.65rem;text-align:center;font-weight:600;background:var(--s3);color:var(--txt)"/>';
-    
-    html+='</div>';
+
+  // تجميع حسب customer مع حفظ idx
+  const custMap=new Map();
+  tenderOrders.forEach((o,i)=>{
+    if(!custMap.has(o.customer))custMap.set(o.customer,[]);
+    custMap.get(o.customer).push({...o,idx:i});
   });
-  
-  // إضافة ملخص الكميات والكغ
-  html+='<div style="margin-top:8px;padding:8px;background:var(--s2);border-radius:2px;border:1px solid var(--b2)">';
-  html+='<div style="font-weight:700;font-size:.75rem;color:var(--teal);margin-bottom:6px">📊 SUMMARY</div>';
-  
-  let totalKG=0;
-  for(let [prod,data] of quantityMap){
-    let kg=0;
-    // حساب صحيح
-    if(prod.toUpperCase().includes('KG')){
-      kg=data.qty; // KG يبقى KG
-    }else{
-      kg=data.qty*(data.grams/1000);
-    }
-    totalKG+=kg;
-    html+='<div style="font-size:.7rem;margin-bottom:3px;padding:3px;background:var(--s1);border-radius:2px">';
-    html+='<div style="color:var(--txt)">'+prod+': '+data.qty+' trays</div>';
-    html+='<div style="color:var(--blue2);font-weight:600">= '+(kg%1===0?kg:kg.toFixed(2))+' kg</div>';
-    html+='</div>';
-  }
-  
-  html+='<div style="font-weight:700;font-size:.75rem;color:var(--teal);padding-top:6px;border-top:1px solid var(--b1);margin-top:6px">🎯 TOTAL: '+totalKG.toFixed(2)+' KG</div>';
-  html+='</div>';
-  
-  el.innerHTML=html;
+
+  el.innerHTML=[...custMap.entries()].map(([c,items])=>`
+    <div class="cc" style="border-color:rgba(251,191,36,.25)">
+      <div class="cc-h" style="background:linear-gradient(90deg,rgba(251,191,36,.15),transparent);border-bottom-color:rgba(251,191,36,.2)">
+        <span class="cc-name" style="display:flex;align-items:center;gap:4px;color:#fcd34d">
+          <span style="cursor:pointer;padding:5px 8px;background:rgba(251,191,36,.1);border-radius:5px;font-size:.78rem;font-weight:700;border:1.5px solid rgba(251,191,36,.35);display:inline-block;color:#fcd34d" onclick="openTCustEdit('${esc(c)}')">
+            👤 ${c}<br/><span style="font-size:.6rem;color:var(--muted);font-weight:400">✏️ Edit</span>
+          </span>
+        </span>
+        <button class="cc-del" style="color:var(--red);font-size:.72rem" onclick="delTCust('${esc(c)}')">Remove ✕</button>
+      </div>
+      ${items.map(o=>`
+        <div style="display:flex;gap:5px;align-items:center;padding:6px 8px;background:var(--s2);border-radius:5px;font-size:.75rem;margin-bottom:3px;border:1px solid var(--b2)">
+          <button onclick="delTRow(${o.idx})" style="flex-shrink:0;padding:2px 6px;background:rgba(248,113,113,.12);border:1.5px solid rgba(248,113,113,.4);border-radius:4px;color:#f87171;cursor:pointer;font-weight:700;font-size:.75rem">✕</button>
+          <span onclick="openTProdEdit(${o.idx})" style="cursor:pointer;padding:4px 8px;background:rgba(77,124,254,.12);border-radius:5px;font-size:.75rem;font-weight:600;min-width:95px;text-align:center;border:1.5px solid rgba(77,124,254,.35);color:var(--blue2)">
+            ${o.product||'?'}<br/><span style="font-size:.6rem;color:var(--muted);font-weight:400">✏️</span>
+          </span>
+          <div style="flex:1"></div>
+          <div style="display:flex;gap:0;flex-shrink:0;align-items:center;border:1.5px solid rgba(251,191,36,.4);border-radius:6px;overflow:hidden;background:var(--s1)">
+            <button onclick="adjTO(${o.idx},-1)" style="padding:4px 9px;background:transparent;border:none;cursor:pointer;color:var(--amber);font-weight:800;font-size:1rem">−</button>
+            <input type="number" min="1" step="1" value="${o.qty}" onchange="setTOQ(${o.idx},this.value)" style="width:46px;height:26px;padding:2px;border:none;text-align:center;font-weight:700;font-size:.88rem;background:transparent;color:#fcd34d;font-family:var(--mono)"/>
+            <button onclick="adjTO(${o.idx},1)" style="padding:4px 9px;background:transparent;border:none;cursor:pointer;color:var(--amber);font-weight:800;font-size:1rem">+</button>
+          </div>
+          <span style="font-size:.68rem;color:var(--teal);font-family:var(--mono);font-weight:600;flex-shrink:0">trays</span>
+        </div>`).join('')}
+    </div>`).join('');
+}
+
+// ── T.Orders CRUD ──
+function adjTO(i,d){
+  if(i<0||i>=tenderOrders.length)return;
+  tenderOrders[i].qty=Math.max(1,(parseInt(tenderOrders[i].qty||1)+d));
+  saveTenderOrders();
+  renderTOrdersPage();
+}
+function setTOQ(i,v){
+  if(i<0||i>=tenderOrders.length)return;
+  tenderOrders[i].qty=Math.max(1,parseInt(v)||1);
+  saveTenderOrders();
+  renderTOrdersPage();
+}
+function delTRow(i){
+  if(i<0||i>=tenderOrders.length)return;
+  tenderOrders.splice(i,1);
+  saveTenderOrders();
+  renderTOrdersPage();
+}
+function delTCust(c){
+  confDlg(`Remove all orders for "${c}"?`,()=>{
+    tenderOrders=tenderOrders.filter(o=>o.customer!==c);
+    saveTenderOrders();
+    renderTOrdersPage();
+    toast('✓ Removed','ok');
+  });
+}
+
+// تعديل اسم الزبون في T.Orders - يستخدم Global Modal
+let _tOrdersCustCtx='';
+function openTCustEdit(cust){
+  _tOrdersCustCtx=cust;
+  const modal=document.getElementById('gCustModal');
+  document.getElementById('gCustModal').dataset.mode='tender';
+  modal.style.display='flex';
+  const inp=document.getElementById('gCustSearch');
+  inp.value='';
+  document.getElementById('gCustNewName').value='';
+  filterGCustModal('');
+  setTimeout(()=>inp.focus(),80);
+}
+
+// تعديل المنتج في T.Orders
+function openTProdEdit(idx){
+  const order=tenderOrders[idx];
+  if(!order)return;
+  const html=`
+    <div style="padding:12px">
+      <div style="font-size:.8rem;font-weight:700;margin-bottom:8px;color:var(--blue2)">Select Product</div>
+      <input type="text" placeholder="🔍 Search..." id="tProdEditSearch"
+        oninput="filterTProdEdit(${idx},this.value)"
+        style="width:100%;padding:8px;border:1px solid var(--b2);border-radius:6px;margin-bottom:8px;font-size:.8rem;background:var(--s3);color:var(--txt);outline:none"/>
+      <div id="tProdEditList" style="max-height:50vh;overflow-y:auto"></div>
+    </div>`;
+  const ov=document.getElementById('tProdEditOv')||createDiv('tProdEditOv');
+  ov.style.cssText='display:flex;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.75);z-index:900;flex-direction:column';
+  ov.onclick=e=>{if(e.target===ov)ov.style.display='none';};
+  ov.innerHTML=`<div style="background:var(--s1);border-radius:0 0 14px 14px;width:100%;max-height:75vh;overflow:hidden">${html}</div>`;
+  document.body.appendChild(ov);
+  filterTProdEdit(idx,'');
+  setTimeout(()=>document.getElementById('tProdEditSearch')?.focus(),80);
+}
+function createDiv(id){const d=document.createElement('div');d.id=id;return d;}
+function filterTProdEdit(idx,q){
+  const list=document.getElementById('tProdEditList');
+  if(!list)return;
+  const src=q?tenderProds.filter(p=>p.toLowerCase().includes(q.toLowerCase())):tenderProds;
+  const cur=tenderOrders[idx]?.product||'';
+  list.innerHTML=src.map(p=>`
+    <div onclick="applyTProdEdit(${idx},'${esc(p)}')"
+      style="padding:11px 14px;cursor:pointer;border-bottom:1px solid var(--b1);font-size:.78rem;
+             color:${p===cur?'var(--teal)':'var(--txt)'};background:${p===cur?'rgba(45,212,191,.08)':'transparent'}"
+      onmouseover="this.style.background='var(--faint)'"
+      onmouseout="this.style.background='${p===cur?'rgba(45,212,191,.08)':'transparent'}'">
+      ${p===cur?'✓ ':''}${p}
+    </div>`).join('');
+}
+function applyTProdEdit(idx,prod){
+  tenderOrders[idx].product=prod;
+  saveTenderOrders();
+  const ov=document.getElementById('tProdEditOv');
+  if(ov)ov.style.display='none';
+  renderTOrdersPage();
 }
 
 function renderTenderViewList(){
