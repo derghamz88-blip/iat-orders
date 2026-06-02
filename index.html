@@ -143,7 +143,7 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
 .import-btn{background:var(--s2);border:2px dashed var(--b2);border-radius:var(--r);padding:8px 14px;color:var(--muted);font-family:var(--sans);font-size:.8rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .2s;}
 .import-btn:hover,.import-btn:active{border-color:var(--blue2);color:var(--blue2);}
 .import-btn input{display:none;}
-.olist{padding:12px;display:flex;flex-direction:column;gap:9px;}
+.olist{padding:6px;display:flex;flex-direction:column;gap:4px;}
 .badge{background:var(--blue);color:#fff;border-radius:20px;padding:2px 9px;font-size:.66rem;font-family:var(--mono);}
 .cc{background:var(--s1);border:1px solid var(--b1);border-radius:var(--r2);overflow:hidden;animation:fi .2s ease;}
 @keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
@@ -222,10 +222,13 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
   <div class="logo">IAT<b>.</b>Orders</div>
   <div class="ntab on" onclick="showPage('entry',this)">✏️ Entry</div>
   <div class="ntab" onclick="showPage('orders',this)">📋 Orders <span class="nbadge" id="navBadge">0</span></div>
+  <div class="ntab" onclick="showPage('view-orders',this)">👁️ View</div>
   <div class="ntab" onclick="showPage('drivers',this)">🚗 Drivers</div>
   <div class="ntab" onclick="showPage('qty',this)">📊 Qty</div>
   <div class="ntab" onclick="showPage('tender',this)">🏷 Tender</div>
+  <div class="ntab" onclick="showPage('tender-orders',this)">📋 T.Orders</div>
   <div class="ntab" onclick="showPage('tqty',this)">📊 T.Qty</div>
+  <div class="ntab" onclick="showPage('report',this)">📄 Report</div>
   <div class="ntab" onclick="showPage('invoice',this)">🧾 Invoice</div>
   <div class="ntab" onclick="showPage('settings',this)">⚙️ Settings</div>
 </nav>
@@ -324,17 +327,37 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
   </div>
   <div class="exp-bar">
     <button class="btn btn-red btn-sm" style="flex-shrink:0" onclick="clearAll()">🗑 Clear</button>
-    <button class="btn btn-ghost btn-sm" style="flex-shrink:0" onclick="exportXL()">⬇ Excel</button>
-    <button class="btn btn-ghost btn-sm" style="flex-shrink:0;color:var(--teal)" onclick="openAIImport()">📋 Import</button>
-    <button class="btn btn-blue btn-sm" style="flex-shrink:0" onclick="showOrdersPrintDlg()">🖨 Orders</button>
-    <button class="btn btn-amber btn-sm" style="flex-shrink:0" onclick="showLabelsPrintDlg()">🏷 Labels</button>
-    <button class="btn btn-ghost btn-sm" style="flex-shrink:0;color:var(--purple)" onclick="saveProductionDaily()">💾 Archive</button>
-    <button class="btn btn-purple btn-sm" style="flex-shrink:0" onclick="printDrivers()">🚗 Drivers</button>
+    <button class="btn btn-ghost btn-sm" style="flex-shrink:0" onclick="openAIImport()">📋 Import</button>
     <button class="btn btn-teal btn-sm" style="flex-shrink:0" onclick="saveToOneDrive()" id="odBtn">☁ OneDrive</button>
   </div>
 </div>
 
-
+<!-- ══ VIEW ORDERS PAGE ══ -->
+<div class="page" id="pg-view-orders">
+  <div class="orders-head">
+    <div>
+      <div style="font-size:.68rem;font-family:var(--mono);color:var(--muted);letter-spacing:.1em;text-transform:uppercase">View Orders</div>
+    </div>
+  </div>
+  <div style="flex:1;overflow-y:auto;">
+    <div class="olist" id="viewList">
+      <div class="empty"><div class="ei">📋</div><p>No orders yet.</p></div>
+    </div>
+  </div>
+  <div class="exp-bar">
+    <div style="display:flex;gap:8px;align-items:center">
+      <label style="font-size:.7rem;color:var(--muted);min-width:fit-content">📍 Print Range:</label>
+      <input type="text" id="printRangeFrom" placeholder="From (A1)" style="width:80px;padding:6px;border:1px solid var(--b2);border-radius:3px;font-size:.75rem;font-family:monospace" value="A1"/>
+      <span style="color:var(--muted);font-size:.7rem">→</span>
+      <input type="text" id="printRangeTo" placeholder="To (Z100)" style="width:80px;padding:6px;border:1px solid var(--b2);border-radius:3px;font-size:.75rem;font-family:monospace" value="Z100"/>
+    </div>
+    <button class="btn btn-blue btn-sm" style="flex-shrink:0" onclick="showOrdersPrintDlg()">🖨 Orders</button>
+    <button class="btn btn-amber btn-sm" style="flex-shrink:0" onclick="showLabelsPrintDlg()">🏷 Labels</button>
+    <button class="btn btn-ghost btn-sm" style="flex-shrink:0;color:var(--purple)" onclick="saveProductionDaily()">💾 Archive</button>
+    <button class="btn btn-purple btn-sm" style="flex-shrink:0" onclick="printDrivers()">🚗 Drivers</button>
+    <button class="btn btn-ghost btn-sm" style="flex-shrink:0" onclick="exportXL()">⬇ Excel</button>
+  </div>
+</div>
 
 <!-- ══ QTY PAGE ══ -->
 <div class="page" id="pg-qty">
@@ -376,6 +399,9 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
 <div class="page" id="pg-tender">
   <!-- Top: customer picker -->
   <div style="padding:10px 12px;border-bottom:1px solid var(--b1);flex-shrink:0">
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button class="btn btn-ghost btn-sm" style="flex:1;color:var(--teal)" onclick="openTenderImport()">📥 AI Import</button>
+    </div>
     <div class="pick-wrap">
       <button class="pick-btn" id="tCustBtn" onclick="togTCDrop()">
         <span id="tCustLabel" style="color:var(--muted)">Select customer…</span>
@@ -397,10 +423,38 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     <div id="tProdList" style="flex:1;overflow-y:auto;padding:6px 8px;display:flex;flex-direction:column;gap:4px"></div>
   </div>
 
-  <!-- Bottom: selected rows + add button -->
-  <div style="border-top:1px solid var(--b1);flex-shrink:0;max-height:45vh;overflow-y:auto;padding:8px 12px;display:flex;flex-direction:column;gap:6px" id="tSelRows"></div>
-  <div style="padding:8px 12px;flex-shrink:0">
+  <!-- Bottom: Add button only -->
+  <div style="padding:8px 12px;flex-shrink:0;border-top:1px solid var(--b1)">
     <button class="btn btn-teal" style="width:100%" onclick="addTenderOrder()">➕ Add to Tender</button>
+  </div>
+</div>
+
+<!-- ══ TENDER ORDERS PAGE ══ -->
+<div class="page" id="pg-tender-orders">
+  <div class="orders-head">
+    <div style="font-size:.8rem;font-weight:700;color:var(--teal)">📋 Tender Orders</div>
+    <div style="display:flex;gap:7px">
+      <span class="badge" id="tOrdersBadge">0</span>
+    </div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:6px 8px;display:flex;flex-direction:column;gap:3px" id="tenderOrdersList"></div>
+</div>
+
+<!-- ══ TENDER VIEW PAGE ══
+<div class="page" id="pg-tender-view">
+  <div class="orders-head">
+    <div>
+      <div style="font-size:.68rem;font-family:var(--mono);color:var(--muted);letter-spacing:.1em;text-transform:uppercase">Tender Orders Preview</div>
+    </div>
+    <div style="display:flex;gap:7px">
+      <span class="badge" id="tenderViewBadge">0</span>
+    </div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:8px">
+    <div id="tenderViewList"></div>
+  </div>
+  <div style="padding:8px;flex-shrink:0">
+    <button class="btn btn-purple" style="width:100%" onclick="mergeTenderToOrders()">➕ Add All to Orders</button>
   </div>
 </div>
 
@@ -415,6 +469,19 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     </div>
   </div>
   <div style="flex:1;overflow-y:auto;padding:12px" id="tqtyList"></div>
+</div>
+
+
+<!-- ══ REPORT PAGE ══ -->
+<div class="page" id="pg-report">
+  <div class="orders-head">
+    <div><div style="font-size:.68rem;font-family:var(--mono);color:var(--muted);letter-spacing:.1em;text-transform:uppercase">📄 Summary Report</div></div>
+    <div style="display:flex;gap:7px">
+      <button class="btn btn-teal btn-sm" onclick="downloadReportPDF()">📄 PDF</button>
+      <button class="btn btn-green btn-sm" onclick="shareReportWhatsApp()">💬 WhatsApp</button>
+    </div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:12px" id="reportContent"></div>
 </div>
 
 
@@ -582,6 +649,31 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
   </div>
 </div>
 
+<div class="ov" id="tenderImportOv" onclick="closeTenderImport()">
+  <div class="cb2" onclick="event.stopPropagation()" style="width:95%;max-width:100%;height:90vh;display:flex;flex-direction:column;gap:10px;overflow:hidden">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
+      <div style="font-size:.9rem;font-weight:700;color:var(--purple)">📋 Tender AI Import</div>
+      <button class="btn btn-ghost btn-sm" onclick="closeTenderImport()">✕</button>
+    </div>
+    
+    <!-- Input section -->
+    <textarea id="tenderTextInput" placeholder="Paste WhatsApp tender text...&#10;&#10;Example:&#10;UNION Barsha&#10;30 Chicken&#10;4 Drum&#10;4 Wings" style="width:100%;height:120px;background:var(--s3);border:1.5px solid var(--b2);border-radius:8px;padding:10px;color:var(--txt);font-family:var(--sans);font-size:.82rem;outline:none;resize:none;box-sizing:border-box;flex-shrink:0"></textarea>
+    <button class="btn btn-purple" id="tenderExtractBtn" onclick="extractTenderAI()" style="flex-shrink:0">📋 Extract</button>
+    
+    <!-- Results section -->
+    <div id="tenderResults" style="display:none;flex:1;overflow:hidden;display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:.75rem;color:var(--muted);font-family:var(--mono);margin-bottom:2px;flex-shrink:0">EXTRACTED — Review & Edit</div>
+      
+      <!-- عرض التعديل - سطر واحد لكل order -->
+      <div id="tenderEditView" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-right:4px">
+      </div>
+      
+      <button class="btn btn-purple" style="width:100%;margin-top:8px;flex-shrink:0" onclick="addTenderAIToList()">➕ Add to Tender</button>
+    </div>
+    <div id="tenderStatus" style="font-size:.75rem;color:var(--muted);text-align:center;flex-shrink:0"></div>
+  </div>
+</div>
+
 <div class="ov" id="ordersPrintOv" onclick="hideOrdersPrintDlg()">
   <div class="cb2" onclick="event.stopPropagation()">
     <div class="lbl" style="margin-bottom:10px">🖨 Print Orders</div>
@@ -668,7 +760,7 @@ let custGroups=LS.get('iat_cg',{});  // {customer: groupId}
 let invoices=LS.get('iat_inv',[]);   // saved invoices
 const DTP=["KG","Zaki 400gr","Zaki 450gr","Zaki 500gr","Chickenco 400gr","Chickenco 450gr","Chickenco 500gr"];
 let tenderProds=LS.get('iat_tp',DTP);
-let tenderOrders=[];
+let tenderOrders=LS.get('iat_to',[]);
 let tSelCust=null;
 let tSelProds=new Map();
 let tCOpen=false;
@@ -740,11 +832,14 @@ function showPage(n,t){
   document.getElementById('pg-'+n).classList.add('on');
   if(t)t.classList.add('on');
   if(n==='orders')renderOrders();
+  if(n==='view-orders')renderViewOrders();
   if(n==='drivers')renderDriversPage();
   if(n==='qty')renderQtyPage();
   if(n==='invoice'){renderInvOrdersList();renderPricingPage();renderInvoiceList();}
-  if(n==='tender'){renderTCustDL(customers);renderTPList('');}
+  if(n==='tender'){renderTCustDL(customers);renderTPList('');renderTenderOrdersList();}
+  if(n==='tender-view'){renderTenderViewList();}
   if(n==='tqty')renderTQtyPage();
+  if(n==='report')renderReportPage();
   if(n==='settings'){renderSettC();renderSettP();renderSettD();renderSettTP();renderCustGroupList();}
 }
 
@@ -856,8 +951,8 @@ function renderSelRows(){
       <input class="note-inp" type="text" placeholder="Note..." value="${esc2(d.note)}" oninput="setNote('${esc(p)}',this.value)"/>
     </div>`).join('');
 }
-function adjQ(p,d){const o=selProds.get(p);if(o){o.qty=Math.max(0.5,Math.round((parseFloat(o.qty)||0.5)+d*0.5)*10/10);renderSelRows();}}
-function setQ(p,v){const o=selProds.get(p);if(o)o.qty=Math.max(0.5,parseFloat(v)||0.5);}
+function adjQ(p,d){const o=selProds.get(p);if(o){o.qty=Math.max(0.5,Math.round((parseFloat(o.qty)||0.5)+(d*0.5))*10/10);renderSelRows();}}
+function setQ(p,v){const o=selProds.get(p);if(o)o.qty=Math.max(0.5,parseFloat(v)||0.5);renderSelRows();}
 function setSz(p,v){const o=selProds.get(p);if(o){o.size=v;renderSelRows();}}
 function setNote(p,v){const o=selProds.get(p);if(o)o.note=v;}
 
@@ -910,33 +1005,44 @@ function renderOrders(){
                 <button class="cc-mb" ${canDn?'':'disabled'} onclick="moveGroup('${esc(date)}','${esc(c)}',1)">▼</button>
               </div>
               <input class="cc-num" type="number" min="1" value="${items[0].num||''}" title="Order #" onchange="setGroupNum('${esc(date)}','${esc(c)}',this.value)" onclick="this.select()"/>
-              <span style="cursor:pointer;user-select:none"
-                onpointerdown="ordLongPressStart(event,'${esc(c)}','customer','${esc(date)}')"
-                onpointerup="ordLongPressEnd()" onpointerleave="ordLongPressEnd()"
-                oncontextmenu="event.preventDefault();openOrdCustPicker('${esc(c)}','${esc(date)}')">
-                👤 ${c}
+              <span style="cursor:pointer;user-select:none;padding:4px 6px;background:var(--b1);border-radius:2px;font-size:.75rem;border:1px solid var(--b2);display:inline-block" onclick="openCustModal('${esc(c)}','${esc(date)}')">
+                👤 ${c}<br/><span style="font-size:.6rem;color:var(--muted)">✏️ Edit</span>
               </span>
+              <div id="custModalOrd${esc(c).replace(/'/g,'')}${date}" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;padding:10px;flex-direction:column" onclick="if(event.target===this)closeCustModal('${esc(c)}','${esc(date)}')">
+                <div style="background:var(--s1);border-radius:4px;padding:12px;margin:auto;max-width:400px;max-height:80vh;overflow-y:auto;display:flex;flex-direction:column">
+                  <div style="font-size:.8rem;font-weight:700;margin-bottom:8px">Select Customer</div>
+                  <input type="text" id="custSearchInput${esc(c).replace(/'/g,'')}${date}" placeholder="Search customers..." oninput="filterCustModal('${esc(c)}','${esc(date)}',this.value)" style="padding:6px;border:1px solid var(--b2);border-radius:2px;margin-bottom:8px;font-size:.75rem"/>
+                  <div id="custModalList${esc(c).replace(/'/g,'')}${date}" style="flex:1;overflow-y:auto"></div>
+                </div>
+              </div>
             </span>
-            <button class="cc-del" onclick="delCust('${esc(c)}','${date}')">Remove ✕</button>
+            <button class="cc-del" onclick="addProdToOrder('${esc(c)}','${date}')">+ Add</button>
+            <button class="cc-del" onclick="delCust('${esc(c)}','${date}')')">Remove ✕</button>
           </div>
-          ${items.map(o=>`<div class="pr">
-            <div style="cursor:pointer;user-select:none"
-              onpointerdown="ordLongPressStart(event,${o.idx},'product')"
-              onpointerup="ordLongPressEnd()" onpointerleave="ordLongPressEnd()"
-              oncontextmenu="event.preventDefault();openOrdPicker(${o.idx},'product')">
-              <div class="pr-name" title="Hold to change">${o.product}</div>
-              <div style="display:flex;gap:4px;margin-top:2px">
-                ${o.size?`<span class="pr-sz">${o.size}g</span>`:''}
+          ${items.map(o=>`<div style="display:flex;gap:4px;align-items:center;padding:4px;background:var(--s1);border-radius:3px;font-size:.7rem;margin-bottom:2px">
+            <button class="pr-del" onclick="delRow(${o.idx})" style="flex-shrink:0;padding:2px 4px">✕</button>
+            
+            <div style="display:flex;gap:4px;flex-shrink:0;align-items:center;position:relative">
+              <span onclick="openProdModal(${o.idx})" style="cursor:pointer;padding:4px 6px;background:var(--b1);border-radius:2px;font-size:.7rem;min-width:90px;text-align:center;border:1px solid var(--b2)">
+                ${o.product||'Select...'}<br/><span style="font-size:.6rem;color:var(--muted)">✏️ Edit</span>
+              </span>
+            </div>
+            <div id="prodModalOrd${o.idx}" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;padding:10px;flex-direction:column" onclick="if(event.target===this)closeProdModal(${o.idx})">
+              <div style="background:var(--s1);border-radius:4px;padding:12px;margin:auto;max-width:400px;max-height:80vh;overflow-y:auto;display:flex;flex-direction:column">
+                <div style="font-size:.8rem;font-weight:700;margin-bottom:8px">Select Product</div>
+                <input type="text" id="prodSearchInput${o.idx}" placeholder="Search products..." oninput="filterProdModal(${o.idx},this.value)" style="padding:6px;border:1px solid var(--b2);border-radius:2px;margin-bottom:8px;font-size:.75rem"/>
+                <div id="prodModalList${o.idx}" style="flex:1;overflow-y:auto"></div>
               </div>
             </div>
-            <input class="note-inp" type="text" placeholder="Note..." value="${esc2(o.note||'')}" oninput="setOrdNote(${o.idx},this.value)"/>
-            <div class="pr-qc">
-              <button class="pr-qb" onclick="adjO(${o.idx},-1)">−</button>
-              <input class="pr-qi" type="number" min="0.5" step="0.5" value="${o.qty}" oninput="setOQ(${o.idx},this.value)"/>
-              <button class="pr-qb" onclick="adjO(${o.idx},1)">+</button>
+            
+            <input class="note-inp" type="text" placeholder="Note" value="${esc2(o.note||'')}" oninput="setOrdNote(${o.idx},this.value)" style="flex:1;height:20px;font-size:.65rem;padding:2px 4px"/>
+            <div style="display:flex;gap:2px;flex-shrink:0;align-items:center;border:1px solid var(--b2);border-radius:3px;overflow:hidden">
+              <button class="pr-qb" onclick="adjO(${o.idx},-1)" style="padding:3px 6px;background:var(--s2);border:none;cursor:pointer;color:var(--txt);font-weight:700">−</button>
+              <input class="pr-qi" type="number" min="1" step="1" value="${o.qty}" oninput="setOQ(${o.idx},this.value)" style="width:45px;height:24px;padding:2px;border:none;text-align:center;font-weight:600;font-size:.8rem;background:transparent"/>
+              <button class="pr-qb" onclick="adjO(${o.idx},1)" style="padding:3px 6px;background:var(--s2);border:none;cursor:pointer;color:var(--txt);font-weight:700">+</button>
             </div>
-            <span class="pr-unit">kg</span>
-            <button class="pr-del" onclick="delRow(${o.idx})">✕</button>
+            <span class="pr-unit" style="flex-shrink:0">kg</span>
+            ${isCHK(o.product)?'<select class="pr-qi" value="'+o.size+'" onchange="setOrdSize('+o.idx+',this.value)" style="width:70px;flex-shrink:0"><option value="">Size</option>'+SIZES.map(s=>'<option value="'+s+'" '+(o.size===s?'selected':'')+'>'+s+'g</option>').join('')+'<option value="">Custom</option></select>'+(o.size&&!SIZES.includes(o.size)?'<span class="pr-qi" style="width:70px;flex-shrink:0;padding:2px;text-align:center">'+o.size+'g</span>':''):''}
           </div>`).join('')}
         </div>`;
       }).join('')}
@@ -979,9 +1085,163 @@ function setGroupNum(date,cust,v){
   renderOrders();
 }
 function setOrdNote(i,v){orders[i].note=v;saveOrders();}
-function adjO(i,d){orders[i].qty=Math.max(0.5,Math.round((parseFloat(orders[i].qty)||0.5)+d*0.5)*10/10);saveOrders();renderOrders();}
-function setOQ(i,v){orders[i].qty=Math.max(0.5,parseFloat(v)||0.5);}
+function setOrdSize(i,v){orders[i].size=v;saveOrders();}
+function adjO(i,d){
+  let current=parseFloat(orders[i].qty)||1;
+  let newQty=current+d;
+  orders[i].qty=Math.max(1,newQty);
+  saveOrders();
+  // تحديث محلي فقط - بدون رسم كل شيء
+  const inputs=document.querySelectorAll('.pr-qi[data-idx="'+i+'"]');
+  inputs.forEach(inp=>inp.value=orders[i].qty);
+}
+function setOQ(i,v){orders[i].qty=Math.max(1,parseFloat(v)||1);saveOrders();}
+function setOrdProduct(i,v){orders[i].product=v;saveOrders();renderOrders();}
+function openCustModal(oldCust,date){
+  const modalId='custModalOrd'+oldCust.replace(/'/g,'')+date;
+  const modal=document.getElementById(modalId);
+  modal.style.display='flex';
+  document.getElementById('custSearchInput'+oldCust.replace(/'/g,'')+date).focus();
+  filterCustModal(oldCust,date,'');
+}
+function closeCustModal(oldCust,date){
+  const modalId='custModalOrd'+oldCust.replace(/'/g,'')+date;
+  document.getElementById(modalId).style.display='none';
+}
+function filterCustModal(oldCust,date,q){
+  const listId='custModalList'+oldCust.replace(/'/g,'')+date;
+  const list=document.getElementById(listId);
+  const filtered=q?customers.filter(c=>c.toLowerCase().includes(q.toLowerCase())):[];
+  list.innerHTML=filtered.map(c=>'<div style="padding:8px;cursor:pointer;border-bottom:1px solid var(--b2);font-size:.75rem" onclick="changeCustName(\''+esc(oldCust)+'\',\''+esc(c)+'\',\''+date+'\')">'+c+'</div>').join('');
+}
+function changeCustName(oldName,newName,date){
+  const orderIdx=orders.findIndex(o=>o.date===date&&o.customer===oldName);
+  if(orderIdx===-1)return;
+  const grouped=groupByDateCust(orders);
+  for(let grp of grouped){
+    if(grp.date===date){
+      for(let item of grp.items){item.customer=newName;}
+    }
+  }
+  saveOrders();
+  closeCustModal(oldName,date);
+  renderOrders();
+}
+function openProdModal(idx){
+  const modal=document.getElementById('prodModalOrd'+idx);
+  if(modal){
+    modal.style.display='flex';
+    document.getElementById('prodSearchInput'+idx)?.focus();
+    filterProdModal(idx,'');
+  }
+}
+function closeProdModal(idx){
+  document.getElementById('prodModalOrd'+idx).style.display='none';
+}
+function filterProdModal(idx,q){
+  const list=document.getElementById('prodModalList'+idx);
+  const filtered=q?products.filter(p=>p.toLowerCase().includes(q.toLowerCase())):products;
+  list.innerHTML=filtered.map(p=>'<div style="padding:8px;cursor:pointer;border-bottom:1px solid var(--b2);font-size:.75rem" onclick="selectProdModal('+idx+',\''+esc(p)+'\')">'+p+'</div>').join('');
+}
+function selectProdModal(idx,prod){
+  orders[idx].product=prod;
+  saveOrders();
+  closeProdModal(idx);
+  renderOrders();
+}
 function delRow(i){orders.splice(i,1);saveOrders();renderOrders();}
+function addProdToOrder(cust,date){
+  // عرض قائمة المنتجات مع بحث
+  const custData=orders.filter(o=>o.customer===cust&&o.date===date);
+  const html=`
+    <div class="lbl" style="margin-bottom:10px">Add Product for ${cust}</div>
+    <input type="text" id="addProdSearch" placeholder="🔍 Search..." style="width:100%;margin-bottom:8px;padding:6px;border:1px solid var(--b2);border-radius:4px" oninput="filterAddProdList()"/>
+    <div id="addProdList" style="display:flex;flex-direction:column;gap:4px;max-height:300px;overflow-y:auto">
+      ${products.map(p=>`<button class="btn btn-ghost" style="text-align:left;padding:6px" data-prod="${esc(p)}" onclick="selectProdForAdd('${esc(cust)}','${date}','${esc(p)}')">${p}</button>`).join('')}
+    </div>
+    <button class="btn btn-ghost" style="margin-top:10px;width:100%" onclick="hideAddProdDlg()">Cancel</button>
+  `;
+  const ov=document.getElementById('addProdOv');
+  if(!ov){
+    const div=document.createElement('div');
+    div.id='addProdOv';
+    div.className='ov';
+    div.onclick=function(e){if(e.target===this)hideAddProdDlg()};
+    div.innerHTML=`<div class="cb2" onclick="event.stopPropagation()">${html}</div>`;
+    document.body.appendChild(div);
+  }else{
+    ov.querySelector('.cb2').innerHTML=html;
+  }
+  document.getElementById('addProdOv').classList.add('on');
+  setTimeout(()=>document.getElementById('addProdSearch').focus(),100);
+}
+function filterAddProdList(){
+  const search=document.getElementById('addProdSearch').value.toLowerCase();
+  document.querySelectorAll('#addProdList button').forEach(btn=>{
+    btn.style.display=btn.getAttribute('data-prod').toLowerCase().includes(search)?'block':'none';
+  });
+}
+function selectProdForAdd(cust,date,prod){
+  if(isCHK(prod)){
+    // للدجاج - اختر القياس أولاً
+    const sizeHtml=`
+      <div style="margin-bottom:10px">Select Size for ${prod}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">
+        ${SIZES.map(s=>`<button class="btn btn-ghost" style="padding:4px 8px;font-size:.7rem" onclick="finishAddProd('${esc(cust)}','${date}','${esc(prod)}','${s}')">${s}g</button>`).join('')}
+      </div>
+      <div style="margin-bottom:10px">
+        <span style="font-size:.7rem">أو</span>
+        <input type="number" id="customSize" placeholder="Custom size (g)" style="width:100%;padding:4px;margin-top:4px;border:1px solid var(--b2);border-radius:2px"/>
+      </div>
+      <button class="btn btn-teal" style="width:100%" onclick="finishAddProd('${esc(cust)}','${date}','${esc(prod)}',document.getElementById('customSize').value)">Continue</button>
+    `;
+    document.querySelector('#addProdOv .cb2').innerHTML=sizeHtml;
+  }else{
+    finishAddProd(cust,date,prod,'');
+  }
+}
+function finishAddProd(cust,date,prod,size){
+  const qty=parseFloat(prompt('Quantity (kg):')||'1');
+  const maxNum=orders.filter(o=>o.date===date).reduce((m,o)=>Math.max(m,o.num||0),0);
+  orders.push({num:maxNum,date,customer:cust,product:prod,qty,size:size||'',note:''});
+  saveOrders();renderOrders();renderViewOrders();hideAddProdDlg();toast('✓ Product added','ok');
+}
+function hideAddProdDlg(){
+  const ov=document.getElementById('addProdOv');
+  if(ov)ov.classList.remove('on');
+}
+function renderViewOrders(){
+  const el=document.getElementById('viewList');
+  if(!orders.length){el.innerHTML='<div class="empty"><div class="ei">📋</div><p>No orders yet.</p></div>';return;}
+  const dateMap=new Map();
+  orders.forEach(o=>{
+    const d=o.date||'—';
+    if(!dateMap.has(d))dateMap.set(d,new Map());
+    const custMap=dateMap.get(d);
+    if(!custMap.has(o.customer))custMap.set(o.customer,[]);
+    custMap.get(o.customer).push(o);
+  });
+  el.innerHTML=[...dateMap.entries()].map(([date,custMap])=>{
+    const custKeys=[...custMap.keys()];
+    return `<div style="margin-bottom:4px">
+      <div style="font-family:var(--mono);font-size:.65rem;color:var(--teal);padding:6px 4px;letter-spacing:.08em">📅 ${date}</div>
+      ${custKeys.map(c=>{
+        const items=custMap.get(c);
+        return `<div class="cc">
+          <div class="cc-h">
+            <span class="cc-name">${items[0].num} 👤 ${c}</span>
+          </div>
+          ${items.map(o=>`<div style="padding:4px;font-size:.7rem;display:flex;gap:8px;align-items:center">
+            <span style="flex:1">${o.product}</span>
+            <span style="color:var(--muted)">${o.qty}kg</span>
+            ${o.size?`<span style="background:var(--s2);padding:1px 4px;border-radius:2px">${o.size}g</span>`:''}
+            ${o.note?`<span style="color:var(--teal);font-size:.65rem">📝</span>`:''}
+          </div>`).join('')}
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+}
 function delCust(c,date){orders=orders.filter(o=>!(o.customer===c&&(o.date||'—')===date));saveOrders();renderOrders();}
 function clearAll(){if(!orders.length)return;confDlg('Clear all orders?',()=>{orders=[];saveOrders();renderOrders();updateBadges();toast('Cleared','ok');});}
 function updateBadges(){
@@ -1136,8 +1396,14 @@ async function saveProductionDaily(){
   const btn=event.target;
   btn.disabled=true;btn.textContent='Saving...';
   try{
+    // قراءة التاريخ من أول أوردر
+    let archiveDate=todayStr();
+    if(orders.length>0){
+      archiveDate=orders[0].date;
+    }
+    
     const token=await getODToken();
-    const markerContent=JSON.stringify({action:'archive_production',ts:Date.now()});
+    const markerContent=JSON.stringify({action:'archive_production',archiveDate:archiveDate,ts:Date.now()});
     const blob=new Blob([markerContent],{type:'application/json'});
     const res=await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',{
       method:'PUT',
@@ -1145,7 +1411,7 @@ async function saveProductionDaily(){
       body:blob
     });
     if(res.ok){
-      toast('✓ Production file archived!','ok');
+      toast('✓ Production file archived: production_'+archiveDate+'.xlsm','ok');
     }else{throw new Error('Failed');}
   }catch(e){
     if(e.message!=='user_cancelled')toast('Error: '+e.message,'err');
@@ -1183,6 +1449,9 @@ function hideOrdersPrintDlg(){document.getElementById('ordersPrintOv').classList
 async function confirmOrdersPrint(){
   const from=document.getElementById('ordersFrom').value;
   const to=document.getElementById('ordersTo').value;
+  const printRangeFrom=document.getElementById('printRangeFrom')?.value||'A1';
+  const printRangeTo=document.getElementById('printRangeTo')?.value||'Z100';
+  const printRange=printRangeFrom+':'+printRangeTo;
   if(!from||!to){toast('Enter both numbers','err');return;}
   const btn=document.getElementById('ordersPrintBtn');
   const status=document.getElementById('ordersPrintStatus');
@@ -1190,7 +1459,7 @@ async function confirmOrdersPrint(){
   status.textContent='';
   try{
     const token=await getODToken();
-    const markerContent=JSON.stringify({from:parseInt(from),to:parseInt(to),ts:Date.now()});
+    const markerContent=JSON.stringify({from:parseInt(from),to:parseInt(to),printRange:printRange,action:'',ts:Date.now()});
     const blob=new Blob([markerContent],{type:'application/json'});
     const res=await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',{
       method:'PUT',
@@ -1224,6 +1493,9 @@ function hideLabelsPrintDlg(){document.getElementById('labelsPrintOv').classList
 async function confirmLabelsPrint(){
   const from=document.getElementById('labelsFrom').value;
   const to=document.getElementById('labelsTo').value;
+  const printRangeFrom=document.getElementById('printRangeFrom')?.value||'A1';
+  const printRangeTo=document.getElementById('printRangeTo')?.value||'Z100';
+  const printRange=printRangeFrom+':'+printRangeTo;
   if(!from||!to){toast('Enter both numbers','err');return;}
   const btn=document.getElementById('labelsPrintBtn');
   const status=document.getElementById('labelsPrintStatus');
@@ -1231,7 +1503,7 @@ async function confirmLabelsPrint(){
   status.textContent='';
   try{
     const token=await getODToken();
-    const markerContent=JSON.stringify({from:parseInt(from),to:parseInt(to),action:'print_labels',ts:Date.now()});
+    const markerContent=JSON.stringify({from:parseInt(from),to:parseInt(to),printRange:printRange,action:'print_labels',ts:Date.now()});
     const blob=new Blob([markerContent],{type:'application/json'});
     const res=await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',{
       method:'PUT',
@@ -1763,10 +2035,10 @@ function renderTSelRows(){
   document.getElementById('tSelRows').innerHTML=[...tSelProds.entries()].map(([p,d])=>`
     <div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:8px 10px;display:flex;align-items:center;gap:8px">
       <span style="flex:1;font-size:.8rem;color:var(--txt)">${p}</span>
-      <div class="pr-qc">
-        <button class="pr-qb" onclick="adjTQ('${esc(p)}',-1)">−</button>
-        <input class="pr-qi" type="number" min="0" step="1" value="${d.qty}" oninput="setTQ('${esc(p)}',this.value)" style="width:52px"/>
-        <button class="pr-qb" onclick="adjTQ('${esc(p)}',1)">+</button>
+      <div style="display:flex;gap:0;align-items:center;border:1px solid var(--b2);border-radius:3px;overflow:hidden">
+        <button class="pr-qb" onclick="adjTQ('${esc(p)}',-1)" style="padding:3px 6px;background:var(--s1);border:none;cursor:pointer;color:var(--txt);font-weight:700">−</button>
+        <input class="pr-qi" type="number" min="0" step="1" value="${d.qty}" oninput="setTQ('${esc(p)}',this.value)" style="width:50px;border:none;text-align:center;font-weight:600;font-size:.8rem;background:transparent"/>
+        <button class="pr-qb" onclick="adjTQ('${esc(p)}',1)" style="padding:3px 6px;background:var(--s1);border:none;cursor:pointer;color:var(--txt);font-weight:700">+</button>
       </div>
       <span style="font-size:.65rem;color:var(--muted)">pcs</span>
       <button class="pr-del" onclick="togTProd('${esc(p)}')">✕</button>
@@ -1804,25 +2076,43 @@ function addTenderOrder(){
 function renderTQtyPage(){
   const el=document.getElementById('tqtyList');
   if(!tenderOrders.length){el.innerHTML='<div class="empty"><div class="ei">🏷</div><p>No tender orders yet.</p></div>';return;}
-  // Aggregate by product+size
+  
+  // جمع الكميات حسب المنتج وحساب الكغ الصحيح
   const totals=new Map();
   tenderOrders.forEach(o=>{
     const key=o.product;
+    let kg=0;
+    
+    // حساب KG بناءً على اسم المنتج
+    if(key.toUpperCase().includes('KG')){
+      // KG يبقى KG مباشرة
+      kg=parseInt(o.qty)||0;
+    }else{
+      // باقي المنتجات: استخرج الجرامات من اسم المنتج
+      let grams=400; // default
+      if(key.includes('450')) grams=450;
+      else if(key.includes('500')) grams=500;
+      else if(key.includes('400')) grams=400;
+      
+      kg=(parseInt(o.qty)||0)*(grams/1000);
+    }
+    
     const cur=totals.get(key)||{qty:0,kg:0,size:o.size};
     cur.qty+=parseInt(o.qty)||0;
-    cur.kg+=parseFloat(o.kg)||0;
+    cur.kg+=kg;
     totals.set(key,cur);
   });
+  
   const rows=[...totals.entries()];
   const totalQty=rows.reduce((s,[,v])=>s+v.qty,0);
   const totalKg=rows.reduce((s,[,v])=>s+v.kg,0);
+  
   el.innerHTML=`<div id="tqtyPrintArea">
     <div style="font-family:var(--mono);font-size:.62rem;color:var(--teal);padding:4px 0 8px;letter-spacing:.08em">TENDER — ${new Date().toLocaleDateString()}</div>
     <table style="width:100%;border-collapse:collapse">
       <thead>
         <tr style="border-bottom:2px solid var(--b2)">
           <th style="text-align:left;padding:6px 8px;font-size:.7rem;color:var(--muted);font-weight:700;text-transform:uppercase">GOODS</th>
-          <th style="text-align:right;padding:6px 6px;font-size:.7rem;color:var(--muted);font-weight:700">SIZE</th>
           <th style="text-align:right;padding:6px 6px;font-size:.7rem;color:var(--muted);font-weight:700">QTY</th>
           <th style="text-align:right;padding:6px 8px;font-size:.7rem;color:var(--muted);font-weight:700">KG</th>
         </tr>
@@ -1831,16 +2121,15 @@ function renderTQtyPage(){
         ${rows.map(([p,v])=>`
           <tr style="border-bottom:1px solid var(--b1)">
             <td style="padding:10px 8px;font-size:1rem;color:var(--txt);font-weight:500">${p}</td>
-            <td style="padding:10px 6px;font-size:.95rem;color:var(--muted);text-align:right">${v.size||''}</td>
             <td style="padding:10px 6px;font-size:1.1rem;color:var(--blue2);text-align:right;font-family:var(--mono);font-weight:800">${v.qty}</td>
-            <td style="padding:10px 8px;font-size:1.1rem;color:var(--teal);text-align:right;font-family:var(--mono);font-weight:800">${v.kg%1===0?v.kg:v.kg.toFixed(1)}</td>
+            <td style="padding:10px 8px;font-size:1.1rem;color:var(--teal);text-align:right;font-family:var(--mono);font-weight:800">${v.kg%1===0?v.kg:v.kg.toFixed(2)}</td>
           </tr>`).join('')}
       </tbody>
       <tfoot>
         <tr style="border-top:2.5px solid var(--b2);background:var(--s2)">
-          <td colspan="2" style="padding:11px 8px;font-size:1rem;font-weight:800;color:var(--txt)">TOTAL</td>
+          <td style="padding:11px 8px;font-size:1rem;font-weight:800;color:var(--txt)">🎯 TOTAL</td>
           <td style="padding:11px 6px;font-size:1.1rem;font-weight:900;color:var(--blue2);text-align:right;font-family:var(--mono)">${totalQty}</td>
-          <td style="padding:11px 8px;font-size:1.1rem;font-weight:900;color:var(--teal);text-align:right;font-family:var(--mono)">${totalKg%1===0?totalKg:totalKg.toFixed(1)}</td>
+          <td style="padding:11px 8px;font-size:1.1rem;font-weight:900;color:var(--teal);text-align:right;font-family:var(--mono)">${totalKg%1===0?totalKg:totalKg.toFixed(2)} kg</td>
         </tr>
       </tfoot>
     </table>
@@ -1856,9 +2145,21 @@ function printTQtyPDF(){
   const totals=new Map();
   tenderOrders.forEach(o=>{
     const key=o.product;
+    let kg=0;
+    
+    // حساب KG الصحيح
+    if(key.toUpperCase().includes('KG')){
+      kg=parseInt(o.qty)||0;
+    }else{
+      let grams=400;
+      if(key.includes('450')) grams=450;
+      else if(key.includes('500')) grams=500;
+      kg=(parseInt(o.qty)||0)*(grams/1000);
+    }
+    
     const cur=totals.get(key)||{qty:0,kg:0,size:o.size};
     cur.qty+=parseInt(o.qty)||0;
-    cur.kg+=parseFloat(o.kg)||0;
+    cur.kg+=kg;
     totals.set(key,cur);
   });
   const rows=[...totals.entries()];
@@ -1889,13 +2190,213 @@ function printTQtyPDF(){
     <table>
       <thead><tr><th>GOODS</th><th>SIZE</th><th>QTY</th><th>KG</th></tr></thead>
       <tbody>
-        ${rows.map(([p,v])=>`<tr><td>${p}</td><td>${v.size||''}</td><td>${v.qty}</td><td>${v.kg%1===0?v.kg:v.kg.toFixed(1)}</td></tr>`).join('')}
+        ${rows.map(([p,v])=>`<tr><td>${p}</td><td>${v.size||''}</td><td>${v.qty}</td><td>${v.kg%1===0?v.kg:v.kg.toFixed(2)}</td></tr>`).join('')}
       </tbody>
-      <tfoot><tr><td>TOTAL</td><td></td><td>${totalQty}</td><td>${totalKg%1===0?totalKg:totalKg.toFixed(1)}</td></tr></tfoot>
+      <tfoot><tr><td>TOTAL</td><td></td><td>${totalQty}</td><td>${totalKg%1===0?totalKg:totalKg.toFixed(2)}</td></tr></tfoot>
     </table>
     </body></html>`);
   win.document.close();
   setTimeout(()=>win.print(),400);
+}
+
+// ══ REPORT PAGE FUNCTIONS ══
+function renderReportPage(){
+  const el=document.getElementById('reportContent');
+  let html='';
+  
+  // ملخص Orders بالمجموع من الصنف
+  if(orders.length>0){
+    const orderTotals=new Map();
+    orders.forEach(o=>{
+      if(o.list){
+        o.list.forEach(item=>{
+          const prod=item.product;
+          const cur=orderTotals.get(prod)||{qty:0};
+          cur.qty+=item.qty;
+          orderTotals.set(prod,cur);
+        });
+      }
+    });
+    
+    if(orderTotals.size>0){
+      html+='<div style="margin-bottom:20px;padding:15px;background:var(--s2);border-radius:8px;border-left:4px solid var(--blue)">';
+      html+='<div style="font-weight:700;color:var(--blue2);font-size:.9rem;margin-bottom:8px">📋 ORDERS SUMMARY</div>';
+      html+='<table style="width:100%;border-collapse:collapse">';
+      html+='<tbody>';
+      let totalOrderQty=0;
+      [...orderTotals.entries()].forEach(([prod,data],idx)=>{
+        totalOrderQty+=data.qty;
+        const bg=idx%2===0?'var(--s1)':'var(--s2)';
+        html+='<tr style="background:'+bg+';border-bottom:1px solid var(--b1)">';
+        html+='<td style="padding:8px;font-size:.8rem">'+prod+'</td>';
+        html+='<td style="padding:8px;text-align:right;font-size:.8rem;color:var(--blue2);font-weight:600">'+data.qty+'</td>';
+        html+='</tr>';
+      });
+      html+='<tr style="background:var(--s2);border-top:2px solid var(--b2);font-weight:700">';
+      html+='<td style="padding:10px;font-size:.8rem">🎯 TOTAL</td>';
+      html+='<td style="padding:10px;text-align:right;font-size:.8rem;color:var(--blue2)">'+totalOrderQty+'</td>';
+      html+='</tr>';
+      html+='</tbody></table>';
+      html+='</div>';
+    }
+  }
+  
+  // جدول Tender فقط
+  if(tenderOrders.length>0){
+    const totals=new Map();
+    tenderOrders.forEach(o=>{
+      const key=o.product;
+      let kg=0;
+      if(key.toUpperCase().includes('KG')){
+        kg=parseInt(o.qty)||0;
+      }else{
+        let grams=400;
+        if(key.includes('450')) grams=450;
+        else if(key.includes('500')) grams=500;
+        kg=(parseInt(o.qty)||0)*(grams/1000);
+      }
+      const cur=totals.get(key)||{qty:0,kg:0};
+      cur.qty+=parseInt(o.qty)||0;
+      cur.kg+=kg;
+      totals.set(key,cur);
+    });
+    
+    const rows=[...totals.entries()];
+    const totalQty=rows.reduce((s,[,v])=>s+v.qty,0);
+    const totalKg=rows.reduce((s,[,v])=>s+v.kg,0);
+    
+    html+='<div style="margin-bottom:20px;padding:15px;background:var(--s2);border-radius:8px;border-left:4px solid var(--teal)">';
+    html+='<div style="font-weight:700;color:var(--teal);font-size:.9rem;margin-bottom:8px">📊 TENDER QUANTITIES</div>';
+    html+='<table style="width:100%;border-collapse:collapse">';
+    html+='<tbody>';
+    rows.forEach(([p,v],idx)=>{
+      const bg=idx%2===0?'var(--s1)':'var(--s2)';
+      html+='<tr style="background:'+bg+';border-bottom:1px solid var(--b1)">';
+      html+='<td style="padding:8px;font-size:.8rem">'+p+'</td>';
+      html+='<td style="padding:8px;text-align:right;font-size:.8rem;color:var(--blue2);font-weight:600">'+v.qty+'</td>';
+      html+='<td style="padding:8px;text-align:right;font-size:.8rem;color:var(--teal);font-weight:600">'+(v.kg%1===0?v.kg:v.kg.toFixed(2))+' kg</td>';
+      html+='</tr>';
+    });
+    html+='<tr style="background:var(--s2);border-top:2px solid var(--b2);font-weight:700">';
+    html+='<td colspan="2" style="padding:10px;font-size:.8rem">🎯 TOTAL</td>';
+    html+='<td style="padding:10px;text-align:right;font-size:.8rem;color:var(--teal)">'+(totalKg%1===0?totalKg:totalKg.toFixed(2))+' kg</td>';
+    html+='</tr>';
+    html+='</tbody></table>';
+    html+='</div>';
+  }
+  
+  if(!orders.length && !tenderOrders.length){
+    html='<div style="color:var(--muted);text-align:center;padding:40px">📭 No data</div>';
+  }
+  
+  el.innerHTML=html;
+}
+
+// PDF للتقرير الموحد
+function downloadReportPDF(){
+  const el=document.getElementById('reportContent');
+  if(!el || !el.innerHTML.trim()){toast('No data to download','err');return;}
+  const html=el.innerHTML;
+  const win=window.open('','_blank');
+  win.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8"/>
+      <style>
+        @page{margin:12mm;size:A4}
+        body{font-family:Arial,sans-serif;color:#000;margin:0;padding:0}
+        .header{text-align:center;padding:10px;border-bottom:2px solid #000;margin-bottom:15px}
+        .header h1{margin:0;font-size:28px;font-weight:900}
+        .header p{margin:3px 0 0;font-size:12px;color:#555}
+        .section{margin-bottom:20px;padding:15px;background:#f9f9f9;border-radius:5px;border-left:4px solid #333}
+        .section-title{font-weight:900;font-size:13px;color:#333;margin-bottom:10px}
+        table{width:100%;border-collapse:collapse;margin:10px 0}
+        th{background:#e0e0e0;padding:10px;font-size:12px;font-weight:bold;border:1px solid #999;text-align:left}
+        td{padding:10px;font-size:12px;border:1px solid #ddd}
+        tr:nth-child(even){background:#f5f5f5}
+        .total{font-weight:bold;background:#e0e0e0;border-top:2px solid #000}
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>📊 SUMMARY REPORT</h1>
+        <p>${new Date().toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p>
+      </div>
+      ${html}
+    </body>
+    </html>
+  `);
+  win.document.close();
+  setTimeout(()=>win.print(),500);
+}
+
+// WhatsApp Share
+function shareReportWhatsApp(){
+  // حساب Qty (Orders)
+  const orderTotals=new Map();
+  orders.forEach(o=>{
+    if(o.list){
+      o.list.forEach(item=>{
+        const prod=item.product;
+        const cur=orderTotals.get(prod)||{qty:0};
+        cur.qty+=item.qty;
+        orderTotals.set(prod,cur);
+      });
+    }
+  });
+  
+  // حساب T.Qty (Tender)
+  const tenderTotals=new Map();
+  tenderOrders.forEach(o=>{
+    const key=o.product;
+    let kg=0;
+    if(key.toUpperCase().includes('KG')){
+      kg=parseInt(o.qty)||0;
+    }else{
+      let grams=400;
+      if(key.includes('450')) grams=450;
+      else if(key.includes('500')) grams=500;
+      kg=(parseInt(o.qty)||0)*(grams/1000);
+    }
+    const cur=tenderTotals.get(key)||{qty:0,kg:0};
+    cur.qty+=parseInt(o.qty)||0;
+    cur.kg+=kg;
+    tenderTotals.set(key,cur);
+  });
+  
+  // بناء الرسالة
+  let msg='📊 *IAT SUMMARY REPORT*\n';
+  msg+='📅 '+new Date().toLocaleDateString()+'\n';
+  msg+='═════════════════════════\n\n';
+  
+  // Orders
+  if(orderTotals.size>0){
+    msg+='📋 *ORDERS QTY*\n';
+    let totalOrd=0;
+    [...orderTotals.entries()].forEach(([p,d])=>{
+      totalOrd+=d.qty;
+      msg+=p+': *'+d.qty+'*\n';
+    });
+    msg+='─────────────────\n';
+    msg+='🎯 *TOTAL: '+totalOrd+'*\n\n';
+  }
+  
+  // Tender
+  if(tenderTotals.size>0){
+    msg+='📊 *TENDER QTY*\n';
+    let totalTenKg=0;
+    [...tenderTotals.entries()].forEach(([p,d])=>{
+      totalTenKg+=d.kg;
+      msg+=p+': *'+d.qty+'* = *'+(d.kg%1===0?d.kg:d.kg.toFixed(2))+' kg*\n';
+    });
+    msg+='─────────────────\n';
+    msg+='🎯 *TOTAL KG: '+(totalTenKg%1===0?totalTenKg:totalTenKg.toFixed(2))+'*\n';
+  }
+  
+  // إرسال إلى واتس اب مباشرة
+  const url='https://api.whatsapp.com/send?text='+encodeURIComponent(msg);
+  window.open(url,'_blank');
 }
 
 function mergeTenderToOrders(){
@@ -2359,6 +2860,357 @@ function learnLookup(type, raw) {
 
 function openAIImport(){document.getElementById('aiImportOv').classList.add('on');}
 function closeAIImport(){document.getElementById('aiImportOv').classList.remove('on');document.getElementById('aiResults').style.display='none';document.getElementById('aiStatus').textContent='';}
+function openTenderImport(){document.getElementById('tenderImportOv').classList.add('on');}
+function closeTenderImport(){document.getElementById('tenderImportOv').classList.remove('on');document.getElementById('tenderResults').style.display='none';document.getElementById('tenderStatus').textContent='';}
+async function extractTenderAI(){
+  let text=document.getElementById('tenderTextInput').value.trim();
+  if(!text){alert('Please paste text');return;}
+  
+  // تنظيف النص من معلومات WhatsApp
+  text=text.replace(/\[\d{2}\/\d{2},\s*\d{2}:\d{2}\]\s*/g,'');
+  text=text.replace(/^[^\n]*:\s*/gm,'');
+  text=text.trim();
+  
+  const status=document.getElementById('tenderStatus');
+  status.textContent='🔄 Processing...';
+  
+  try{
+    const lines=text.split('\n').map(l=>l.trim()).filter(l=>l);
+    let currentCust='';
+    const extracted=[];
+    const quantityMap=new Map(); // {product: {qty, grams}}
+    
+    for(let line of lines){
+      // 1. البحث عن الزبون من DC
+      let foundCust=false;
+      for(let cust of DC){
+        if(line.toLowerCase().includes(cust.toLowerCase())){
+          currentCust=cust;
+          foundCust=true;
+          break;
+        }
+      }
+      
+      if(foundCust) continue;
+      
+      // 2. البحث عن الكمية والمنتج (حتى بدون اسم زبون)
+      // ابحث عن رقم في البداية (الكمية)
+      const numMatch=line.match(/^(\d+)\s+/);
+      if(numMatch){
+        const qty=parseInt(numMatch[1]);
+        
+        // استخدم الزبون الحالي أو افترض "General"
+        if(!currentCust) currentCust='General';
+        
+        // ابحث عن المنتج
+        let found=false;
+        
+        // البحث 1: ابحث عن منتج محفوظ (Zaki 400gr, إلخ)
+        for(let prod of tenderProds){
+          if(line.toLowerCase().includes(prod.toLowerCase())){
+            extracted.push({idx:extracted.length,customer:currentCust,product:prod,qty});
+            
+            // جمع الكميات
+            if(!quantityMap.has(prod)){
+              let grams=400;
+              if(prod.includes('450')) grams=450;
+              else if(prod.includes('500')) grams=500;
+              quantityMap.set(prod,{qty:0,grams});
+            }
+            quantityMap.get(prod).qty+=qty;
+            found=true;
+            break;
+          }
+        }
+        
+        // البحث 2: إذا لم يجد، ابحث عن "tender breast" مع الجرامات
+        if(!found && (line.toLowerCase().includes('tender') || line.toLowerCase().includes('breast'))){
+          const gramMatch=line.match(/(\d+)\s*(?:gm|gr|g)/);
+          if(gramMatch){
+            const grams=parseInt(gramMatch[1]);
+            
+            // ابحث عن منتج يطابق الجرامات
+            for(let prod of tenderProds){
+              if(prod.includes(grams.toString())){
+                extracted.push({idx:extracted.length,customer:currentCust,product:prod,qty});
+                
+                if(!quantityMap.has(prod)){
+                  quantityMap.set(prod,{qty:0,grams});
+                }
+                quantityMap.get(prod).qty+=qty;
+                found=true;
+                break;
+              }
+            }
+          }
+          
+          // إذا لم يجد منتج، أضفه بالوصف
+          if(!found){
+            const prodName='Tender '+grams+'gr';
+            extracted.push({idx:extracted.length,customer:currentCust,product:prodName,qty});
+            
+            if(!quantityMap.has(prodName)){
+              quantityMap.set(prodName,{qty:0,grams});
+            }
+            quantityMap.get(prodName).qty+=qty;
+            found=true;
+          }
+        }
+      }
+    }
+    
+    if(!extracted.length){status.textContent='❌ No valid items found';return;}
+    
+    window.tenderAIExtracted=extracted;
+    renderTenderEditView();
+    
+    // عرض الملخص
+    let summaryHTML='<div style="font-size:.7rem;color:var(--muted);margin-top:8px;padding:8px;border-top:1px solid var(--b1);background:var(--s2);border-radius:2px">';
+    summaryHTML+='<div style="font-weight:700;margin-bottom:6px;color:var(--teal)">📊 QTY SUMMARY</div>';
+    
+    let totalKG=0;
+    for(let [prod,data] of quantityMap){
+      // حساب الكغ
+      let kg;
+      if(prod.toUpperCase().includes('KG')){
+        kg=data.qty; // KG يبقى KG
+      }else{
+        kg=data.qty*(data.grams/1000); // تحويل باقي المنتجات
+      }
+      totalKG+=kg;
+      
+      summaryHTML+='<div style="margin-bottom:4px;padding:4px;background:var(--s1);border-radius:2px;border:1px solid var(--b2)">';
+      summaryHTML+='<div style="font-weight:600;color:var(--txt)">'+prod+'</div>';
+      summaryHTML+='<div style="color:var(--blue2)">QTY: '+data.qty+' → '+kg.toFixed(2)+' kg</div>';
+      summaryHTML+='</div>';
+    }
+    
+    summaryHTML+='<div style="font-weight:700;margin-top:6px;padding-top:6px;border-top:1px solid var(--b1);color:var(--teal);font-size:.75rem">🎯 TOTAL: '+totalKG.toFixed(2)+' KG</div>';
+    summaryHTML+='</div>';
+    
+    const resultsDiv=document.getElementById('tenderResults');
+    const existingSummary=resultsDiv.querySelector('[id="tenderSummary"]');
+    if(existingSummary) existingSummary.remove();
+    
+    const summaryDiv=document.createElement('div');
+    summaryDiv.id='tenderSummary';
+    summaryDiv.innerHTML=summaryHTML;
+    resultsDiv.appendChild(summaryDiv);
+    
+    resultsDiv.style.display='flex';
+    status.textContent='✓ Found '+extracted.length+' items';
+  }catch(e){
+    status.textContent='❌ '+e.message;
+  }
+}
+
+function renderTenderEditView(){
+  if(!window.tenderAIExtracted?.length)return;
+  let html='';
+  window.tenderAIExtracted.forEach((item,i)=>{
+    html+='<div style="display:grid;grid-template-columns:35px 1.2fr 0.9fr 50px;gap:6px;align-items:center;padding:8px;background:var(--s1);border-radius:3px;border:1px solid var(--b2);font-size:.73rem">';
+    
+    // Delete
+    html+='<button onclick="tenderAIExtracted.splice('+i+',1);renderTenderEditView()" style="padding:3px;background:#e74c3c;color:white;border:none;border-radius:2px;cursor:pointer;font-weight:700;font-size:.7rem">✕</button>';
+    
+    // Customer - نافذة بحث مثل Orders
+    html+='<div style="cursor:pointer;padding:4px 6px;background:var(--b1);border-radius:2px;font-size:.7rem;text-align:center;border:1px solid var(--b2);overflow:hidden;text-overflow:ellipsis" onclick="openTenderCustModal('+i+')">';
+    html+=''+item.customer+'<br/><span style="font-size:.6rem;color:var(--muted)">✏️</span>';
+    html+='</div>';
+    
+    // Modal للزبون
+    html+='<div id="tCustModalAI'+i+'" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;padding:10px;flex-direction:column" onclick="if(event.target===this)closeTenderCustModal('+i+')">';
+    html+='<div style="background:var(--s1);border-radius:4px;padding:12px;margin:auto;max-width:400px;max-height:80vh;overflow-y:auto;display:flex;flex-direction:column">';
+    html+='<div style="font-size:.8rem;font-weight:700;margin-bottom:8px">Select Customer</div>';
+    html+='<input type="text" id="tCustSearchAI'+i+'" placeholder="Search customers..." oninput="filterTenderCustModal('+i+',this.value)" style="padding:6px;border:1px solid var(--b2);border-radius:2px;margin-bottom:8px;font-size:.75rem"/>';
+    html+='<div id="tCustListAI'+i+'" style="flex:1;overflow-y:auto"></div>';
+    html+='</div>';
+    html+='</div>';
+    
+    // Product - نافذة بحث مثل Orders
+    html+='<div style="cursor:pointer;padding:4px 6px;background:var(--b1);border-radius:2px;font-size:.7rem;text-align:center;border:1px solid var(--b2);overflow:hidden;text-overflow:ellipsis" onclick="openTenderProdModal('+i+')">';
+    html+=''+item.product+'<br/><span style="font-size:.6rem;color:var(--muted)">✏️</span>';
+    html+='</div>';
+    
+    // Modal للمنتج
+    html+='<div id="tProdModalAI'+i+'" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;padding:10px;flex-direction:column" onclick="if(event.target===this)closeTenderProdModal('+i+')">';
+    html+='<div style="background:var(--s1);border-radius:4px;padding:12px;margin:auto;max-width:400px;max-height:80vh;overflow-y:auto;display:flex;flex-direction:column">';
+    html+='<div style="font-size:.8rem;font-weight:700;margin-bottom:8px">Select Product</div>';
+    html+='<input type="text" id="tProdSearchAI'+i+'" placeholder="Search products..." oninput="filterTenderProdModal('+i+',this.value)" style="padding:6px;border:1px solid var(--b2);border-radius:2px;margin-bottom:8px;font-size:.75rem"/>';
+    html+='<div id="tProdListAI'+i+'" style="flex:1;overflow-y:auto"></div>';
+    html+='</div>';
+    html+='</div>';
+    
+    // Qty
+    html+='<input type="number" value="'+item.qty+'" oninput="tenderAIExtracted['+i+'].qty=Math.max(1,parseInt(this.value)||1)" style="padding:4px;border:1px solid var(--b2);border-radius:2px;font-size:.73rem;text-align:center;font-weight:600;width:100%"/>';
+    
+    html+='</div>';
+  });
+  document.getElementById('tenderEditView').innerHTML=html;
+}
+
+function openTenderCustModal(idx){
+  const modal=document.getElementById('tCustModalAI'+idx);
+  modal.style.display='flex';
+  document.getElementById('tCustSearchAI'+idx).focus();
+  filterTenderCustModal(idx,'');
+}
+
+function closeTenderCustModal(idx){
+  document.getElementById('tCustModalAI'+idx).style.display='none';
+}
+
+function filterTenderCustModal(idx,q){
+  const list=document.getElementById('tCustListAI'+idx);
+  const filtered=q?DC.filter(c=>c.toLowerCase().includes(q.toLowerCase())):[];
+  list.innerHTML=filtered.map(c=>'<div style="padding:8px;cursor:pointer;border-bottom:1px solid var(--b2);font-size:.75rem" onclick="tenderAIExtracted['+idx+'].customer=\''+esc(c)+'\';renderTenderEditView();closeTenderCustModal('+idx+')">'+c+'</div>').join('');
+}
+
+function openTenderProdModal(idx){
+  const modal=document.getElementById('tProdModalAI'+idx);
+  modal.style.display='flex';
+  document.getElementById('tProdSearchAI'+idx).focus();
+  filterTenderProdModal(idx,'');
+}
+
+function closeTenderProdModal(idx){
+  document.getElementById('tProdModalAI'+idx).style.display='none';
+}
+
+function filterTenderProdModal(idx,q){
+  const list=document.getElementById('tProdListAI'+idx);
+  const filtered=q?tenderProds.filter(p=>p.toLowerCase().includes(q.toLowerCase())):[];
+  list.innerHTML=filtered.map(p=>'<div style="padding:8px;cursor:pointer;border-bottom:1px solid var(--b2);font-size:.75rem" onclick="tenderAIExtracted['+idx+'].product=\''+esc(p)+'\';renderTenderEditView();closeTenderProdModal('+idx+')">'+p+'</div>').join('');
+}
+function addTenderAIToList(){
+  if(!window.tenderAIExtracted?.length)return;
+  const now=new Date().toISOString().slice(0,10);
+  window.tenderAIExtracted.forEach(item=>{
+    tenderOrders.push({
+      date:now,
+      customer:item.customer,
+      product:item.product,
+      qty:item.qty
+    });
+  });
+  LS.set('iat_to',tenderOrders);
+  renderTenderOrdersList();
+  closeTenderImport();
+  toast('✓ Added to tender','ok');
+}
+
+function renderTenderOrdersList(){
+  const el=document.getElementById('tenderOrdersList');
+  const badge=document.getElementById('tOrdersBadge');
+  if(!tenderOrders.length){
+    el.innerHTML='<div style="color:var(--muted);font-size:.75rem;text-align:center;padding:20px;opacity:.6">📭 No orders</div>';
+    if(badge)badge.textContent='0';
+    return;
+  }
+  if(badge)badge.textContent=tenderOrders.length;
+  
+  // جمع الكميات حسب المنتج
+  const quantityMap=new Map();
+  for(let order of tenderOrders){
+    if(!quantityMap.has(order.product)){
+      // استخرج الجرامات من اسم المنتج
+      let grams=400; // default
+      if(order.product.includes('450')) grams=450;
+      else if(order.product.includes('500')) grams=500;
+      quantityMap.set(order.product,{qty:0,grams});
+    }
+    const data=quantityMap.get(order.product);
+    data.qty+=order.qty;
+  }
+  
+  // عرض الأوردرات
+  let html='';
+  tenderOrders.forEach((order,idx)=>{
+    const custColor=idx%2===0?'var(--s2)':'var(--s1)';
+    html+='<div style="display:grid;grid-template-columns:30px 1fr 1fr 50px;gap:4px;align-items:center;padding:6px;background:'+custColor+';border-radius:2px;border:1px solid var(--b2);font-size:.7rem;margin-bottom:3px;width:100%;box-sizing:border-box">';
+    
+    html+='<button onclick="tenderOrders.splice('+idx+',1);LS.set(\'iat_to\',tenderOrders);renderTenderOrdersList();renderTenderViewList()" style="padding:2px;background:#e74c3c;color:white;border:none;border-radius:2px;cursor:pointer;font-weight:700;font-size:.65rem;min-width:30px">✕</button>';
+    
+    html+='<select onchange="tenderOrders['+idx+'].customer=this.value;LS.set(\'iat_to\',tenderOrders);renderTenderOrdersList()" style="padding:4px;border:1px solid var(--b2);border-radius:2px;font-size:.65rem;background:var(--s3);color:var(--txt);min-width:0">';
+    html+='<option value="">Cust</option>';
+    DC.forEach(c=>{html+='<option value="'+c+'" '+(order.customer===c?'selected':'')+'>'+c.substring(0,12)+'</option>'});
+    html+='</select>';
+    
+    html+='<select onchange="tenderOrders['+idx+'].product=this.value;LS.set(\'iat_to\',tenderOrders);renderTenderOrdersList()" style="padding:4px;border:1px solid var(--b2);border-radius:2px;font-size:.65rem;background:var(--s3);color:var(--txt);min-width:0">';
+    html+='<option value="">Prod</option>';
+    tenderProds.forEach(p=>{html+='<option value="'+p+'" '+(order.product===p?'selected':'')+'>'+p+'</option>'});
+    html+='</select>';
+    
+    html+='<input type="number" value="'+order.qty+'" onchange="tenderOrders['+idx+'].qty=Math.max(1,parseInt(this.value)||1);LS.set(\'iat_to\',tenderOrders);renderTenderOrdersList()" style="width:50px;padding:4px;border:1px solid var(--b2);border-radius:2px;font-size:.65rem;text-align:center;font-weight:600;background:var(--s3);color:var(--txt)"/>';
+    
+    html+='</div>';
+  });
+  
+  // إضافة ملخص الكميات والكغ
+  html+='<div style="margin-top:8px;padding:8px;background:var(--s2);border-radius:2px;border:1px solid var(--b2)">';
+  html+='<div style="font-weight:700;font-size:.75rem;color:var(--teal);margin-bottom:6px">📊 SUMMARY</div>';
+  
+  let totalKG=0;
+  for(let [prod,data] of quantityMap){
+    let kg=0;
+    // حساب صحيح
+    if(prod.toUpperCase().includes('KG')){
+      kg=data.qty; // KG يبقى KG
+    }else{
+      kg=data.qty*(data.grams/1000);
+    }
+    totalKG+=kg;
+    html+='<div style="font-size:.7rem;margin-bottom:3px;padding:3px;background:var(--s1);border-radius:2px">';
+    html+='<div style="color:var(--txt)">'+prod+': '+data.qty+' trays</div>';
+    html+='<div style="color:var(--blue2);font-weight:600">= '+(kg%1===0?kg:kg.toFixed(2))+' kg</div>';
+    html+='</div>';
+  }
+  
+  html+='<div style="font-weight:700;font-size:.75rem;color:var(--teal);padding-top:6px;border-top:1px solid var(--b1);margin-top:6px">🎯 TOTAL: '+totalKG.toFixed(2)+' KG</div>';
+  html+='</div>';
+  
+  el.innerHTML=html;
+}
+
+function renderTenderViewList(){
+  const el=document.getElementById('tenderViewList');
+  document.getElementById('tenderViewBadge').textContent=tenderOrders.length;
+  
+  if(!tenderOrders.length){el.innerHTML='<div style="color:var(--muted);font-size:.8rem;text-align:center;padding:20px">No orders</div>';return;}
+  
+  let html='';
+  const groupedByDate=new Map();
+  tenderOrders.forEach(order=>{
+    const date=order.date||'—';
+    if(!groupedByDate.has(date))groupedByDate.set(date,[]);
+    groupedByDate.get(date).push(order);
+  });
+  
+  [...groupedByDate.entries()].forEach(([date,orders])=>{
+    html+='<div style="margin-bottom:8px">';
+    html+='<div style="font-family:var(--mono);font-size:.65rem;color:var(--teal);padding:4px;letter-spacing:.08em">📅 '+date+'</div>';
+    
+    const byCustomer=new Map();
+    orders.forEach(order=>{
+      if(!byCustomer.has(order.customer))byCustomer.set(order.customer,[]);
+      byCustomer.get(order.customer).push(order);
+    });
+    
+    [...byCustomer.entries()].forEach(([cust,custOrders])=>{
+      html+='<div style="background:var(--s1);border-radius:3px;padding:4px;margin-bottom:4px">';
+      html+='<div style="font-weight:600;font-size:.7rem;margin-bottom:2px">👤 '+cust+'</div>';
+      custOrders.forEach(o=>{
+        html+='<div style="display:flex;gap:6px;padding:2px;font-size:.65rem">';
+        html+='<span style="flex:1">'+o.product+'</span>';
+        html+='<span style="color:var(--muted)">'+o.qty+'</span>';
+        html+='</div>';
+      });
+      html+='</div>';
+    });
+    html+='</div>';
+  });
+  el.innerHTML=html;
+}
 
 function switchAITab(tab){
   aiCurrentTab=tab;
