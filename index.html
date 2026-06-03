@@ -3388,8 +3388,8 @@ function mergeTenderToOrders(){
     if(key.toUpperCase().includes('KG')){kg=parseInt(o.qty)||0;}
     else{let g=400;if(key.includes('450'))g=450;else if(key.includes('500'))g=500;kg=(parseInt(o.qty)||0)*(g/1000);}
     if(!custNums.has(o.customer)){num++;custNums.set(o.customer,num);}
-    // isTender:true عشان يتعرف عليها بالـ All Qty وينفصل
-    orders.push({customer:o.customer,product:o.product,qty:kg||o.qty,size:'',note:'Tender',date,num:custNums.get(o.customer),driver:'',isTender:true,tQty:parseInt(o.qty)||0});
+    const custName=(o.customer||'')+' tender';
+    orders.push({customer:custName,product:o.product,qty:kg||o.qty,size:'',note:'',date,num:custNums.get(o.customer),driver:'',isTender:true,tQty:parseInt(o.qty)||0});
   });
   saveOrders();
   toast(`✓ ${tenderOrders.length} rows added to Orders`,'ok');
