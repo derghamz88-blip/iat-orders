@@ -622,6 +622,7 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     <div class="stab" id="stab-tp" onclick="showSTab('tp')">🏷 Tender</div>
     <div class="stab" id="stab-d" onclick="showSTab('d')">🚗 Drivers</div>
     <div class="stab" id="stab-pg" onclick="showSTab('pg')">💰 Pricing</div>
+    <div class="stab" id="stab-cloud" onclick="showSTab('cloud')">☁ Cloud</div>
   </div>
   <div class="set-body">
     <div class="set-section on" id="ss-c">
@@ -667,6 +668,37 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
       <div class="sch"><span class="sch-t">Customer Groups</span></div>
       <div style="font-size:.75rem;color:var(--muted);margin-bottom:8px">Assign each customer to a price group</div>
       <div id="custGroupList" style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto"></div>
+    </div>
+    </div>
+
+    <!-- ☁ Cloud Backup Section -->
+    <div class="set-section" id="ss-cloud">
+    <div class="set-card">
+      <div class="sch"><span class="sch-t">☁ OneDrive Backup</span></div>
+      <div style="padding:14px;display:flex;flex-direction:column;gap:10px">
+        <div style="font-size:.72rem;color:var(--muted);line-height:1.6">
+          حفظ جميع بيانات التطبيق على OneDrive كملف JSON
+          <br/>
+          <span style="color:var(--teal);font-family:var(--mono)">iat_backup.json</span>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-teal" style="flex:1" id="cloudSaveBtn" onclick="saveAppToOneDrive()">
+            ☁ Save to OneDrive
+          </button>
+          <button class="btn btn-blue" style="flex:1" id="cloudLoadBtn" onclick="loadAppFromOneDrive()">
+            ⬇ Load from OneDrive
+          </button>
+        </div>
+        <div id="cloudStatus" style="font-size:.72rem;color:var(--muted);text-align:center;min-height:16px"></div>
+        <div style="background:var(--s2);border-radius:8px;padding:10px;font-size:.7rem;color:var(--muted);line-height:1.7">
+          <div style="color:var(--txt);font-weight:700;margin-bottom:4px">📦 يشمل:</div>
+          Orders · Tender Orders · Customers · Products<br/>
+          Drivers · Tender Products · Price Groups
+        </div>
+        <div style="background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:8px;padding:10px;font-size:.7rem;color:var(--red)">
+          ⚠ Load سيستبدل جميع البيانات الحالية
+        </div>
+      </div>
     </div>
     </div>
   </div>
@@ -882,8 +914,114 @@ let selProds=new Map();
 let cOpen=false,pOpen=false;
 
 // ✅ دوال الحفظ المركزية
-function saveOrders(){LS.set('iat_orders',orders);}
-function saveTenderOrders(){LS.set('iat_to',tenderOrders);}
+const OD_BACKUP_PATH = 'iat_backup.json';
+
+async function saveAppToOneDrive(){
+  const btn=document.getElementById('cloudSaveBtn');
+  const status=document.getElementById('cloudStatus');
+  btn.disabled=true; btn.textContent='⏳ Saving...';
+  status.textContent='';
+  try{
+    const token=await getODToken();
+
+    const backup={
+      saved: new Date().toISOString(),
+      version: 1,
+      orders,
+      tenderOrders,
+      customers,
+      products,
+      drivers,
+      tenderProds,
+      freq,
+      priceGroups,
+      custGroups,
+      invoices
+    };
+
+    const content = JSON.stringify(backup, null, 2);
+    const blob = new Blob([content], {type:'application/json'});
+
+    const res = await fetch(
+      `https://graph.microsoft.com/v1.0/me/drive/root:/${OD_BACKUP_PATH}:/content`,
+      {
+        method:'PUT',
+        headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+        body: content
+      }
+    );
+    if(!res.ok) throw new Error(await res.text());
+
+    const saved = new Date().toLocaleTimeString('en-GB');
+    status.style.color='var(--teal)';
+    status.textContent=`✓ Saved at ${saved}`;
+    toast('✓ Backup saved to OneDrive','ok');
+  }catch(e){
+    status.style.color='var(--red)';
+    status.textContent='✗ '+e.message;
+    toast('Error: '+e.message,'err');
+  }finally{
+    btn.disabled=false; btn.textContent='☁ Save to OneDrive';
+  }
+}
+
+async function loadAppFromOneDrive(){
+  const btn=document.getElementById('cloudLoadBtn');
+  const status=document.getElementById('cloudStatus');
+  confDlg('Load from OneDrive? This will replace ALL current data.',async()=>{
+    btn.disabled=true; btn.textContent='⏳ Loading...';
+    status.textContent='';
+    try{
+      const token=await getODToken();
+
+      const res=await fetch(
+        `https://graph.microsoft.com/v1.0/me/drive/root:/${OD_BACKUP_PATH}:/content`,
+        {headers:{'Authorization':'Bearer '+token}}
+      );
+      if(!res.ok) throw new Error('Backup file not found on OneDrive');
+
+      const backup=await res.json();
+      if(!backup.version) throw new Error('Invalid backup file');
+
+      // استرجاع البيانات
+      if(backup.orders)      { orders=backup.orders;       LS.set('iat_orders',orders); }
+      if(backup.tenderOrders){ tenderOrders=backup.tenderOrders; LS.set('iat_to',tenderOrders); }
+      if(backup.customers)   { customers=backup.customers;  LS.set('iat_c',customers); }
+      if(backup.products)    { products=backup.products;    LS.set('iat_p',products); }
+      if(backup.drivers)     { drivers=backup.drivers;      LS.set('iat_d',drivers); }
+      if(backup.tenderProds) { tenderProds=backup.tenderProds; LS.set('iat_tp',tenderProds); }
+      if(backup.freq)        { freq=backup.freq;            LS.set('iat_freq',freq); }
+      if(backup.priceGroups) { priceGroups=backup.priceGroups; LS.set('iat_pg',priceGroups); }
+      if(backup.custGroups)  { custGroups=backup.custGroups; LS.set('iat_cg',custGroups); }
+      if(backup.invoices)    { invoices=backup.invoices;    LS.set('iat_inv',invoices); }
+
+      const savedDate=backup.saved?new Date(backup.saved).toLocaleString('en-GB'):'unknown';
+      status.style.color='var(--teal)';
+      status.textContent=`✓ Loaded (saved: ${savedDate})`;
+      toast('✓ Data loaded from OneDrive','ok');
+
+      // تحديث الواجهة
+      renderOrders(); updateBadges();
+      renderSettC(); renderSettP(); renderSettD(); renderSettTP();
+
+    }catch(e){
+      status.style.color='var(--red)';
+      status.textContent='✗ '+e.message;
+      toast('Error: '+e.message,'err');
+    }finally{
+      btn.disabled=false; btn.textContent='⬇ Load from OneDrive';
+    }
+  });
+}
+
+function saveOrders(){
+  LS.set('iat_orders',orders);
+  if(document.getElementById('pg-combined-qty')?.classList.contains('on'))renderCombinedQtyPage();
+}
+function saveTenderOrders(){
+  LS.set('iat_to',tenderOrders);
+  if(document.getElementById('pg-combined-qty')?.classList.contains('on'))renderCombinedQtyPage();
+}
 
 function todayStr(){const d=new Date();return d.toISOString().slice(0,10);}
 function sortedProds(list){return[...list].sort((a,b)=>(freq[b]||0)-(freq[a]||0));}
@@ -970,7 +1108,11 @@ function showPage(n,t){
   if(n==='tender-orders'){tenderProds=LS.get('iat_tp',DTP);renderTOrdersPage();}
   if(n==='tender-view'){renderTenderViewList();}
   if(n==='tqty')renderTQtyPage();
-  if(n==='combined-qty')renderCombinedQtyPage();
+  if(n==='combined-qty'){
+    orders=LS.get('iat_orders',[]);
+    tenderOrders=LS.get('iat_to',[]);
+    renderCombinedQtyPage();
+  }
   if(n==='report')renderReportPage();
   if(n==='settings'){renderSettC();renderSettP();renderSettD();renderSettTP();renderCustGroupList();}
 }
@@ -1331,18 +1473,17 @@ function addTenderOrder(){
     tenderOrders.push({customer:tSelCust,product:p,qty:d.qty,note:d.note});
   });
   
-  LS.set('iat_to',tenderOrders);
+  saveTenderOrders(); // ✅ يحفظ + يحدث Combined Qty إذا مفتوح
   toast(`✓ ${tSelProds.size} item(s) added for ${tSelCust}`,'ok');
   
-  // Clear selections only
   tSelCust=null;
   tSelProds.clear();
   document.getElementById('tCustLbl').textContent='Choose...';
   document.getElementById('tCustLbl').style.color='var(--muted)';
   document.getElementById('tProdSrch').value='';
   
-  renderTSelRows();  // يفرغ tenderMid لأن tSelProds فارغة
-  renderTenderOrdersList();  // يعرض الأوردرات المضافة
+  renderTSelRows();
+  renderTenderOrdersList();
 }
 
 // ── RENDER TENDER ORDERS (used internally, no display) ──
@@ -3023,36 +3164,27 @@ function renderCombinedQtyPage(){
   const el=document.getElementById('combinedQtyList');
   if(!el)return;
 
-  // Orders data - exclude tender rows (isTender flag OR old ' tender' suffix)
+  // ✅ جميع orders[] بدون استثناء
   const orderTotals=new Map();
   orders.forEach(o=>{
-    if(o.isTender)return;
-    if(o.customer&&o.customer.toLowerCase().endsWith(' tender'))return;
-    if((o.note||'').toLowerCase()==='tender')return;
     const key=o.product;
+    if(!key)return;
     orderTotals.set(key,(orderTotals.get(key)||0)+parseFloat(o.qty||0));
   });
   const orderRows=[...orderTotals.entries()].sort((a,b)=>b[1]-a[1]).filter(([,q])=>q>0);
   const orderTotal=orderRows.reduce((s,[,q])=>s+q,0);
 
-  // Tender data: from tenderOrders (not yet merged) + isTender orders already merged
+  // ✅ جميع tenderOrders[] بدون استثناء
   const tenderTotals=new Map();
-  // Live tender orders (not yet merged)
   tenderOrders.forEach(o=>{
-    const key=o.product;let kg=0;
+    const key=o.product;
+    if(!key)return;
+    let kg=0;
     if(key.toUpperCase().includes('KG')){kg=parseInt(o.qty)||0;}
     else{let g=400;if(key.includes('450'))g=450;else if(key.includes('500'))g=500;kg=(parseInt(o.qty)||0)*(g/1000);}
-    const cur=tenderTotals.get(key)||{qty:0,kg:0};cur.qty+=parseInt(o.qty)||0;cur.kg+=kg;
-    tenderTotals.set(key,cur);
-  });
-  // Already merged tender orders (isTender:true)
-  orders.forEach(o=>{
-    if(!o.isTender)return;
-    const key=o.product;
-    const tq=o.tQty||0; // الكمية الأصلية بالعدد
-    const kg=parseFloat(o.qty||0);
     const cur=tenderTotals.get(key)||{qty:0,kg:0};
-    cur.qty+=tq;cur.kg+=kg;
+    cur.qty+=parseInt(o.qty)||0;
+    cur.kg+=kg;
     tenderTotals.set(key,cur);
   });
   const tenderRows=[...tenderTotals.entries()];
