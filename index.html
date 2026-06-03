@@ -1825,7 +1825,6 @@ async function saveOrdersToLoading(from,to,dateVal){
 
     // ترتيب الأوردرات بـ num
     const sorted=[...orders]
-      .filter(o=>!from||!to||(o.num>=from&&o.num<=to))
       .sort((a,b)=>(a.num||0)-(b.num||0));
 
     if(!sorted.length){toast('No orders in range','err');return;}
