@@ -1840,19 +1840,25 @@ async function saveOrdersToLoading(from,to,dateVal){
     const baseUrl=`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/workbook/worksheets/`;
 
     // ── 1. كتابة الأوردرات في AI5:AQ{lastRow} ──
-    // AI=driver | AJ | AK | AL=customer | AM=customer | AN=product | AO=qty | AP=size | AQ=note
+    // AI=driver | AJ=num(كل صف) | AK=num(أول صف من كل زبون فقط) | AL=customer | AM=customer | AN=product | AO=qty | AP=size | AQ=note
     const startRow=LOADING.startRow; // 5
-    const values=sorted.map(o=>[
-      o.driver||'',    // AI
-      '',              // AJ
-      '',              // AK
-      o.customer||'',  // AL
-      o.customer||'',  // AM
-      o.product||'',   // AN
-      o.qty||0,        // AO
-      o.size||'',      // AP
-      o.note||''       // AQ
-    ]);
+    const seenCust=new Set();
+    const values=sorted.map(o=>{
+      const key=(o.num||'')+'_'+(o.customer||'');
+      const isFirst=!seenCust.has(key);
+      if(isFirst)seenCust.add(key);
+      return [
+        o.driver||'',          // AI
+        o.num||'',             // AJ - رقم الأوردر في كل صف
+        isFirst?o.num||'':'',  // AK - رقم الأوردر أول صف فقط
+        o.customer||'',        // AL
+        o.customer||'',        // AM
+        o.product||'',         // AN
+        o.qty||0,              // AO
+        o.size||'',            // AP
+        o.note||''             // AQ
+      ];
+    });
     const lastRow=startRow+values.length-1;
     const rangeAddr=`AI${startRow}:AQ${lastRow}`;
 
