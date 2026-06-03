@@ -1810,52 +1810,79 @@ const LOADING={
 const PRODUCTION_PATH='production/production.xlsm';
 
 function manualSaveRange(){
-  // ✅ حفظ يدويّ عند الضغط على الزر
-  const from=parseInt(document.getElementById('printRangeFrom').value);
-  const to=parseInt(document.getElementById('printRangeTo').value);
-  if(!from||!to||from>to){toast('Enter valid range','err');return;}
-  
-  // قراءة التاريخ من Entry أو من أول أوردر
-  const entryDate=document.getElementById('orderDate')?.value||todayStr();
-  saveRangeToOneDrive(from,to,entryDate);
+  if(!orders.length){toast('No orders to save','err');return;}
+  const from=parseInt(document.getElementById('printRangeFrom').value)||1;
+  const to=parseInt(document.getElementById('printRangeTo').value)||999;
+  const date=document.getElementById('orderDate')?.value||todayStr();
+  saveOrdersToLoading(from,to,date);
 }
 
-async function saveRangeToOneDrive(from,to,dateOverride){
+async function saveOrdersToLoading(from,to,dateVal){
   const btn=document.getElementById('odBtn');
   if(btn){btn.textContent='⏳...';btn.disabled=true;}
-  
   try{
     const token=await getODToken();
-    const today=dateOverride||todayStr();
-    
-    // كتابة BS1 و BT1 في شيت Loading، و H1 في شيت Production
-    const fileRes=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,{
-      headers:{'Authorization':'Bearer '+token}
-    });
+
+    // ترتيب الأوردرات بـ num
+    const sorted=[...orders]
+      .filter(o=>!from||!to||(o.num>=from&&o.num<=to))
+      .sort((a,b)=>(a.num||0)-(b.num||0));
+
+    if(!sorted.length){toast('No orders in range','err');return;}
+
+    // جلب fileId
+    const fileRes=await fetch(
+      `https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,
+      {headers:{'Authorization':'Bearer '+token}}
+    );
     if(!fileRes.ok) throw new Error('production.xlsm not found');
     const fileId=(await fileRes.json()).id;
     const baseUrl=`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/workbook/worksheets/`;
-    
-    // كتابة BS1:BT1 في Loading
-    const r1=await fetch(baseUrl+"Loading/range(address='BS1:BT1')",{
+
+    // ── 1. كتابة الأوردرات في AI5:AQ{lastRow} ──
+    // AI=driver | AJ | AK | AL=customer | AM=customer | AN=product | AO=qty | AP=size | AQ=note
+    const startRow=LOADING.startRow; // 5
+    const values=sorted.map(o=>[
+      o.driver||'',    // AI
+      '',              // AJ
+      '',              // AK
+      o.customer||'',  // AL
+      o.customer||'',  // AM
+      o.product||'',   // AN
+      o.qty||0,        // AO
+      o.size||'',      // AP
+      o.note||''       // AQ
+    ]);
+    const lastRow=startRow+values.length-1;
+    const rangeAddr=`AI${startRow}:AQ${lastRow}`;
+
+    const r1=await fetch(baseUrl+`Loading/range(address='${rangeAddr}')`,{
+      method:'PATCH',
+      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:JSON.stringify({values})
+    });
+    if(!r1.ok){const e=await r1.text();throw new Error('Loading write failed: '+e);}
+
+    // ── 2. كتابة BS1=from, BT1=to ──
+    const r2=await fetch(baseUrl+"Loading/range(address='BS1:BT1')",{
       method:'PATCH',
       headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
       body:JSON.stringify({values:[[from,to]]})
     });
-    if(!r1.ok) throw new Error('Failed to write BS1:BT1');
-    
-    // كتابة H1 في Production
-    const r2=await fetch(baseUrl+"Production/range(address='H1')",{
+    if(!r2.ok) throw new Error('Failed BS1:BT1');
+
+    // ── 3. كتابة H1 في شيت Production ──
+    const r3=await fetch(baseUrl+"Production/range(address='H1')",{
       method:'PATCH',
       headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
-      body:JSON.stringify({values:[[today]]})
+      body:JSON.stringify({values:[[dateVal||todayStr()]]})
     });
-    if(!r2.ok) throw new Error('Failed to write H1 in Production');
-    
-    toast(`✓ Saved! From ${from} → To ${to} | Date: ${today}`,'ok');
-    console.log(`✓ Saved: BS1=${from}, BT1=${to}, Production!H1=${today}`);
+    if(!r3.ok) throw new Error('Failed H1 Production');
+
+    toast(`✓ Saved ${sorted.length} rows → Loading (${rangeAddr})`,'ok');
   }catch(e){
     if(e.message!=='user_cancelled')toast('Error: '+e.message,'err');
+    console.error(e);
   }finally{
     if(btn){btn.textContent='☁ Save';btn.disabled=false;}
   }
@@ -1971,43 +1998,42 @@ async function backupProductionFile(){
   if(!date){toast('Choose a date','err');return;}
   const newName=`production_${date}.xlsm`;
   const btn=document.getElementById('backupConfirmBtn');
-  btn.disabled=true; btn.textContent='\u23f3 Saving...';
+  btn.disabled=true; btn.textContent='⏳ Saving...';
   try{
     const token=await getODToken();
+
+    // جلب fileId للملف الأصلي
     const srcRes=await fetch(
       `https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,
       {headers:{'Authorization':'Bearer '+token}}
     );
     if(!srcRes.ok) throw new Error('production.xlsm not found');
     const fileId=(await srcRes.json()).id;
-    const rootRes=await fetch(
-      'https://graph.microsoft.com/v1.0/me/drive/root',
-      {headers:{'Authorization':'Bearer '+token}}
-    );
-    const rootData=await rootRes.json();
+
+    // نسخ إلى root OneDrive مباشرة
     const copyRes=await fetch(
       `https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/copy`,
       {
         method:'POST',
         headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
         body:JSON.stringify({
-          parentReference:{driveId:rootData.parentReference?.driveId||rootData.id, id:rootData.id},
+          parentReference:{path:'/drive/root:'},
           name:newName
         })
       }
     );
     if(copyRes.status===202||copyRes.ok){
-      toast(`\u2713 Backup: ${newName}`,'ok');
+      toast(`✓ Backup: ${newName}`,'ok');
       closeBackupDialog();
     } else {
-      const err=await copyRes.text();
-      throw new Error(err);
+      const err=await copyRes.json().catch(()=>({error:{message:copyRes.statusText}}));
+      throw new Error(err?.error?.message||copyRes.statusText);
     }
   }catch(e){
     toast('Error: '+e.message,'err');
     console.error(e);
   }finally{
-    btn.disabled=false; btn.textContent='\ud83d\udcc2 Save Backup';
+    btn.disabled=false; btn.textContent='📂 Save Backup';
   }
 }
 
