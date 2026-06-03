@@ -374,6 +374,8 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     <button class="btn btn-ghost btn-sm" style="flex-shrink:0;color:var(--purple)" onclick="saveProductionDaily()">💾 Archive</button>
     <button class="btn btn-purple btn-sm" style="flex-shrink:0" onclick="printDrivers()">🚗 Drivers</button>
     <button class="btn btn-ghost btn-sm" style="flex-shrink:0" onclick="exportXL()">⬇ Excel</button>
+    <button class="btn btn-red btn-sm" id="clearLoadingBtn" style="flex-shrink:0" onclick="clearLoadingSheet()">🧹 Clear Sheet</button>
+    <button class="btn btn-amber btn-sm" id="backupFileBtn" style="flex-shrink:0" onclick="openBackupDialog()">📂 Backup</button>
   </div>
 </div>
 
@@ -784,6 +786,25 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     <div id="labelsPrintStatus" style="font-size:.7rem;color:var(--amber);margin-top:8px;text-align:center"></div>
   </div>
 </div>
+<!-- ✅ Backup Dialog -->
+<div class="ov" id="backupOv" onclick="if(event.target===this)closeBackupDialog()">
+  <div class="cb2" onclick="event.stopPropagation()" style="gap:12px">
+    <div style="font-size:.85rem;font-weight:800;color:var(--amber)">📂 Backup Production File</div>
+    <div style="font-size:.72rem;color:var(--muted)">سيحفظ نسخة من <span style="color:var(--txt);font-family:var(--mono)">production.xlsm</span> باسم:</div>
+    <div style="font-family:var(--mono);font-size:.8rem;color:var(--teal);background:var(--s3);padding:8px 12px;border-radius:6px;text-align:center" id="backupFileName">production_2025-01-01.xlsm</div>
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <label style="font-size:.7rem;color:var(--muted)">التاريخ:</label>
+      <input type="date" id="backupDate" oninput="updateBackupName()"
+        style="background:var(--s3);border:1.5px solid var(--b2);border-radius:8px;padding:9px 12px;color:var(--txt);font-family:var(--mono);font-size:.85rem;outline:none;width:100%"/>
+    </div>
+    <div style="font-size:.68rem;color:var(--muted)">📁 يُحفظ في: OneDrive / production_[date].xlsm</div>
+    <div class="rg">
+      <button class="btn btn-amber btn-sm" id="backupConfirmBtn" onclick="backupProductionFile()">📂 Save Backup</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeBackupDialog()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <div class="ov" id="confOv">
   <div class="cb2">
     <p id="confMsg">Are you sure?</p>
@@ -1902,6 +1923,94 @@ async function saveToOneDriveAuto(){
 }
 
 // ── PRINT ──
+// ── Clear Loading Sheet ──
+async function clearLoadingSheet(){
+  confDlg('Clear A5:AQ1000 from Loading sheet?', async ()=>{
+    const btn=document.getElementById('clearLoadingBtn');
+    if(btn){btn.disabled=true;btn.textContent='⏳...';}
+    try{
+      const token=await getODToken();
+      const fileRes=await fetch(
+        `https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,
+        {headers:{'Authorization':'Bearer '+token}}
+      );
+      if(!fileRes.ok) throw new Error('production.xlsm not found');
+      const fileId=(await fileRes.json()).id;
+      const clearUrl=`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/workbook/worksheets/Loading/range(address='A5:AQ1000')/clear`;
+      const r=await fetch(clearUrl,{
+        method:'POST',
+        headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+        body:JSON.stringify({applyTo:'Contents'})
+      });
+      if(!r.ok){const err=await r.text();throw new Error(err);}
+      toast('\u2713 Loading sheet cleared (A5:AQ1000)','ok');
+    }catch(e){
+      toast('Error: '+e.message,'err');
+    }finally{
+      if(btn){btn.disabled=false;btn.textContent='\ud83e\uddf9 Clear Sheet';}
+    }
+  });
+}
+
+// ── Backup Production File ──
+function openBackupDialog(){
+  const d=document.getElementById('orderDate')?.value||todayStr();
+  document.getElementById('backupDate').value=d;
+  updateBackupName();
+  document.getElementById('backupOv').classList.add('on');
+}
+function closeBackupDialog(){
+  document.getElementById('backupOv').classList.remove('on');
+}
+function updateBackupName(){
+  const d=document.getElementById('backupDate').value||todayStr();
+  document.getElementById('backupFileName').textContent=`production_${d}.xlsm`;
+}
+async function backupProductionFile(){
+  const date=document.getElementById('backupDate').value;
+  if(!date){toast('Choose a date','err');return;}
+  const newName=`production_${date}.xlsm`;
+  const btn=document.getElementById('backupConfirmBtn');
+  btn.disabled=true; btn.textContent='\u23f3 Saving...';
+  try{
+    const token=await getODToken();
+    const srcRes=await fetch(
+      `https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,
+      {headers:{'Authorization':'Bearer '+token}}
+    );
+    if(!srcRes.ok) throw new Error('production.xlsm not found');
+    const fileId=(await srcRes.json()).id;
+    const rootRes=await fetch(
+      'https://graph.microsoft.com/v1.0/me/drive/root',
+      {headers:{'Authorization':'Bearer '+token}}
+    );
+    const rootData=await rootRes.json();
+    const copyRes=await fetch(
+      `https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/copy`,
+      {
+        method:'POST',
+        headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+        body:JSON.stringify({
+          parentReference:{driveId:rootData.parentReference?.driveId||rootData.id, id:rootData.id},
+          name:newName
+        })
+      }
+    );
+    if(copyRes.status===202||copyRes.ok){
+      toast(`\u2713 Backup: ${newName}`,'ok');
+      closeBackupDialog();
+    } else {
+      const err=await copyRes.text();
+      throw new Error(err);
+    }
+  }catch(e){
+    toast('Error: '+e.message,'err');
+    console.error(e);
+  }finally{
+    btn.disabled=false; btn.textContent='\ud83d\udcc2 Save Backup';
+  }
+}
+
 async function saveProductionDaily(){
   const btn=event.target;
   btn.disabled=true;btn.textContent='Saving...';
