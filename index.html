@@ -241,12 +241,12 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
   <div class="ntab" onclick="showPage('orders',this)">📋 Orders <span class="nbadge" id="navBadge">0</span></div>
   <div class="ntab" onclick="showPage('view-orders',this)">👁️ View</div>
   <div class="ntab" onclick="showPage('drivers',this)">🚗 Drivers</div>
-  <div class="ntab" onclick="showPage('qty',this)">📊 Qty</div>
+  <!-- Qty tab removed - use All Qty -->
   <div class="ntab" onclick="showPage('tender',this)">🏷 Tender</div>
   <div class="ntab" onclick="showPage('tender-orders',this)">📋 T.Orders</div>
-  <div class="ntab" onclick="showPage('tqty',this)">📊 T.Qty</div>
+  <!-- T.Qty tab removed - use All Qty -->
   <div class="ntab" onclick="showPage('combined-qty',this)">📊 All Qty</div>
-  <div class="ntab" onclick="showPage('report',this)">📄 Report</div>
+  <!-- Report tab removed -->
   <div class="ntab" onclick="showPage('invoice',this)">🧾 Invoice</div>
   <div class="ntab" onclick="showPage('settings',this)">⚙️ Settings</div>
 </nav>
@@ -363,10 +363,10 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
   </div>
   <div class="exp-bar">
     <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
-      <label style="font-size:.7rem;color:var(--muted);white-space:nowrap">📍 Orders:</label>
-      <input type="number" id="printRangeFrom" placeholder="From" style="width:70px;padding:6px;border:1px solid var(--b2);border-radius:3px;font-size:.75rem;font-family:monospace;text-align:center" value="1"/>
-      <span style="color:var(--muted);font-size:.7rem">→</span>
-      <input type="number" id="printRangeTo" placeholder="To" style="width:70px;padding:6px;border:1px solid var(--b2);border-radius:3px;font-size:.75rem;font-family:monospace;text-align:center" value="100"/>
+      <label style="font-size:.7rem;color:var(--blue2);white-space:nowrap;font-weight:700">📍 Print:</label>
+      <input type="number" id="printRangeFrom" placeholder="From" min="1" step="1" onclick="this.select()" style="width:60px;padding:6px;border:1.5px solid var(--b2);border-radius:6px;font-size:.8rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--amber);font-weight:700;outline:none" value="1"/>
+      <span style="color:var(--muted);font-size:.8rem">→</span>
+      <input type="number" id="printRangeTo" placeholder="To" min="1" step="1" onclick="this.select()" style="width:60px;padding:6px;border:1.5px solid var(--b2);border-radius:6px;font-size:.8rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--amber);font-weight:700;outline:none" value="100"/>
     </div>
     <button class="btn btn-teal btn-sm" style="flex-shrink:0" onclick="manualSaveRange()" id="odBtn">☁ Save</button>
     <button class="btn btn-blue btn-sm" style="flex-shrink:0" onclick="directPrintOrders()">🖨 Orders</button>
@@ -406,6 +406,7 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
       <button class="btn btn-purple btn-sm" onclick="printDriversPDF()" style="padding:4px 8px">⬇ PDF</button>
     </div>
   </div>
+
   <!-- List view -->
   <div style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px" id="drvList"></div>
   <!-- Board view -->
@@ -456,6 +457,9 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     <div class="rg">
       <button class="btn btn-ghost" style="flex-shrink:0;padding:10px 14px;color:var(--teal);border-color:var(--teal)" onclick="openTenderImport()">📥 Import</button>
       <button class="btn btn-teal btn-full" onclick="addTenderOrder()">＋ Add to Tender</button>
+    </div>
+    <div class="rg" style="margin-top:6px">
+      <button class="btn btn-amber btn-full" onclick="mergeTenderToOrders()">➕ Add to Orders</button>
     </div>
   </div>
 
@@ -677,6 +681,7 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     <div style="display:flex;gap:4px;background:var(--s3);border-radius:8px;padding:3px">
       <button id="aiTab-text" class="btn btn-teal btn-sm" style="flex:1;font-size:.68rem" onclick="switchAITab('text')">📝 WhatsApp</button>
       <button id="aiTab-bof" class="btn btn-ghost btn-sm" style="flex:1;font-size:.68rem" onclick="switchAITab('bof')">📄 BOF</button>
+      <button id="aiTab-drv" class="btn btn-ghost btn-sm" style="flex:1;font-size:.68rem" onclick="switchAITab('drv')">🚗 Drivers</button>
     </div>
     <!-- Text input (WhatsApp) -->
     <div id="aiTextSection">
@@ -691,6 +696,15 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
         <div style="font-size:.68rem;color:var(--muted);font-weight:400;margin-top:4px">JPG · PNG · PDF</div>
       </div>
       <img id="aiBofPreview" style="display:none;width:100%;border-radius:8px;max-height:200px;object-fit:contain"/>
+    </div>
+    <!-- Driver assignment section -->
+    <div id="aiDrvSection" style="display:none;flex-direction:column;gap:8px">
+      <div style="font-size:.72rem;color:var(--blue2);font-family:var(--mono);font-weight:700;letter-spacing:.05em">🚗 DRIVER ASSIGNMENT</div>
+      <div style="font-size:.7rem;color:var(--muted);line-height:1.5">الصق النص بهاد الشكل:<br><span style="color:var(--teal);font-family:monospace">*اسم السائق*<br>اسم الزبون<br>اسم الزبون</span></div>
+      <textarea id="aiDrvInput" placeholder="*Radwan*&#10;UNION Barsha&#10;GMG Dubai hills&#10;&#10;*Habib*&#10;Union hamriya&#10;Union towar" style="width:100%;height:180px;background:var(--s3);border:1.5px solid var(--b2);border-radius:8px;padding:10px;color:var(--txt);font-family:var(--sans);font-size:.82rem;outline:none;resize:none;box-sizing:border-box"></textarea>
+      <button class="btn btn-purple" onclick="parseDriverAssignment()">🚗 Assign Drivers</button>
+      <div id="aiDrvResult" style="display:none;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto"></div>
+      <div id="aiDrvStatus" style="font-size:.72rem;color:var(--muted);text-align:center"></div>
     </div>
     <!-- Extract button -->
     <button class="btn btn-teal" id="aiExtractBtn" onclick="extractOrdersAI()">📋 Extract Orders</button>
@@ -735,11 +749,11 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     <div style="display:flex;gap:8px;margin-bottom:12px">
       <div style="flex:1">
         <div style="font-size:.65rem;color:var(--muted);margin-bottom:4px">From #</div>
-        <input type="number" min="1" id="ordersFrom" class="inp-f" style="text-align:center" placeholder="1"/>
+        <input type="number" min="1" step="1" id="ordersFrom" class="inp-f" style="text-align:center" placeholder="1" onclick="this.select()"/>
       </div>
       <div style="flex:1">
         <div style="font-size:.65rem;color:var(--muted);margin-bottom:4px">To #</div>
-        <input type="number" min="1" id="ordersTo" class="inp-f" style="text-align:center" placeholder="10"/>
+        <input type="number" min="1" step="1" id="ordersTo" class="inp-f" style="text-align:center" placeholder="10" onclick="this.select()"/>
       </div>
     </div>
     <div class="rg" style="justify-content:center">
@@ -756,11 +770,11 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     <div style="display:flex;gap:8px;margin-bottom:12px">
       <div style="flex:1">
         <div style="font-size:.65rem;color:var(--muted);margin-bottom:4px">From #</div>
-        <input type="number" min="1" id="labelsFrom" class="inp-f" style="text-align:center" placeholder="1"/>
+        <input type="number" min="1" step="1" id="labelsFrom" class="inp-f" style="text-align:center" placeholder="1" onclick="this.select()"/>
       </div>
       <div style="flex:1">
         <div style="font-size:.65rem;color:var(--muted);margin-bottom:4px">To #</div>
-        <input type="number" min="1" id="labelsTo" class="inp-f" style="text-align:center" placeholder="10"/>
+        <input type="number" min="1" step="1" id="labelsTo" class="inp-f" style="text-align:center" placeholder="10" onclick="this.select()"/>
       </div>
     </div>
     <div class="rg" style="justify-content:center">
@@ -1191,7 +1205,12 @@ function selTCust(c){
   document.getElementById('tCustLbl').textContent=c;
   document.getElementById('tCustLbl').style.color='var(--txt)';
   closeTCDrop();
-  document.getElementById('tProdSrch').focus();
+  setTimeout(()=>{
+    const inp=document.getElementById('tProdSrch');
+    inp.focus();
+    inp.value='';
+    openTPDrop();
+  },80);
 }
 
 function openTPDrop(){
@@ -1410,7 +1429,7 @@ function renderOrders(){
             <input class="note-inp" type="text" placeholder="Note" value="${esc2(o.note||'')}" onchange="setOrdNote(${o.idx},this.value)" style="flex:1;height:20px;font-size:.65rem;padding:2px 4px"/>
             <div style="display:flex;gap:2px;flex-shrink:0;align-items:center;border:1px solid var(--b2);border-radius:3px;overflow:hidden">
               <button class="pr-qb" onclick="adjO(${o.idx},-1)" style="padding:3px 6px;background:var(--s2);border:none;cursor:pointer;color:var(--txt);font-weight:700">−</button>
-              <input class="pr-qi" type="number" min="1" step="0.5" value="${o.qty}" onchange="setOQ(${o.idx},this.value)" style="width:45px;height:24px;padding:2px;border:none;text-align:center;font-weight:600;font-size:.8rem;background:transparent"/>
+              <input class="pr-qi" type="number" min="1" step="0.5" value="${o.qty}" onchange="setOQ(${o.idx},this.value)" style="width:45px;height:24px;padding:2px;border:none;text-align:center;font-weight:700;font-size:.8rem;background:transparent;color:var(--amber)"/>
               <button class="pr-qb" onclick="adjO(${o.idx},1)" style="padding:3px 6px;background:var(--s2);border:none;cursor:pointer;color:var(--txt);font-weight:700">+</button>
             </div>
             <span class="pr-unit" style="flex-shrink:0">kg</span>
@@ -1472,7 +1491,11 @@ function adjO(i,d){
   const newQty=Math.max(0.5,Math.round((parseFloat(orders[i].qty||1)+d)*10)/10);
   orders[i].qty=newQty;
   saveOrders();
-  renderOrders();
+  // تحديث مباشر بدون re-render لتجنب وميض الشاشة
+  const inps=document.querySelectorAll('.pr-qi[type="number"]');
+  let found=false;
+  inps.forEach(inp=>{const oc=inp.getAttribute('onchange')||'';if(oc.includes('setOQ('+i+',')){inp.value=newQty;found=true;}});
+  if(!found)renderOrders();
 }
 function setOQ(i,v){
   if(i<0||i>=orders.length)return;
@@ -1480,9 +1503,9 @@ function setOQ(i,v){
   orders[i].qty=Math.round(qty*10)/10;
   saveOrders();
   renumberOrders(orders[i].date||'—');
-  renderOrders();
+  // لا نعمل renderOrders هون عشان المستخدم لسا عم يكتب
 }
-function setOrdProduct(i,v){orders[i].product=v;saveOrders();renderOrders();}
+function setOrdProduct(i,v){orders[i].product=v;saveOrders();}
 // ── Global Customer Change Modal ──
 let _gCustCtx={oldCust:'',date:''};
 
@@ -1541,7 +1564,16 @@ function applyGCustChange(newName){
     saveOrders();
     closeGCustModal();
     renumberOrders(date);
-    renderOrders();
+    // تحديث اسم الزبون بالـ DOM مباشرة بدون re-render
+    const custSpans=document.querySelectorAll('[onclick*="openCustModal(\''+oldCust.replace(/'/g,"\\'")+'\',"]');
+    if(custSpans.length){
+      custSpans.forEach(s=>{
+        s.innerHTML='👤 '+newName+'<br/><span style="font-size:.6rem;color:var(--muted)">✏️ Edit</span>';
+        // update onclick too
+        const oc=s.getAttribute('onclick')||'';
+        s.setAttribute('onclick',oc.replace(oldCust,newName));
+      });
+    } else renderOrders();
   }
   toast('✓ Updated','ok');
 }
@@ -1587,7 +1619,11 @@ function selectProdModal(idx,prod){
   orders[idx].product=prod;
   saveOrders();
   closeProdModal(idx);
-  renderOrders();
+  // تحديث اسم المنتج مباشرة بالـ DOM بدون re-render
+  const spans=document.querySelectorAll('[onclick="openProdModal('+idx+')"]');
+  if(spans.length){
+    spans.forEach(s=>{s.innerHTML=prod+'<br/><span style="font-size:.6rem;color:var(--muted)">✏️ Edit</span>';});
+  } else renderOrders();
 }
 function delRow(i){
   if(i<0||i>=orders.length)return;
@@ -1758,40 +1794,49 @@ function manualSaveRange(){
   const to=parseInt(document.getElementById('printRangeTo').value);
   if(!from||!to||from>to){toast('Enter valid range','err');return;}
   
-  saveRangeToOneDrive(from,to);
+  // قراءة التاريخ من Entry أو من أول أوردر
+  const entryDate=document.getElementById('orderDate')?.value||todayStr();
+  saveRangeToOneDrive(from,to,entryDate);
 }
 
-async function saveRangeToOneDrive(from,to){
-  const btn=document.querySelector('.exp-bar .btn-blue');
-  if(!btn)return;
+async function saveRangeToOneDrive(from,to,dateOverride){
+  const btn=document.getElementById('odBtn');
+  if(btn){btn.textContent='⏳...';btn.disabled=true;}
   
   try{
     const token=await getODToken();
-    const today=todayStr();
+    const today=dateOverride||todayStr();
     
-    // كتابة BS1 و BT1 و H1 في Production.xlsm
+    // كتابة BS1 و BT1 في شيت Loading، و H1 في شيت Production
     const fileRes=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,{
       headers:{'Authorization':'Bearer '+token}
     });
     if(!fileRes.ok) throw new Error('production.xlsm not found');
     const fileId=(await fileRes.json()).id;
-    const baseUrl=`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/workbook/`;
+    const baseUrl=`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/workbook/worksheets/`;
     
-    // كتابة البيانات
-    const patchUrl=baseUrl+'worksheets/Loading/range(address=\'BS1:BT1,H1\')';
-    const patchData={
-      values:[[from,to],[today]]
-    };
-    const r=await fetch(patchUrl,{
+    // كتابة BS1:BT1 في Loading
+    const r1=await fetch(baseUrl+"Loading/range(address='BS1:BT1')",{
       method:'PATCH',
       headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
-      body:JSON.stringify(patchData)
+      body:JSON.stringify({values:[[from,to]]})
     });
-    if(!r.ok) throw new Error('Failed to write');
+    if(!r1.ok) throw new Error('Failed to write BS1:BT1');
     
-    console.log(`✓ Auto-saved: BS1=${from}, BT1=${to}, H1=${today}`);
+    // كتابة H1 في Production
+    const r2=await fetch(baseUrl+"Production/range(address='H1')",{
+      method:'PATCH',
+      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:JSON.stringify({values:[[today]]})
+    });
+    if(!r2.ok) throw new Error('Failed to write H1 in Production');
+    
+    toast(`✓ Saved! From ${from} → To ${to} | Date: ${today}`,'ok');
+    console.log(`✓ Saved: BS1=${from}, BT1=${to}, Production!H1=${today}`);
   }catch(e){
-    console.error('Auto-save error:',e.message);
+    if(e.message!=='user_cancelled')toast('Error: '+e.message,'err');
+  }finally{
+    if(btn){btn.textContent='☁ Save';btn.disabled=false;}
   }
 }
 
@@ -1823,26 +1868,30 @@ async function saveToOneDriveAuto(){
     });
     if(!r1.ok) throw new Error('Excel upload failed');
     
-    // 2. كتابة BS1 و BT1 و H1 تلقائياً
+    // 2. كتابة BS1 و BT1 في Loading و H1 في Production
     btn.textContent='⏳ Writing to Production...';
     const fileRes=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,{
       headers:{'Authorization':'Bearer '+token}
     });
     if(!fileRes.ok) throw new Error('production.xlsm not found');
     const fileId=(await fileRes.json()).id;
-    const baseUrl=`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/workbook/`;
+    const baseUrl=`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/workbook/worksheets/`;
     
-    // كتابة البيانات (From و To تلقائية)
-    const patchUrl=baseUrl+'worksheets/Loading/range(address=\'BS1:BT1,H1\')';
-    const patchData={
-      values:[[from,to],[today]]
-    };
-    const r2=await fetch(patchUrl,{
+    // كتابة BS1:BT1 في Loading
+    const r2=await fetch(baseUrl+"Loading/range(address='BS1:BT1')",{
       method:'PATCH',
       headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
-      body:JSON.stringify(patchData)
+      body:JSON.stringify({values:[[from,to]]})
     });
     if(!r2.ok) throw new Error('Failed to write to Loading sheet');
+    
+    // كتابة H1 في Production
+    const r3=await fetch(baseUrl+"Production/range(address='H1')",{
+      method:'PATCH',
+      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:JSON.stringify({values:[[today]]})
+    });
+    if(!r3.ok) throw new Error('Failed to write H1 in Production sheet');
     
     toast(`✓ Saved to OneDrive!\nFrom ${from} To ${to}\nDate: ${today}`,'ok');
   }catch(e){
@@ -2242,15 +2291,21 @@ function renderDriversPage(){
       groups.push({date,cust,num:info.num,driver:info.driver});
     });
   });
-  // Filter
+  // Sort by num
+  groups.sort((a,b)=>(a.num||0)-(b.num||0));
+  // Dropdown filter
   const filter=document.getElementById('drvFilter').value;
-  if(filter==='__num__') groups.sort((a,b)=>(a.num||0)-(b.num||0));
-  else if(filter==='__none__') groups=groups.filter(g=>!g.driver);
+  if(filter==='__none__') groups=groups.filter(g=>!g.driver);
   else if(filter) groups=groups.filter(g=>g.driver===filter);
+  if(!groups.length){
+    el.innerHTML='<div style="padding:30px;text-align:center;color:var(--muted);font-size:.85rem">No orders</div>';
+    return;
+  }
   el.innerHTML=groups.map(g=>`
     <div style="background:var(--s2);border:1.5px solid var(--b1);border-radius:var(--r);padding:10px 13px;display:flex;align-items:center;gap:10px">
-      <span style="font-family:var(--mono);font-size:.7rem;color:var(--amber);min-width:24px;text-align:center">${g.num||'—'}</span>
-      <span style="flex:1;font-size:.83rem;font-weight:700;color:var(--blue2)">👤 ${g.cust}</span>
+      <span style="font-family:var(--mono);font-size:.75rem;color:var(--amber);min-width:28px;text-align:center;font-weight:800">${g.num||'—'}</span>
+      <span style="flex:1;font-size:.83rem;font-weight:700;color:var(--txt)">👤 ${g.cust}</span>
+      ${g.driver?`<span style="font-size:.68rem;color:var(--teal);font-family:var(--mono);font-weight:700;flex-shrink:0">🚗${g.driver}</span>`:''}
       <select style="background:var(--s3);border:1.5px solid var(--b2);border-radius:7px;padding:5px 8px;color:var(--txt);font-family:var(--sans);font-size:.75rem;outline:none;max-width:130px" onchange="assignDriver('${esc(g.date)}','${esc(g.cust)}',this.value)">
         <option value="">No driver</option>
         ${drivers.map(d=>`<option value="${esc2(d)}"${g.driver===d?' selected':''}>${d}</option>`).join('')}
@@ -2828,23 +2883,36 @@ function renderCombinedQtyPage(){
   const el=document.getElementById('combinedQtyList');
   if(!el)return;
 
-  // Orders data
+  // Orders data - exclude tender rows (isTender flag OR old ' tender' suffix)
   const orderTotals=new Map();
   orders.forEach(o=>{
+    if(o.isTender)return;
     if(o.customer&&o.customer.toLowerCase().endsWith(' tender'))return;
+    if((o.note||'').toLowerCase()==='tender')return;
     const key=o.product;
     orderTotals.set(key,(orderTotals.get(key)||0)+parseFloat(o.qty||0));
   });
-  const orderRows=[...orderTotals.entries()].sort((a,b)=>b[1]-a[1]);
+  const orderRows=[...orderTotals.entries()].sort((a,b)=>b[1]-a[1]).filter(([,q])=>q>0);
   const orderTotal=orderRows.reduce((s,[,q])=>s+q,0);
 
-  // Tender data
+  // Tender data: from tenderOrders (not yet merged) + isTender orders already merged
   const tenderTotals=new Map();
+  // Live tender orders (not yet merged)
   tenderOrders.forEach(o=>{
     const key=o.product;let kg=0;
     if(key.toUpperCase().includes('KG')){kg=parseInt(o.qty)||0;}
     else{let g=400;if(key.includes('450'))g=450;else if(key.includes('500'))g=500;kg=(parseInt(o.qty)||0)*(g/1000);}
     const cur=tenderTotals.get(key)||{qty:0,kg:0};cur.qty+=parseInt(o.qty)||0;cur.kg+=kg;
+    tenderTotals.set(key,cur);
+  });
+  // Already merged tender orders (isTender:true)
+  orders.forEach(o=>{
+    if(!o.isTender)return;
+    const key=o.product;
+    const tq=o.tQty||0; // الكمية الأصلية بالعدد
+    const kg=parseFloat(o.qty||0);
+    const cur=tenderTotals.get(key)||{qty:0,kg:0};
+    cur.qty+=tq;cur.kg+=kg;
     tenderTotals.set(key,cur);
   });
   const tenderRows=[...tenderTotals.entries()];
@@ -2928,7 +2996,20 @@ function downloadCombinedImage(){
   if(!el||!el.innerHTML.trim()){toast('No data','err');return;}
   const btn=document.getElementById('btnDownloadImg');
   btn.textContent='⏳...';btn.disabled=true;
-  // Light background for capture
+  // Light background for capture - override all dark colors
+  const style=document.createElement('style');
+  style.id='_captureOverride';
+  style.textContent=`
+    #combinedQtyList, #combinedQtyList * {
+      color: #111 !important;
+      border-color: #ccc !important;
+      background: transparent !important;
+    }
+    #combinedQtyList [style*="color:var(--blue2)"], #combinedQtyList [style*="color:#fcd34d"], #combinedQtyList [style*="color:var(--teal)"] { color: #0a5c7a !important; }
+    #combinedQtyList [style*="background:var(--s2)"] { background: #f0f0f0 !important; }
+    #combinedQtyList [style*="background:linear-gradient"] { background: #e8f4fd !important; }
+  `;
+  document.head.appendChild(style);
   el.style.background='#fff';
   el.style.padding='16px';
   html2canvas(el,{
@@ -2938,6 +3019,7 @@ function downloadCombinedImage(){
     logging:false
   }).then(canvas=>{
     el.style.background='';el.style.padding='';
+    document.getElementById('_captureOverride')?.remove();
     const link=document.createElement('a');
     link.download='AllQty_'+new Date().toISOString().slice(0,10)+'.png';
     link.href=canvas.toDataURL('image/png');
@@ -2946,6 +3028,7 @@ function downloadCombinedImage(){
     toast('✓ Image saved','ok');
   }).catch(e=>{
     el.style.background='';el.style.padding='';
+    document.getElementById('_captureOverride')?.remove();
     btn.textContent='⬇ Save Image';btn.disabled=false;
     toast('Error: '+e.message,'err');
   });
@@ -2956,6 +3039,19 @@ function shareCombinedImageWhatsApp(){
   if(!el||!el.innerHTML.trim()){toast('No data','err');return;}
   const btn=document.getElementById('btnShareWA');
   btn.textContent='⏳...';btn.disabled=true;
+  const style=document.createElement('style');
+  style.id='_captureOverride';
+  style.textContent=`
+    #combinedQtyList, #combinedQtyList * {
+      color: #111 !important;
+      border-color: #ccc !important;
+      background: transparent !important;
+    }
+    #combinedQtyList [style*="color:var(--blue2)"], #combinedQtyList [style*="color:#fcd34d"], #combinedQtyList [style*="color:var(--teal)"] { color: #0a5c7a !important; }
+    #combinedQtyList [style*="background:var(--s2)"] { background: #f0f0f0 !important; }
+    #combinedQtyList [style*="background:linear-gradient"] { background: #e8f4fd !important; }
+  `;
+  document.head.appendChild(style);
   el.style.background='#fff';
   el.style.padding='16px';
   html2canvas(el,{
@@ -2965,6 +3061,7 @@ function shareCombinedImageWhatsApp(){
     logging:false
   }).then(canvas=>{
     el.style.background='';el.style.padding='';
+    document.getElementById('_captureOverride')?.remove();
     btn.textContent='💬 WhatsApp';btn.disabled=false;
     // Try Web Share API first (mobile)
     canvas.toBlob(blob=>{
@@ -2990,6 +3087,7 @@ function shareCombinedImageWhatsApp(){
     },'image/png');
   }).catch(e=>{
     el.style.background='';el.style.padding='';
+    document.getElementById('_captureOverride')?.remove();
     btn.textContent='💬 WhatsApp';btn.disabled=false;
     toast('Error: '+e.message,'err');
   });
@@ -3012,12 +3110,19 @@ function mergeTenderToOrders(){
   let num=maxNum;
   const custNums=new Map();
   tenderOrders.forEach(o=>{
+    // احسب الكغ
+    let kg=0;
+    const key=o.product||'';
+    if(key.toUpperCase().includes('KG')){kg=parseInt(o.qty)||0;}
+    else{let g=400;if(key.includes('450'))g=450;else if(key.includes('500'))g=500;kg=(parseInt(o.qty)||0)*(g/1000);}
     if(!custNums.has(o.customer)){num++;custNums.set(o.customer,num);}
-    orders.push({customer:o.customer,product:o.product,qty:o.kg,size:'',note:'Tender',date,num:custNums.get(o.customer),driver:''});
+    // isTender:true عشان يتعرف عليها بالـ All Qty وينفصل
+    orders.push({customer:o.customer,product:o.product,qty:kg||o.qty,size:'',note:'Tender',date,num:custNums.get(o.customer),driver:'',isTender:true,tQty:parseInt(o.qty)||0});
   });
+  saveOrders();
   toast(`✓ ${tenderOrders.length} rows added to Orders`,'ok');
-  tenderOrders=[];
-  renderTQtyPage();
+  tenderOrders=[];LS.set('iat_to',tenderOrders);
+  renderOrders();renderCombinedQtyPage();updateBadges();
 }
 
 // ── SETTINGS TENDER PRODUCTS ──
@@ -3752,15 +3857,19 @@ function renderTOrdersPage(){
 // ── T.Orders CRUD ──
 function adjTO(i,d){
   if(i<0||i>=tenderOrders.length)return;
-  tenderOrders[i].qty=Math.max(1,(parseInt(tenderOrders[i].qty||1)+d));
+  const nq=Math.max(1,(parseInt(tenderOrders[i].qty||1)+d));
+  tenderOrders[i].qty=nq;
   saveTenderOrders();
-  renderTOrdersPage();
+  // تحديث مباشر بدون re-render
+  const inps=document.querySelectorAll('input[onchange*="setTOQ('+i+',"]');
+  if(inps.length){inps.forEach(inp=>inp.value=nq);}
+  else renderTOrdersPage();
 }
 function setTOQ(i,v){
   if(i<0||i>=tenderOrders.length)return;
   tenderOrders[i].qty=Math.max(1,parseInt(v)||1);
   saveTenderOrders();
-  renderTOrdersPage();
+  // لا نعمل re-render وقت الكتابة
 }
 function delTRow(i){
   if(i<0||i>=tenderOrders.length)return;
@@ -3878,10 +3987,12 @@ function switchAITab(tab){
   aiCurrentTab=tab;
   document.getElementById('aiTextSection').style.display=tab==='text'?'block':'none';
   document.getElementById('aiBofSection').style.display=tab==='bof'?'flex':'none';
-  document.getElementById('aiTab-text').className=tab==='text'?'btn btn-teal btn-sm':'btn btn-ghost btn-sm';
-  document.getElementById('aiTab-bof').className=tab==='bof'?'btn btn-teal btn-sm':'btn btn-ghost btn-sm';
-  document.getElementById('aiTab-text').style.flex='1';document.getElementById('aiTab-text').style.fontSize='.68rem';
-  document.getElementById('aiTab-bof').style.flex='1';document.getElementById('aiTab-bof').style.fontSize='.68rem';
+  document.getElementById('aiDrvSection').style.display=tab==='drv'?'flex':'none';
+  document.getElementById('aiExtractBtn').style.display=tab==='drv'?'none':'block';
+  ['text','bof','drv'].forEach(t=>{
+    const el=document.getElementById('aiTab-'+t);
+    if(el){el.className=tab===t?'btn btn-teal btn-sm':'btn btn-ghost btn-sm';el.style.flex='1';el.style.fontSize='.68rem';}
+  });
   document.getElementById('aiResults').style.display='none';
   document.getElementById('aiStatus').textContent='';
   const btn=document.getElementById('aiExtractBtn');
@@ -4611,7 +4722,7 @@ function renderAIResults() {
         <!-- Qty + delete -->
         <div style="display:flex;flex-direction:column;align-items:center;gap:5px;flex-shrink:0">
           <input type="number" value="${item.qty}" min="0" step="0.5"
-            style="width:52px;background:var(--s2);border:1.5px solid var(--b2);border-radius:7px;padding:6px 4px;color:var(--amber);font-size:.88rem;font-weight:700;outline:none;text-align:center"
+            style="width:52px;background:var(--s2);border:1.5px solid var(--b2);border-radius:7px;padding:6px 4px;color:var(--amber);font-size:.95rem;font-weight:800;outline:none;text-align:center"
             onchange="aiExtracted[${i}].qty=parseFloat(this.value)||0"/>
           <span style="font-size:.6rem;color:var(--muted)">kg</span>
           <button onclick="aiExtracted.splice(${i},1);renderAIResults()"
@@ -4707,6 +4818,103 @@ let _tt;
 function toast(msg,type=''){const el=document.getElementById('toast');el.textContent=msg;el.className='toast on'+(type?' '+type:'');clearTimeout(_tt);_tt=setTimeout(()=>el.classList.remove('on'),2500);}
 function confDlg(msg,cb){document.getElementById('confMsg').textContent=msg;document.getElementById('confOv').classList.add('on');document.getElementById('confYes').onclick=()=>{closeConf();cb();};}
 function closeConf(){document.getElementById('confOv').classList.remove('on');}
+
+// ══ DRIVER ASSIGNMENT FROM TEXT ══
+function parseDriverAssignment(){
+  const raw=document.getElementById('aiDrvInput').value.trim();
+  const status=document.getElementById('aiDrvStatus');
+  const resultEl=document.getElementById('aiDrvResult');
+  if(!raw){status.textContent='❌ الصق النص أولاً';return;}
+  
+  status.textContent='⏳ جاري المعالجة...';
+  resultEl.style.display='none';
+  
+  // Parse: lines starting with *name* are drivers, rest are customers
+  const lines=raw.split(/\n/).map(l=>l.trim()).filter(l=>l);
+  let currentDriver='';
+  const assignments=[]; // [{driver, customer, matched, ordersFound}]
+  
+  lines.forEach(line=>{
+    // Check if driver line: *Name* or **Name** (bold in WhatsApp)
+    const drvMatch=line.match(/^\*+([^*]+)\*+\s*$/) || line.match(/^_([^_]+)_\s*$/);
+    if(drvMatch){
+      currentDriver=drvMatch[1].trim();
+      return;
+    }
+    // Skip date lines like *3/6* 
+    if(line.match(/^\*?\d+\/\d+\*?\s*$/) || line.match(/^\d+\/\d+\s*$/)) return;
+    // Skip empty or short lines
+    if(!line || line.length<2) return;
+    // It's a customer line
+    if(currentDriver && line){
+      // Try to match customer
+      const matched=matchCustomer(line);
+      // Find orders for this customer
+      const found=orders.filter(o=>o.customer===matched || o.customer.toLowerCase()===matched.toLowerCase());
+      assignments.push({driver:currentDriver, raw:line, customer:matched, ordersFound:found.length});
+    }
+  });
+  
+  if(!assignments.length){status.textContent='❌ ما عرفت أقرأ النص. تأكد من الشكل.';return;}
+  
+  // Apply assignments
+  let applied=0;
+  assignments.forEach(a=>{
+    if(a.ordersFound>0){
+      orders.forEach(o=>{
+        if(o.customer===a.customer||o.customer.toLowerCase()===a.customer.toLowerCase()){
+          o.driver=a.driver;
+          applied++;
+        }
+      });
+    }
+  });
+  
+  saveOrders();
+  
+  // Show result preview
+  // Group by driver
+  const byDriver=new Map();
+  assignments.forEach(a=>{
+    if(!byDriver.has(a.driver))byDriver.set(a.driver,[]);
+    byDriver.get(a.driver).push(a);
+  });
+  
+  let html='';
+  byDriver.forEach((items,drv)=>{
+    const drvColor=drivers.includes(drv)?'var(--teal)':'var(--amber)';
+    const drvNote=drivers.includes(drv)?'':'⚠️ سائق غير موجود في القائمة';
+    html+=`<div style="background:var(--s2);border:1.5px solid var(--b1);border-radius:8px;overflow:hidden;margin-bottom:4px">
+      <div style="background:rgba(45,212,191,.1);padding:7px 10px;display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:.82rem;font-weight:800;color:${drvColor}">🚗 ${drv}</span>
+        <span style="font-size:.62rem;color:var(--muted)">${items.length} orders${drvNote?'  '+drvNote:''}</span>
+      </div>
+      <div style="padding:4px 8px">
+        ${items.map(a=>`<div style="display:flex;align-items:center;gap:6px;padding:4px 2px;border-bottom:1px solid rgba(255,255,255,.04);font-size:.72rem">
+          <span style="color:${a.ordersFound>0?'var(--teal)':'var(--red)'};font-size:.7rem">${a.ordersFound>0?'✓':'✗'}</span>
+          <span style="flex:1;color:${a.ordersFound>0?'var(--txt)':'var(--muted)'};">${a.customer}</span>
+          ${a.raw.toLowerCase()!==a.customer.toLowerCase()?`<span style="font-size:.6rem;color:var(--muted);font-style:italic">${a.raw}</span>`:''}
+        </div>`).join('')}
+      </div>
+    </div>`;
+  });
+  
+  // Add warning for unmatched
+  const unmatched=assignments.filter(a=>a.ordersFound===0);
+  
+  resultEl.innerHTML=html;
+  resultEl.style.display='flex';
+  
+  const matchedCount=assignments.filter(a=>a.ordersFound>0).length;
+  status.textContent=`✓ طبّق ${matchedCount} من ${assignments.length} | ${unmatched.length} غير موجود في الأوردرات`;
+  status.style.color=unmatched.length>0?'var(--amber)':'var(--teal)';
+  
+  if(applied>0){
+    renderOrders();
+    renderDriversPage();
+    toast(`✓ وزّع ${matchedCount} زبون على السوايقين`,'ok');
+  }
+}
 </script>
 </body>
 </html>
