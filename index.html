@@ -364,9 +364,9 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
   <div class="exp-bar">
     <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
       <label style="font-size:.7rem;color:var(--blue2);white-space:nowrap;font-weight:700">📍 Print:</label>
-      <input type="number" id="printRangeFrom" placeholder="From" min="1" step="1" onclick="this.select()" style="width:60px;padding:6px;border:1.5px solid var(--b2);border-radius:6px;font-size:.8rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--amber);font-weight:700;outline:none" value="1"/>
+      <input type="number" id="printRangeFrom" placeholder="From" min="1" step="1" onclick="this.select()" onchange="LS.set('iat_pfrom',this.value)" style="width:60px;padding:6px;border:1.5px solid var(--b2);border-radius:6px;font-size:.8rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--amber);font-weight:700;outline:none" value="1"/>
       <span style="color:var(--muted);font-size:.8rem">→</span>
-      <input type="number" id="printRangeTo" placeholder="To" min="1" step="1" onclick="this.select()" style="width:60px;padding:6px;border:1.5px solid var(--b2);border-radius:6px;font-size:.8rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--amber);font-weight:700;outline:none" value="100"/>
+      <input type="number" id="printRangeTo" placeholder="To" min="1" step="1" onclick="this.select()" onchange="LS.set('iat_pto',this.value)" style="width:60px;padding:6px;border:1.5px solid var(--b2);border-radius:6px;font-size:.8rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--amber);font-weight:700;outline:none" value="100"/>
     </div>
     <button class="btn btn-teal btn-sm" style="flex-shrink:0" onclick="manualSaveRange()" id="odBtn">☁ Save</button>
     <button class="btn btn-blue btn-sm" style="flex-shrink:0" onclick="directPrintOrders()">🖨 Orders</button>
@@ -1028,6 +1028,11 @@ function sortedProds(list){return[...list].sort((a,b)=>(freq[b]||0)-(freq[a]||0)
 
 (()=>{
   document.getElementById('orderDate').value=todayStr();
+  // ✅ تحميل Print Range المحفوظ
+  const savedFrom=LS.get('iat_pfrom',null);
+  const savedTo=LS.get('iat_pto',null);
+  if(savedFrom)document.getElementById('printRangeFrom').value=savedFrom;
+  if(savedTo)document.getElementById('printRangeTo').value=savedTo;
   renderCustDL(customers);
   renderPDropList('');
   renderSettC();renderSettP();renderSettD();renderSettTP();
@@ -1572,12 +1577,15 @@ function renderOrders(){
             <button class="cc-del" onclick="addProdToOrder('${esc(c)}','${date}')">+ Add</button>
             <button class="cc-del" onclick="delCust('${esc(c)}','${date}')">Remove ✕</button>
           </div>
-          ${items.map(o=>`<div style="display:flex;gap:4px;align-items:center;padding:4px;background:var(--s1);border-radius:3px;font-size:.7rem;margin-bottom:2px">
-            <button class="pr-del" onclick="delRow(${o.idx})" style="flex-shrink:0;padding:2px 4px">✕</button>
-            
-            <div style="display:flex;gap:4px;flex-shrink:0;align-items:center;position:relative">
-              <span onclick="openProdModal(${o.idx})" style="cursor:pointer;padding:4px 6px;background:var(--b1);border-radius:2px;font-size:.7rem;min-width:90px;text-align:center;border:1px solid var(--b2)">
-                ${o.product||'Select...'}<br/><span style="font-size:.6rem;color:var(--muted)">✏️ Edit</span>
+          ${items.map(o=>`<div style="display:flex;gap:3px;align-items:center;padding:3px 4px;background:var(--s1);border-radius:2px;font-size:.68rem;margin-bottom:1px">
+            <button class="pr-del" onclick="delRow(${o.idx})" style="flex-shrink:0;padding:1px 3px;font-size:.65rem">✕</button>
+            <div style="display:flex;flex-direction:column;gap:1px;flex-shrink:0;margin-right:1px">
+              <button onclick="moveProd(${o.idx},-1)" style="background:var(--s3);border:1px solid var(--b2);border-radius:2px;padding:0 3px;cursor:pointer;color:var(--muted);font-size:.55rem;line-height:1.4">▲</button>
+              <button onclick="moveProd(${o.idx},1)" style="background:var(--s3);border:1px solid var(--b2);border-radius:2px;padding:0 3px;cursor:pointer;color:var(--muted);font-size:.55rem;line-height:1.4">▼</button>
+            </div>
+            <div style="display:flex;gap:3px;flex-shrink:0;align-items:center;position:relative">
+              <span onclick="openProdModal(${o.idx})" style="cursor:pointer;padding:2px 5px;background:var(--b1);border-radius:2px;font-size:.68rem;min-width:80px;text-align:center;border:1px solid var(--b2)">
+                ${o.product||'Select...'}<br/><span style="font-size:.55rem;color:var(--muted)">✏️</span>
               </span>
             </div>
             <div id="prodModalOrd${o.idx}" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;padding:10px;flex-direction:column" onclick="if(event.target===this)closeProdModal(${o.idx})">
@@ -1587,21 +1595,38 @@ function renderOrders(){
                 <div id="prodModalList${o.idx}" style="flex:1;overflow-y:auto"></div>
               </div>
             </div>
-            
-            <input class="note-inp" type="text" placeholder="Note" value="${esc2(o.note||'')}" onchange="setOrdNote(${o.idx},this.value)" style="flex:1;height:20px;font-size:.65rem;padding:2px 4px"/>
-            <div style="display:flex;gap:2px;flex-shrink:0;align-items:center;border:1px solid var(--b2);border-radius:3px;overflow:hidden">
-              <button class="pr-qb" onclick="adjO(${o.idx},-1)" style="padding:3px 6px;background:var(--s2);border:none;cursor:pointer;color:var(--txt);font-weight:700">−</button>
-              <input class="pr-qi" type="number" min="1" step="0.5" value="${o.qty}" onchange="setOQ(${o.idx},this.value)" style="width:45px;height:24px;padding:2px;border:none;text-align:center;font-weight:700;font-size:.8rem;background:transparent;color:var(--amber)"/>
-              <button class="pr-qb" onclick="adjO(${o.idx},1)" style="padding:3px 6px;background:var(--s2);border:none;cursor:pointer;color:var(--txt);font-weight:700">+</button>
+            <input class="note-inp" type="text" placeholder="Note" value="${esc2(o.note||'')}" onchange="setOrdNote(${o.idx},this.value)" style="flex:1;height:18px;font-size:.62rem;padding:1px 4px"/>
+            <div style="display:flex;gap:1px;flex-shrink:0;align-items:center;border:1px solid var(--b2);border-radius:2px;overflow:hidden">
+              <button class="pr-qb" onclick="adjO(${o.idx},-1)" style="padding:2px 5px;background:var(--s2);border:none;cursor:pointer;color:var(--txt);font-weight:700;font-size:.75rem">−</button>
+              <input class="pr-qi" type="number" min="1" step="0.5" value="${o.qty}" onchange="setOQ(${o.idx},this.value)" style="width:40px;height:20px;padding:1px;border:none;text-align:center;font-weight:700;font-size:.75rem;background:transparent;color:var(--amber)"/>
+              <button class="pr-qb" onclick="adjO(${o.idx},1)" style="padding:2px 5px;background:var(--s2);border:none;cursor:pointer;color:var(--txt);font-weight:700;font-size:.75rem">+</button>
             </div>
-            <span class="pr-unit" style="flex-shrink:0">kg</span>
-            ${isCHK(o.product)?'<select class="pr-qi" value="'+o.size+'" onchange="setOrdSize('+o.idx+',this.value)" style="width:70px;flex-shrink:0"><option value="">Size</option>'+SIZES.map(s=>'<option value="'+s+'" '+(o.size===s?'selected':'')+'>'+s+'g</option>').join('')+'<option value="">Custom</option></select>'+(o.size&&!SIZES.includes(o.size)?'<span class="pr-qi" style="width:70px;flex-shrink:0;padding:2px;text-align:center">'+o.size+'g</span>':''):''}
+            <span class="pr-unit" style="flex-shrink:0;font-size:.6rem">kg</span>
+            ${isCHK(o.product)?'<select class="pr-qi" value="'+o.size+'" onchange="setOrdSize('+o.idx+',this.value)" style="width:60px;flex-shrink:0;font-size:.62rem"><option value="">Size</option>'+SIZES.map(s=>'<option value="'+s+'" '+(o.size===s?'selected':'')+'>'+s+'g</option>').join('')+'<option value="">Custom</option></select>'+(o.size&&!SIZES.includes(o.size)?'<span style="width:60px;flex-shrink:0;padding:2px;text-align:center;font-size:.62rem">'+o.size+'g</span>':''):''}
           </div>`).join('')}
         </div>`;
       }).join('')}
     </div>`;
   }).join('');
 }
+function moveProd(idx, dir){
+  // يحرك منتج داخل نفس مجموعة الزبون
+  const o=orders[idx];
+  if(!o)return;
+  const {customer,date}=o;
+  // جمع جميع منتجات نفس الزبون بنفس التاريخ
+  const grpIdxs=[];
+  orders.forEach((x,i)=>{if(x.customer===customer&&(x.date||'—')===(date||'—'))grpIdxs.push(i);});
+  const pos=grpIdxs.indexOf(idx);
+  const newPos=pos+dir;
+  if(newPos<0||newPos>=grpIdxs.length)return;
+  // تبديل
+  const swapIdx=grpIdxs[newPos];
+  [orders[idx],orders[swapIdx]]=[orders[swapIdx],orders[idx]];
+  saveOrders();
+  renderOrders();
+}
+
 function setGroupNum(date,cust,v){
   const n=parseInt(v)||0;
   orders.forEach(o=>{if((o.date||'—')===date&&o.customer===cust)o.num=n;});
@@ -1862,28 +1887,31 @@ function renderViewOrders(){
   orders.forEach(o=>{
     const d=o.date||'—';
     if(!dateMap.has(d))dateMap.set(d,new Map());
-    const custMap=dateMap.get(d);
-    if(!custMap.has(o.customer))custMap.set(o.customer,[]);
-    custMap.get(o.customer).push(o);
+    const cm=dateMap.get(d);
+    if(!cm.has(o.customer))cm.set(o.customer,[]);
+    cm.get(o.customer).push(o);
   });
-  el.innerHTML=[...dateMap.entries()].map(([date,custMap])=>{
-    const custKeys=[...custMap.keys()];
-    return `<div style="margin-bottom:4px">
-      <div style="font-family:var(--mono);font-size:.65rem;color:var(--teal);padding:6px 4px;letter-spacing:.08em">📅 ${date}</div>
-      ${custKeys.map(c=>{
-        const items=custMap.get(c);
-        return `<div class="cc">
-          <div class="cc-h">
-            <span class="cc-name">${items[0].num} 👤 ${c}</span>
+  // ✅ ترتيب حسب num مثل renderOrders
+  const sortedDateMap=new Map();
+  [...dateMap.entries()].forEach(([date,cm])=>{
+    const arr=[...cm.entries()].sort((a,b)=>(a[1][0].num||0)-(b[1][0].num||0));
+    sortedDateMap.set(date,new Map(arr));
+  });
+  el.innerHTML=[...sortedDateMap.entries()].map(([date,custMap])=>{
+    return `<div style="margin-bottom:2px">
+      <div style="font-family:var(--mono);font-size:.6rem;color:var(--teal);padding:3px 4px;letter-spacing:.08em">📅 ${date}</div>
+      ${[...custMap.entries()].map(([c,items])=>`
+        <div class="cc" style="margin-bottom:2px">
+          <div class="cc-h" style="padding:5px 10px">
+            <span class="cc-name" style="font-size:.8rem">${items[0].num||''} 👤 ${c}</span>
           </div>
-          ${items.map(o=>`<div style="padding:4px;font-size:.7rem;display:flex;gap:8px;align-items:center">
+          ${items.map(o=>`<div style="padding:2px 10px;font-size:.7rem;display:flex;gap:8px;align-items:center;border-bottom:1px solid rgba(255,255,255,.03)">
             <span style="flex:1">${o.product}</span>
-            <span style="color:var(--muted)">${o.qty}kg</span>
-            ${o.size?`<span style="background:var(--s2);padding:1px 4px;border-radius:2px">${o.size}g</span>`:''}
-            ${o.note?`<span style="color:var(--teal);font-size:.65rem">📝</span>`:''}
+            <span style="color:var(--amber);font-family:var(--mono);font-size:.68rem">${o.qty}kg</span>
+            ${o.size?`<span style="background:var(--s2);padding:1px 4px;border-radius:2px;font-size:.6rem">${o.size}g</span>`:''}
+            ${o.note?`<span style="color:var(--teal);font-size:.6rem" title="${esc2(o.note)}">📝</span>`:''}
           </div>`).join('')}
-        </div>`;
-      }).join('')}
+        </div>`).join('')}
     </div>`;
   }).join('');
 }
@@ -2210,51 +2238,51 @@ async function saveProductionDaily(){
     btn.disabled=false;btn.textContent='💾 Archive';
   }
 }
-async function printDrivers(){
-  const btn=event.target;
-  btn.disabled=true;btn.textContent='Sending...';
+// ── دالة مشتركة تضيف Job للقائمة بدل الاستبدال ──
+async function addPrintJob(job){
+  const token=await getODToken();
+  // قراءة القائمة الحالية
+  let jobs=[];
   try{
-    const token=await getODToken();
-    const markerContent=JSON.stringify({action:'print_drivers',ts:Date.now()});
-    const blob=new Blob([markerContent],{type:'application/json'});
-    const res=await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',{
-      method:'PUT',
-      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
-      body:blob
-    });
-    if(res.ok){toast('✓ Drivers print sent!','ok');}
-    else{throw new Error('Failed');}
+    const r=await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',
+      {headers:{'Authorization':'Bearer '+token}});
+    if(r.ok){
+      const d=await r.json();
+      jobs=Array.isArray(d.jobs)?d.jobs:[];
+    }
+  }catch(e){}
+  // إضافة الـ job الجديد
+  jobs.push(job);
+  // كتابة القائمة
+  const res=await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',{
+    method:'PUT',
+    headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+    body:JSON.stringify({jobs,ts:Date.now()})
+  });
+  if(!res.ok)throw new Error('Failed to queue job');
+  return jobs.length;
+}
+
+async function printDrivers(){
+  const btn=event?.target;
+  if(btn){btn.disabled=true;btn.textContent='Queuing...';}
+  try{
+    const count=await addPrintJob({action:'print_drivers'});
+    toast(`✓ Drivers queued (#${count})`,'ok');
   }catch(e){
     if(e.message!=='user_cancelled')toast('Error: '+e.message,'err');
   }finally{
-    btn.disabled=false;btn.textContent='🚗 Drivers';
+    if(btn){btn.disabled=false;btn.textContent='🚗 Drivers';}
   }
 }
-// ══ PRINT ORDERS ══
-function showOrdersPrintDlg(){
-  document.getElementById('ordersPrintOv').classList.add('on');
-  document.getElementById('ordersPrintStatus').textContent='';
-  setTimeout(()=>document.getElementById('ordersFrom').focus(),100);
-}
-function hideOrdersPrintDlg(){document.getElementById('ordersPrintOv').classList.remove('on');}
-// ── DIRECT PRINT (بدون Dialog) ──
+
 async function directPrintOrders(){
   const from=parseInt(document.getElementById('printRangeFrom').value);
   const to=parseInt(document.getElementById('printRangeTo').value);
   if(!from||!to||from>to){toast('Set valid range first','err');return;}
-  
   try{
-    const token=await getODToken();
-    const printRange='A1:Z1000';
-    const markerContent=JSON.stringify({from,to,printRange,action:'',ts:Date.now()});
-    const blob=new Blob([markerContent],{type:'application/json'});
-    const res=await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',{
-      method:'PUT',
-      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
-      body:blob
-    });
-    if(res.ok)toast(`✓ Printing Orders ${from}-${to}...`,'ok');
-    else throw new Error('Print failed');
+    const count=await addPrintJob({action:'',from,to});
+    toast(`✓ Orders ${from}-${to} queued (#${count})`,'ok');
   }catch(e){
     if(e.message!=='user_cancelled')toast('Error: '+e.message,'err');
   }
@@ -2264,19 +2292,9 @@ async function directPrintLabels(){
   const from=parseInt(document.getElementById('printRangeFrom').value);
   const to=parseInt(document.getElementById('printRangeTo').value);
   if(!from||!to||from>to){toast('Set valid range first','err');return;}
-  
   try{
-    const token=await getODToken();
-    const printRange='A1:Z1000';
-    const markerContent=JSON.stringify({from,to,printRange,action:'print_labels',ts:Date.now()});
-    const blob=new Blob([markerContent],{type:'application/json'});
-    const res=await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',{
-      method:'PUT',
-      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
-      body:blob
-    });
-    if(res.ok)toast(`✓ Printing Labels ${from}-${to}...`,'ok');
-    else throw new Error('Print failed');
+    const count=await addPrintJob({action:'print_labels',from,to});
+    toast(`✓ Labels ${from}-${to} queued (#${count})`,'ok');
   }catch(e){
     if(e.message!=='user_cancelled')toast('Error: '+e.message,'err');
   }
@@ -4402,6 +4420,18 @@ function isGMGBrand(s) {
 function matchCustomer(raw) {
   const inp = raw.trim();
   if (!inp) return inp;
+
+  // ✅ 0. ابحث في الأوردرات الحالية أولاً
+  const ordCustomers = [...new Set(orders.map(o=>o.customer).filter(Boolean))];
+  const exactInOrds = ordCustomers.find(c=>c.toLowerCase()===inp.toLowerCase());
+  if(exactInOrds) return exactInOrds;
+  // fuzzy في الأوردرات
+  let bestOrd=null, bestOrdScore=0;
+  ordCustomers.forEach(c=>{
+    const s=similarity(inp,c);
+    if(s>bestOrdScore){bestOrdScore=s;bestOrd=c;}
+  });
+  if(bestOrd && bestOrdScore>=50) return bestOrd;
 
   // 1. Learned corrections (highest priority)
   const learned = learnLookup('c', inp);
