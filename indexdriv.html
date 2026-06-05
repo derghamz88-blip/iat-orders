@@ -5127,94 +5127,109 @@ function parseDriverAssignment(){
   const status=document.getElementById('aiDrvStatus');
   const resultEl=document.getElementById('aiDrvResult');
   if(!raw){status.textContent='❌ الصق النص أولاً';return;}
-  
+
   status.textContent='⏳ جاري المعالجة...';
   resultEl.style.display='none';
-  
-  // Parse: lines starting with *name* are drivers, rest are customers
+
+  // ✅ قائمة الزبائن من الأوردرات فقط
+  const ordCustomers=[...new Set(orders.map(o=>o.customer).filter(Boolean))];
+  if(!ordCustomers.length){status.textContent='❌ ما في أوردرات موجودة!';return;}
+
+  // دالة مطابقة تبحث فقط في الأوردرات
+  function matchFromOrders(inp){
+    const q=inp.trim().toLowerCase();
+    // 1. تطابق exact
+    const exact=ordCustomers.find(c=>c.toLowerCase()===q);
+    if(exact)return {name:exact,score:100};
+    // 2. يحتوي
+    const contains=ordCustomers.find(c=>c.toLowerCase().includes(q)||q.includes(c.toLowerCase()));
+    if(contains)return {name:contains,score:80};
+    // 3. similarity
+    let best=null,bestScore=0;
+    ordCustomers.forEach(c=>{
+      const s=similarity(inp,c);
+      if(s>bestScore){bestScore=s;best=c;}
+    });
+    if(best&&bestScore>=35)return {name:best,score:bestScore};
+    return {name:inp,score:0};
+  }
+
+  // قراءة النص - *Driver* ثم أسماء الزبائن
   const lines=raw.split(/\n/).map(l=>l.trim()).filter(l=>l);
   let currentDriver='';
-  const assignments=[]; // [{driver, customer, matched, ordersFound}]
-  
+  const assignments=[];
+
   lines.forEach(line=>{
-    // Check if driver line: *Name* or **Name** (bold in WhatsApp)
-    const drvMatch=line.match(/^\*+([^*]+)\*+\s*$/) || line.match(/^_([^_]+)_\s*$/);
-    if(drvMatch){
-      currentDriver=drvMatch[1].trim();
-      return;
-    }
-    // Skip date lines like *3/6* 
-    if(line.match(/^\*?\d+\/\d+\*?\s*$/) || line.match(/^\d+\/\d+\s*$/)) return;
-    // Skip empty or short lines
-    if(!line || line.length<2) return;
-    // It's a customer line
-    if(currentDriver && line){
-      // Try to match customer
-      const matched=matchCustomer(line);
-      // Find orders for this customer
-      const found=orders.filter(o=>o.customer===matched || o.customer.toLowerCase()===matched.toLowerCase());
-      assignments.push({driver:currentDriver, raw:line, customer:matched, ordersFound:found.length});
+    const drvMatch=line.match(/^\*+([^*]+)\*+\s*$/)||line.match(/^_([^_]+)_\s*$/);
+    if(drvMatch){currentDriver=drvMatch[1].trim();return;}
+    if(line.match(/^\*?\d+\/\d+\*?\s*$/)||line.match(/^\d+\/\d+\s*$/))return;
+    if(!line||line.length<2)return;
+    if(currentDriver&&line){
+      const match=matchFromOrders(line);
+      const found=match.score>0?orders.filter(o=>o.customer===match.name):[];
+      assignments.push({
+        driver:currentDriver,
+        raw:line,
+        customer:match.name,
+        score:match.score,
+        ordersFound:found.length
+      });
     }
   });
-  
+
   if(!assignments.length){status.textContent='❌ ما عرفت أقرأ النص. تأكد من الشكل.';return;}
-  
-  // Apply assignments
+
+  // تطبيق التعيينات
   let applied=0;
   assignments.forEach(a=>{
     if(a.ordersFound>0){
       orders.forEach(o=>{
-        if(o.customer===a.customer||o.customer.toLowerCase()===a.customer.toLowerCase()){
-          o.driver=a.driver;
-          applied++;
-        }
+        if(o.customer===a.customer){o.driver=a.driver;applied++;}
       });
     }
   });
-  
+
   saveOrders();
-  
-  // Show result preview
-  // Group by driver
+
+  // عرض النتيجة
   const byDriver=new Map();
   assignments.forEach(a=>{
     if(!byDriver.has(a.driver))byDriver.set(a.driver,[]);
     byDriver.get(a.driver).push(a);
   });
-  
+
   let html='';
   byDriver.forEach((items,drv)=>{
     const drvColor=drivers.includes(drv)?'var(--teal)':'var(--amber)';
-    const drvNote=drivers.includes(drv)?'':'⚠️ سائق غير موجود في القائمة';
     html+=`<div style="background:var(--s2);border:1.5px solid var(--b1);border-radius:8px;overflow:hidden;margin-bottom:4px">
       <div style="background:rgba(45,212,191,.1);padding:7px 10px;display:flex;align-items:center;justify-content:space-between">
         <span style="font-size:.82rem;font-weight:800;color:${drvColor}">🚗 ${drv}</span>
-        <span style="font-size:.62rem;color:var(--muted)">${items.length} orders${drvNote?'  '+drvNote:''}</span>
+        <span style="font-size:.62rem;color:var(--muted)">${items.length} orders</span>
       </div>
       <div style="padding:4px 8px">
         ${items.map(a=>`<div style="display:flex;align-items:center;gap:6px;padding:4px 2px;border-bottom:1px solid rgba(255,255,255,.04);font-size:.72rem">
-          <span style="color:${a.ordersFound>0?'var(--teal)':'var(--red)'};font-size:.7rem">${a.ordersFound>0?'✓':'✗'}</span>
+          <span style="color:${a.ordersFound>0?'var(--teal)':'var(--red)'};">${a.ordersFound>0?'✓':'✗'}</span>
           <span style="flex:1;color:${a.ordersFound>0?'var(--txt)':'var(--muted)'};">${a.customer}</span>
-          ${a.raw.toLowerCase()!==a.customer.toLowerCase()?`<span style="font-size:.6rem;color:var(--muted);font-style:italic">${a.raw}</span>`:''}
+          ${a.raw.toLowerCase()!==a.customer.toLowerCase()?
+            `<span style="font-size:.6rem;color:var(--muted);font-style:italic">← ${a.raw}</span>`:''}
+          <span style="font-size:.58rem;color:var(--muted)">${a.score}%</span>
         </div>`).join('')}
       </div>
     </div>`;
   });
-  
-  // Add warning for unmatched
-  const unmatched=assignments.filter(a=>a.ordersFound===0);
-  
+
   resultEl.innerHTML=html;
   resultEl.style.display='flex';
-  
+
   const matchedCount=assignments.filter(a=>a.ordersFound>0).length;
-  status.textContent=`✓ طبّق ${matchedCount} من ${assignments.length} | ${unmatched.length} غير موجود في الأوردرات`;
-  status.style.color=unmatched.length>0?'var(--amber)':'var(--teal)';
-  
+  const unmatched=assignments.filter(a=>a.ordersFound===0).length;
+  status.textContent=`✓ ${matchedCount}/${assignments.length} matched | ${unmatched} not found`;
+  status.style.color=unmatched>0?'var(--amber)':'var(--teal)';
+
   if(applied>0){
     renderOrders();
     renderDriversPage();
-    toast(`✓ وزّع ${matchedCount} زبون على السوايقين`,'ok');
+    toast(`✓ وزّع ${matchedCount} زبون`,'ok');
   }
 }
 </script>
