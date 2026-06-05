@@ -5135,23 +5135,12 @@ function parseDriverAssignment(){
   const ordCustomers=[...new Set(orders.map(o=>o.customer).filter(Boolean))];
   if(!ordCustomers.length){status.textContent='❌ ما في أوردرات موجودة!';return;}
 
-  // دالة مطابقة تبحث فقط في الأوردرات
+  // دالة مطابقة تستخدم bestMatch مع قائمة الأوردرات
   function matchFromOrders(inp){
-    const q=inp.trim().toLowerCase();
-    // 1. تطابق exact
-    const exact=ordCustomers.find(c=>c.toLowerCase()===q);
-    if(exact)return {name:exact,score:100};
-    // 2. يحتوي
-    const contains=ordCustomers.find(c=>c.toLowerCase().includes(q)||q.includes(c.toLowerCase()));
-    if(contains)return {name:contains,score:80};
-    // 3. similarity
-    let best=null,bestScore=0;
-    ordCustomers.forEach(c=>{
-      const s=similarity(inp,c);
-      if(s>bestScore){bestScore=s;best=c;}
-    });
-    if(best&&bestScore>=35)return {name:best,score:bestScore};
-    return {name:inp,score:0};
+    const matched = bestMatch(inp, ordCustomers);
+    const score = matched===inp ? 0 : Math.round(similarity(inp, matched));
+    const found = orders.filter(o=>o.customer===matched);
+    return {name:matched, score, found:found.length};
   }
 
   // قراءة النص - *Driver* ثم أسماء الزبائن
@@ -5166,13 +5155,12 @@ function parseDriverAssignment(){
     if(!line||line.length<2)return;
     if(currentDriver&&line){
       const match=matchFromOrders(line);
-      const found=match.score>0?orders.filter(o=>o.customer===match.name):[];
       assignments.push({
         driver:currentDriver,
         raw:line,
         customer:match.name,
         score:match.score,
-        ordersFound:found.length
+        ordersFound:match.found
       });
     }
   });
