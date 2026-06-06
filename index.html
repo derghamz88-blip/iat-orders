@@ -719,7 +719,19 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     </div>
     <!-- Text input (WhatsApp) -->
     <div id="aiTextSection">
-      <textarea id="aiTextInput" placeholder="Paste WhatsApp order text here...&#10;&#10;Example:&#10;UNION Barsha&#10;30kg chicken&#10;4kg leg&#10;4kg thigh&#10;&#10;Aswaaq JVC&#10;Breast 5kg&#10;Wings 2kg" style="width:100%;height:140px;background:var(--s3);border:1.5px solid var(--b2);border-radius:8px;padding:10px;color:var(--txt);font-family:var(--sans);font-size:.82rem;outline:none;resize:none;box-sizing:border-box"></textarea>
+      <!-- زر رفع صورة -->
+      <input type="file" id="aiImgInput" accept="image/*" style="display:none" onchange="readOrdersFromImage(this)"/>
+      <div onclick="document.getElementById('aiImgInput').click()"
+        style="border:2px dashed var(--b2);border-radius:8px;padding:10px;text-align:center;cursor:pointer;color:var(--muted);font-size:.78rem;margin-bottom:8px;transition:all .2s"
+        onmouseover="this.style.borderColor='var(--teal)';this.style.color='var(--teal)'"
+        onmouseout="this.style.borderColor='var(--b2)';this.style.color='var(--muted)'"
+        id="aiImgDropzone">
+        📷 Upload screenshot to read orders
+        <div style="font-size:.62rem;margin-top:2px">JPG · PNG</div>
+      </div>
+      <img id="aiImgPreview" style="display:none;width:100%;border-radius:8px;max-height:160px;object-fit:contain;margin-bottom:4px"/>
+      <button id="aiImgClear" onclick="clearOrderImage()" style="display:none;width:100%;background:transparent;border:1px solid var(--red);border-radius:6px;color:var(--red);padding:5px;font-size:.72rem;cursor:pointer;margin-bottom:8px">✕ Remove image</button>
+      <textarea id="aiTextInput" placeholder="Paste WhatsApp order text here...&#10;&#10;Example:&#10;UNION Barsha&#10;30kg chicken&#10;4kg leg&#10;4kg thigh&#10;&#10;Aswaaq JVC&#10;Breast 5kg&#10;Wings 2kg" style="width:100%;height:120px;background:var(--s3);border:1.5px solid var(--b2);border-radius:8px;padding:10px;color:var(--txt);font-family:var(--sans);font-size:.82rem;outline:none;resize:none;box-sizing:border-box"></textarea>
     </div>
     <!-- BOF image input -->
     <div id="aiBofSection" style="display:none;flex-direction:column;gap:8px">
@@ -743,10 +755,10 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     <!-- Extract button -->
     <button class="btn btn-teal" id="aiExtractBtn" onclick="extractOrdersAI()">📋 Extract Orders</button>
     <!-- Results -->
-    <div id="aiResults" style="display:none">
-      <div style="font-size:.72rem;color:var(--muted);font-family:var(--mono);margin-bottom:6px">EXTRACTED ORDERS — Review & Edit</div>
-      <div id="aiResultItems" style="display:flex;flex-direction:column;gap:5px"></div>
-      <button class="btn btn-teal" style="margin-top:8px;width:100%" onclick="addAIOrdersToEntry()">➕ Add to Orders</button>
+    <div id="aiResults" style="display:none;flex-direction:column;gap:6px">
+      <div style="font-size:.6rem;color:var(--muted);font-family:var(--mono);letter-spacing:.08em">EXTRACTED ORDERS — tap to edit</div>
+      <div id="aiResultItems" style="display:flex;flex-direction:column;gap:4px"></div>
+      <button class="btn btn-teal" style="width:100%" onclick="addAIOrdersToEntry()">➕ Add to Orders</button>
     </div>
     <div id="aiStatus" style="font-size:.75rem;color:var(--muted);text-align:center"></div>
   </div>
@@ -1536,46 +1548,46 @@ function renderOrders(){
   updateBadges();
   if(!orders.length){el.innerHTML='<div class="empty"><div class="ei">📋</div><p>No orders yet.</p></div>';return;}
 
-  // تجميع حسب date ثم customer، مع حفظ idx الأصلي
+  // ✅ تجميع بـ (customer + num) - كل num منفصل حتى لو نفس الزبون
   const dateMap=new Map();
   orders.forEach((o,i)=>{
     const dk=o.date||'—';
     if(!dateMap.has(dk))dateMap.set(dk,new Map());
     const cm=dateMap.get(dk);
-    if(!cm.has(o.customer))cm.set(o.customer,[]);
-    cm.get(o.customer).push({...o,idx:i});
+    const groupKey=`${o.customer}__${o.num||0}`;  // ✅ مفتاح مركب
+    if(!cm.has(groupKey))cm.set(groupKey,[]);
+    cm.get(groupKey).push({...o,idx:i});
   });
 
-  // ✅ ترتيب كل date حسب num تصاعدياً
+  // ✅ ترتيب حسب num تصاعدياً
   const sortedDateMap=new Map();
   [...dateMap.entries()].forEach(([date,cm])=>{
-    const custArr=[...cm.entries()];
-    // رتّب حسب num أول عنصر في كل مجموعة
-    custArr.sort((a,b)=>(a[1][0].num||0)-(b[1][0].num||0));
-    sortedDateMap.set(date,new Map(custArr));
+    const arr=[...cm.entries()].sort((a,b)=>(a[1][0].num||0)-(b[1][0].num||0));
+    sortedDateMap.set(date,new Map(arr));
   });
 
   el.innerHTML=[...sortedDateMap.entries()].map(([date,custMap])=>{
     const custKeys=[...custMap.keys()];
     return `<div style="margin-bottom:4px">
       <div style="font-family:var(--mono);font-size:.65rem;color:var(--teal);padding:6px 4px;letter-spacing:.08em">📅 ${date}</div>
-      ${custKeys.map((c,ci)=>{
-        const items=custMap.get(c);
+      ${custKeys.map((groupKey,ci)=>{
+        const c=custMap.get(groupKey)[0].customer;  // اسم الزبون الحقيقي
+        const items=custMap.get(groupKey);
         const canUp=ci>0; const canDn=ci<custKeys.length-1;
         return `<div class="cc">
           <div class="cc-h">
             <span class="cc-name" style="display:flex;align-items:center;gap:4px">
               <div class="cc-move">
-                <button class="cc-mb" ${canUp?'':'disabled'} onclick="moveGroup('${esc(date)}','${esc(c)}',-1)">▲</button>
-                <button class="cc-mb" ${canDn?'':'disabled'} onclick="moveGroup('${esc(date)}','${esc(c)}',1)">▼</button>
+                <button class="cc-mb" ${canUp?'':'disabled'} onclick="moveGroup('${esc(date)}','${esc(c)}',${items[0].num||0},-1)">▲</button>
+                <button class="cc-mb" ${canDn?'':'disabled'} onclick="moveGroup('${esc(date)}','${esc(c)}',${items[0].num||0},1)">▼</button>
               </div>
-              <input class="cc-num" type="number" min="1" value="${items[0].num||''}" title="Order #" onchange="setGroupNum('${esc(date)}','${esc(c)}',this.value)" onclick="this.select()"/>
+              <input class="cc-num" type="number" min="1" value="${items[0].num||''}" title="Order #" onchange="setGroupNum('${esc(date)}','${esc(c)}',${items[0].num||0},this.value)" onclick="this.select()"/>
               <span style="cursor:pointer;user-select:none;padding:4px 6px;background:var(--b1);border-radius:2px;font-size:.75rem;border:1px solid var(--b2);display:inline-block" onclick="openCustModal('${esc(c)}','${esc(date)}')">
                 👤 ${c}<br/><span style="font-size:.6rem;color:var(--muted)">✏️ Edit</span>
               </span>
             </span>
-            <button class="cc-del" onclick="addProdToOrder('${esc(c)}','${date}')">+ Add</button>
-            <button class="cc-del" onclick="delCust('${esc(c)}','${date}')">Remove ✕</button>
+            <button class="cc-del" onclick="addProdToOrder('${esc(c)}','${date}',${items[0].num||0})">+ Add</button>
+            <button class="cc-del" onclick="delCust('${esc(c)}','${date}',${items[0].num||0})">Remove ✕</button>
           </div>
           ${items.map(o=>`<div style="display:flex;gap:3px;align-items:center;padding:3px 4px;background:var(--s1);border-radius:2px;font-size:.68rem;margin-bottom:1px">
             <button class="pr-del" onclick="delRow(${o.idx})" style="flex-shrink:0;padding:1px 3px;font-size:.65rem">✕</button>
@@ -1915,9 +1927,9 @@ function renderViewOrders(){
     </div>`;
   }).join('');
 }
-function delCust(c,date){
+function delCust(c,date,num){
   confDlg(`Remove ${c}?`,()=>{
-    orders=orders.filter(o=>!(o.customer===c&&(o.date||'—')===date));
+    orders=orders.filter(o=>!(o.customer===c&&(o.date||'—')===date&&(o.num||0)===(num||0)));
     saveOrders();
     renumberOrders(date);
     renderOrders();
@@ -4327,6 +4339,63 @@ function previewBOF(input){
   reader.readAsDataURL(file);
 }
 
+function clearOrderImage(){
+  document.getElementById('aiImgPreview').style.display='none';
+  document.getElementById('aiImgClear').style.display='none';
+  document.getElementById('aiImgDropzone').style.display='block';
+  document.getElementById('aiTextInput').value='';
+  document.getElementById('aiStatus').textContent='';
+  document.getElementById('aiImgInput').value='';
+}
+
+async function readOrdersFromImage(input){
+  const file = input.files[0];
+  if(!file) return;
+
+  // عرض الصورة
+  const preview = document.getElementById('aiImgPreview');
+  const dropzone = document.getElementById('aiImgDropzone');
+  const reader = new FileReader();
+  reader.onload = e => {
+    preview.src = e.target.result;
+    preview.style.display = 'block';
+    dropzone.style.display = 'none';
+    document.getElementById('aiImgClear').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+
+  const statusEl = document.getElementById('aiStatus');
+  const extractBtn = document.getElementById('aiExtractBtn');
+  extractBtn.disabled = true;
+  statusEl.textContent = '⏳ Reading image (OCR)...';
+  statusEl.style.color = 'var(--muted)';
+
+  try{
+    const imgSrc = URL.createObjectURL(file);
+    const result = await Tesseract.recognize(imgSrc, 'eng', {
+      logger: m => {
+        if(m.status === 'recognizing text')
+          statusEl.textContent = '⏳ OCR: ' + Math.round(m.progress * 100) + '%';
+      }
+    });
+
+    const text = result.data.text.trim();
+    if(text){
+      document.getElementById('aiTextInput').value = text;
+      statusEl.textContent = '✓ Image read — press Extract Orders';
+      statusEl.style.color = 'var(--teal)';
+    } else {
+      statusEl.textContent = '⚠ No text found in image';
+    }
+  }catch(e){
+    statusEl.textContent = '✗ Error: ' + e.message;
+    statusEl.style.color = 'var(--red)';
+  }finally{
+    extractBtn.disabled = false;
+    input.value = '';
+  }
+}
+
 async function extractOrdersAI(){
   const status=document.getElementById('aiStatus');
   document.getElementById('aiResults').style.display='none';
@@ -4715,8 +4784,9 @@ function extractWhatsApp(status) {
   if (!text) { toast('Enter order text', 'err'); return; }
   aiExtracted = parseOrdersFromText(text);
   if (!aiExtracted.length) { status.textContent = 'No orders found.'; return; }
+  buildSourceText(text);
   renderAIResults();
-  document.getElementById('aiResults').style.display = 'block';
+  document.getElementById('aiResults').style.display = 'flex';
   const custCount = new Set(aiExtracted.map(i => i.customer)).size;
   status.textContent = `✓ Found ${aiExtracted.length} items from ${custCount} customers`;
 }
@@ -4836,8 +4906,9 @@ async function extractBOF(status) {
   });
 
   if (!aiExtracted.length) { status.textContent = 'No items found.'; return; }
+  buildSourceText(document.getElementById('aiTextInput').value||'');
   renderAIResults();
-  document.getElementById('aiResults').style.display = 'block';
+  document.getElementById('aiResults').style.display = 'flex';
   status.textContent = `✓ Found ${aiExtracted.length} items for ${customer}`;
 }
 
@@ -4861,29 +4932,20 @@ function openAIPicker(idx, type) {
 
 // Apply correction to ALL items with same value + save learning
 function aiApplyCorrection(type, oldVal, newVal, rawVal) {
-  if (!newVal) return;
-  learnSave(type, rawVal || oldVal, newVal);
-  // Apply to all matching items
-  let count = 0;
-  aiExtracted.forEach((item, i) => {
+  if (!newVal || newVal === oldVal) return;
+  learnSave(type === 'customer' ? 'c' : 'p', rawVal || oldVal, newVal);
+  aiExtracted.forEach(item => {
     if (type === 'customer' && item.customer === oldVal) {
+      if (!item._rawC) item._rawC = oldVal;
       item.customer = newVal;
-      if (item._rawC) learnSave('c', item._rawC, newVal);
-      count++;
-      // Update DOM directly — fast and no flicker
-      const el = document.querySelector(`#aiResultItems > div:nth-child(${i+1}) [data-ai-customer]`);
-      if (el) el.textContent = '👤 ' + newVal;
     }
     if (type === 'product' && item.product === oldVal) {
+      if (!item._rawP) item._rawP = oldVal;
       item.product = newVal;
-      if (item._rawP) learnSave('p', item._rawP, newVal);
-      count++;
-      const el = document.querySelector(`#aiResultItems > div:nth-child(${i+1}) [data-ai-product]`);
-      if (el) el.textContent = '🍗 ' + newVal;
     }
   });
-  if (count === 0 && newVal !== oldVal) renderAIResults();
-  toast('✓ ' + (count > 1 ? count + ' rows updated' : 'Updated'), 'ok');
+  renderAIResults();
+  toast('✓ Updated & saved to memory', 'ok');
 }
 
 // Open picker for AI results edit
@@ -5004,55 +5066,114 @@ document.addEventListener('DOMContentLoaded', () => {
 function renderGPickerList() { gPickerFilter(); }
 function gPickerSelect(val) { gPickerDone(val); }
 
+// ── Source text sync scroll ──
+function buildSourceText(rawText){
+  const el = document.getElementById('aiSourceText');
+  if(el) el.textContent = rawText;
+}
+
+function syncSourceScroll(ordersEl){
+  const src = document.getElementById('aiSourceText');
+  const maxOrders = ordersEl.scrollHeight - ordersEl.clientHeight;
+  const maxSrc    = src.scrollHeight - src.clientHeight;
+  if(maxOrders <= 0 || maxSrc <= 0) return;
+  const ratio = ordersEl.scrollTop / maxOrders;
+  src.scrollTop = ratio * maxSrc;
+}
+
+function highlightSource(rawCustomer, rawProduct){} // kept for compatibility
+
 function renderAIResults() {
-  document.getElementById('aiResultItems').innerHTML = aiExtracted.map((item, i) => `
-    <div style="background:var(--s3);border:1px solid var(--b2);border-radius:10px;padding:9px 11px;display:flex;flex-direction:column;gap:6px">
-      <div style="display:flex;gap:8px;align-items:flex-start">
-        <!-- Customer + Product stacked -->
-        <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px">
-          <!-- Customer — tap to edit -->
-          <div data-ai-customer onclick="aiEditPicker(${i},'customer')"
-            style="background:rgba(77,124,254,.12);border:1.5px solid var(--blue);border-radius:7px;padding:7px 10px;color:var(--blue2);font-size:.82rem;font-weight:700;line-height:1.4;cursor:pointer;word-break:break-word">
-            👤 ${esc2(item.customer)}
-          </div>
-          <!-- Product — tap to edit -->
-          <div data-ai-product onclick="aiEditPicker(${i},'product')"
-            style="background:rgba(45,212,191,.08);border:1.5px solid var(--teal);border-radius:7px;padding:7px 10px;color:var(--teal);font-size:.82rem;font-weight:700;line-height:1.4;cursor:pointer;word-break:break-word">
-            🍗 ${esc2(item.product)}
-          </div>
+  const grouped = new Map();
+  aiExtracted.forEach((item, i) => {
+    if (!grouped.has(item.customer)) grouped.set(item.customer, []);
+    grouped.get(item.customer).push({...item, _idx: i});
+  });
+
+  document.getElementById('aiResultItems').innerHTML = [...grouped.entries()].map(([cust, items]) => `
+    <div style="background:var(--s3);border:1.5px solid var(--blue);border-radius:10px;overflow:hidden;margin-bottom:4px">
+      <div style="display:flex;align-items:center;gap:8px;padding:9px 11px;background:rgba(77,124,254,.12);border-bottom:1px solid var(--b1)">
+        <div onclick="aiEditCustomer('${esc2(cust)}')"
+          style="flex:1;color:var(--blue2);font-size:.85rem;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:6px;padding:4px 0">
+          👤 ${esc2(cust)} <span style="font-size:.65rem;color:var(--muted)">✏️</span>
         </div>
-        <!-- Qty + delete -->
-        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;flex-shrink:0">
-          <input type="number" value="${item.qty}" min="0" step="0.5"
-            style="width:52px;background:var(--s2);border:1.5px solid var(--b2);border-radius:7px;padding:6px 4px;color:var(--amber);font-size:.95rem;font-weight:800;outline:none;text-align:center"
-            onchange="aiExtracted[${i}].qty=parseFloat(this.value)||0"/>
-          <span style="font-size:.6rem;color:var(--muted)">kg</span>
-          <button onclick="aiExtracted.splice(${i},1);renderAIResults()"
-            style="background:transparent;border:none;color:var(--faint);font-size:.85rem;cursor:pointer;padding:2px">✕</button>
-        </div>
+        <button onclick="aiDeleteCustomer('${esc2(cust)}')"
+          style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:.75rem;padding:4px 8px">✕</button>
+      </div>
+      <div style="padding:6px 11px;display:flex;flex-direction:column;gap:4px">
+        ${items.map(item => `
+          <div style="display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04)">
+            <div onclick="aiEditPicker(${item._idx},'product')"
+              style="flex:1;color:var(--teal);font-size:.79rem;font-weight:600;cursor:pointer;padding:2px 0">
+              🍗 ${esc2(item.product)}
+            </div>
+            <input type="number" value="${item.qty}" min="0" step="0.5"
+              style="width:48px;background:var(--s2);border:1.5px solid var(--b2);border-radius:6px;padding:4px;color:var(--amber);font-size:.85rem;font-weight:800;outline:none;text-align:center"
+              onchange="aiExtracted[${item._idx}].qty=parseFloat(this.value)||0"/>
+            <span style="font-size:.6rem;color:var(--muted)">kg</span>
+            <button onclick="aiExtracted.splice(${item._idx},1);renderAIResults()"
+              style="background:transparent;border:none;color:var(--faint);font-size:.85rem;cursor:pointer;padding:2px 6px">✕</button>
+          </div>`).join('')}
       </div>
     </div>`).join('');
+}
+
+// تعديل اسم زبون لجميع items بنفس الاسم
+function aiEditCustomer(oldName) {
+  _showPickerWithAdd(
+    customers,
+    oldName,
+    '👤 Change Customer',
+    newName => {
+      if (!newName || newName === oldName) return;
+      aiExtracted.forEach(item => {
+        if (item.customer === oldName) {
+          item._rawC = item._rawC || oldName;
+          item.customer = newName;
+        }
+      });
+      learnSave('c', oldName, newName);
+      renderAIResults();
+      toast('✓ Updated & saved to memory', 'ok');
+    },
+    'customer'
+  );
+}
+
+// حذف جميع items لزبون معين
+function aiDeleteCustomer(cust) {
+  aiExtracted = aiExtracted.filter(item => item.customer !== cust);
+  renderAIResults();
 }
 
 function addAIOrdersToEntry() {
   if (!aiExtracted.length) { toast('No items', 'err'); return; }
   const date = todayStr();
+  // ✅ كل زبون يأخذ num جديد حتى لو موجود مسبقاً
   const maxNum = orders.filter(o => o.date === date).reduce((m, o) => Math.max(m, o.num || 0), 0);
   const custNums = new Map();
   let num = maxNum;
   aiExtracted.forEach(item => {
     if (!custNums.has(item.customer)) { num++; custNums.set(item.customer, num); }
-    orders.push({ customer: item.customer, product: item.product, qty: item.qty || 1, size: item.size || '', note: item.note || '', date, num: custNums.get(item.customer), driver: '' });
-    // Save learning: if raw differs from matched, remember it
+    orders.push({
+      customer: item.customer,
+      product: item.product,
+      qty: item.qty || 1,
+      size: item.size || '',
+      note: item.note || '',
+      date,
+      num: custNums.get(item.customer),
+      driver: ''
+    });
     if (item._rawC && item._rawC !== item.customer) learnSave('c', item._rawC, item.customer);
     if (item._rawP && item._rawP !== item.product) learnSave('p', item._rawP, item.product);
   });
   saveOrders(); renderOrders(); updateBadges(); closeAIImport();
-  toast(`✓ Added ${aiExtracted.length} items to Orders`, 'ok');
+  toast(`✓ Added ${aiExtracted.length} items`, 'ok');
   document.querySelectorAll('.ntab').forEach(t => t.classList.remove('on'));
   document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
   document.getElementById('pg-orders').classList.add('on');
-  document.querySelector('[onclick*="orders"]').classList.add('on');
+  document.querySelector('[onclick*="\'orders\'"]')?.classList.add('on');
 }
 
 
