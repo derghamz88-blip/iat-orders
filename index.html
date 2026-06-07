@@ -1102,8 +1102,8 @@ function showPage(n,t){
   document.querySelectorAll('.ntab').forEach(x=>x.classList.remove('on'));
   document.getElementById('pg-'+n).classList.add('on');
   if(t)t.classList.add('on');
-  if(n==='orders')renderOrders();
-  if(n==='view-orders')renderViewOrders();
+  if(n==='orders'){renderOrders();setTimeout(()=>{const el=document.querySelector('#pg-orders [style*="overflow-y"]');if(el)el.scrollTop=el.scrollHeight;},100);}
+  if(n==='view-orders'){renderViewOrders();setTimeout(()=>{const el=document.querySelector('#pg-view-orders [style*="overflow-y"]');if(el)el.scrollTop=el.scrollHeight;},100);}
   if(n==='drivers')renderDriversPage();
   if(n==='qty')renderQtyPage();
   if(n==='invoice'){renderInvOrdersList();renderPricingPage();renderInvoiceList();}
@@ -1545,6 +1545,9 @@ function deleteTenderOrder(idx){
 
 function renderOrders(){
   const el=document.getElementById('olist');
+  const par=el.parentElement;
+  const scrollTop=par?par.scrollTop:0;
+  el.style.visibility='hidden';  // ← يخفي بدون وميض
   updateBadges();
   if(!orders.length){el.innerHTML='<div class="empty"><div class="ei">📋</div><p>No orders yet.</p></div>';return;}
 
@@ -1589,7 +1592,7 @@ function renderOrders(){
             <button class="cc-del" onclick="addProdToOrder('${esc(c)}','${date}',${items[0].num||0})">+ Add</button>
             <button class="cc-del" onclick="delCust('${esc(c)}','${date}',${items[0].num||0})">Remove ✕</button>
           </div>
-          ${items.map(o=>`<div style="display:flex;gap:3px;align-items:center;padding:3px 4px;background:var(--s1);border-radius:2px;font-size:.68rem;margin-bottom:1px">
+          ${items.map(o=>`<div data-oidx="${o.idx}" style="display:flex;gap:3px;align-items:center;padding:3px 4px;background:var(--s1);border-radius:2px;font-size:.68rem;margin-bottom:1px">
             <button class="pr-del" onclick="delRow(${o.idx})" style="flex-shrink:0;padding:1px 3px;font-size:.65rem">✕</button>
             <div style="display:flex;flex-direction:column;gap:1px;flex-shrink:0;margin-right:1px">
               <button onclick="moveProd(${o.idx},-1)" style="background:var(--s3);border:1px solid var(--b2);border-radius:2px;padding:0 3px;cursor:pointer;color:var(--muted);font-size:.55rem;line-height:1.4">▲</button>
@@ -1620,23 +1623,45 @@ function renderOrders(){
       }).join('')}
     </div>`;
   }).join('');
+  // ✅ إرجاع visibility بدون وميض
+  requestAnimationFrame(()=>{
+    el.style.visibility='visible';
+    if(par)par.scrollTop=scrollTop;
+  });
 }
 function moveProd(idx, dir){
-  // يحرك منتج داخل نفس مجموعة الزبون
-  const o=orders[idx];
-  if(!o)return;
-  const {customer,date}=o;
-  // جمع جميع منتجات نفس الزبون بنفس التاريخ
-  const grpIdxs=[];
-  orders.forEach((x,i)=>{if(x.customer===customer&&(x.date||'—')===(date||'—'))grpIdxs.push(i);});
-  const pos=grpIdxs.indexOf(idx);
-  const newPos=pos+dir;
-  if(newPos<0||newPos>=grpIdxs.length)return;
-  // تبديل
-  const swapIdx=grpIdxs[newPos];
-  [orders[idx],orders[swapIdx]]=[orders[swapIdx],orders[idx]];
+  const o = orders[idx];
+  if(!o) return;
+  const {customer, date} = o;
+  const grpIdxs = [];
+  orders.forEach((x,i) => {
+    if(x.customer === customer && (x.date||'—') === (date||'—')) grpIdxs.push(i);
+  });
+  const pos = grpIdxs.indexOf(idx);
+  const newPos = pos + dir;
+  if(newPos < 0 || newPos >= grpIdxs.length) return;
+  const swapIdx = grpIdxs[newPos];
+  [orders[idx], orders[swapIdx]] = [orders[swapIdx], orders[idx]];
   saveOrders();
-  renderOrders();
+  // ✅ تحريك DOM مباشرة بدون re-render
+  const rows = document.querySelectorAll(`[data-oidx]`);
+  const elA = document.querySelector(`[data-oidx="${idx}"]`);
+  const elB = document.querySelector(`[data-oidx="${swapIdx}"]`);
+  if(elA && elB){
+    const parent = elA.parentNode;
+    const nextA = elA.nextSibling;
+    const nextB = elB.nextSibling;
+    if(nextA === elB){ parent.insertBefore(elB, elA); }
+    else if(nextB === elA){ parent.insertBefore(elA, elB); }
+    else {
+      parent.insertBefore(elB, nextA);
+      parent.insertBefore(elA, nextB);
+    }
+    elA.setAttribute('data-oidx', swapIdx);
+    elB.setAttribute('data-oidx', idx);
+  } else {
+    renderOrders(); // fallback
+  }
 }
 
 function setGroupNum(date,cust,v){
