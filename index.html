@@ -152,7 +152,7 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
 .import-btn input{display:none;}
 .olist{padding:6px;display:flex;flex-direction:column;gap:4px;}
 .badge{background:var(--blue);color:#fff;border-radius:20px;padding:2px 9px;font-size:.66rem;font-family:var(--mono);}
-.cc{background:var(--s1);border:1px solid var(--b1);border-radius:var(--r2);overflow:hidden;animation:fi .2s ease;}
+.cc{background:var(--s1);border:1px solid var(--b1);border-radius:var(--r2);overflow:hidden;}
 @keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 .cc-h{background:linear-gradient(90deg,rgba(77,124,254,.15),transparent);border-bottom:1px solid var(--b1);padding:9px 13px;display:flex;align-items:center;justify-content:space-between;}
 .cc-name{font-size:.87rem;font-weight:800;color:var(--blue2);}
@@ -1547,7 +1547,6 @@ function renderOrders(){
   const el=document.getElementById('olist');
   const par=el.parentElement;
   const scrollTop=par?par.scrollTop:0;
-  el.style.visibility='hidden';  // ← يخفي بدون وميض
   updateBadges();
   if(!orders.length){el.innerHTML='<div class="empty"><div class="ei">📋</div><p>No orders yet.</p></div>';return;}
 
@@ -1623,11 +1622,7 @@ function renderOrders(){
       }).join('')}
     </div>`;
   }).join('');
-  // ✅ إرجاع visibility بدون وميض
-  requestAnimationFrame(()=>{
-    el.style.visibility='visible';
-    if(par)par.scrollTop=scrollTop;
-  });
+  if(par) par.scrollTop = scrollTop;
 }
 function moveProd(idx, dir){
   const o = orders[idx];
@@ -1643,25 +1638,7 @@ function moveProd(idx, dir){
   const swapIdx = grpIdxs[newPos];
   [orders[idx], orders[swapIdx]] = [orders[swapIdx], orders[idx]];
   saveOrders();
-  // ✅ تحريك DOM مباشرة بدون re-render
-  const rows = document.querySelectorAll(`[data-oidx]`);
-  const elA = document.querySelector(`[data-oidx="${idx}"]`);
-  const elB = document.querySelector(`[data-oidx="${swapIdx}"]`);
-  if(elA && elB){
-    const parent = elA.parentNode;
-    const nextA = elA.nextSibling;
-    const nextB = elB.nextSibling;
-    if(nextA === elB){ parent.insertBefore(elB, elA); }
-    else if(nextB === elA){ parent.insertBefore(elA, elB); }
-    else {
-      parent.insertBefore(elB, nextA);
-      parent.insertBefore(elA, nextB);
-    }
-    elA.setAttribute('data-oidx', swapIdx);
-    elB.setAttribute('data-oidx', idx);
-  } else {
-    renderOrders(); // fallback
-  }
+  renderOrders();
 }
 
 function setGroupNum(date,cust,v){
@@ -1689,23 +1666,25 @@ function renumberOrders(date){
   });
 }
 
-function moveGroup(date,cust,dir){
+function moveGroup(date,cust,num,dir){
+  // جمع المجموعات مرتبة حسب num
   const seen=[];
-  orders.forEach(o=>{if((o.date||'—')===date&&!seen.includes(o.customer))seen.push(o.customer);});
-  seen.sort((a,b)=>{
-    const na=orders.find(o=>(o.date||'—')===date&&o.customer===a)?.num||0;
-    const nb=orders.find(o=>(o.date||'—')===date&&o.customer===b)?.num||0;
-    return na-nb;
-  });
-  const ci=seen.indexOf(cust);
-  const swapCust=seen[ci+dir];
-  if(!swapCust)return;
-  // تبديل الأرقام
-  const numA=orders.find(o=>(o.date||'—')===date&&o.customer===cust)?.num||0;
-  const numB=orders.find(o=>(o.date||'—')===date&&o.customer===swapCust)?.num||0;
   orders.forEach(o=>{
-    if((o.date||'—')===date&&o.customer===cust)o.num=numB;
-    if((o.date||'—')===date&&o.customer===swapCust)o.num=numA;
+    if((o.date||'—')===date){
+      const key=o.customer+'__'+(o.num||0);
+      if(!seen.find(s=>s.key===key))
+        seen.push({key,cust:o.customer,num:o.num||0});
+    }
+  });
+  seen.sort((a,b)=>a.num-b.num);
+  const ci=seen.findIndex(s=>s.cust===cust&&s.num===num);
+  if(ci<0)return;
+  const swap=seen[ci+dir];
+  if(!swap)return;
+  // تبديل الأرقام
+  orders.forEach(o=>{
+    if((o.date||'—')===date&&o.customer===cust&&(o.num||0)===num)o.num=swap.num;
+    else if((o.date||'—')===date&&o.customer===swap.cust&&(o.num||0)===swap.num)o.num=num;
   });
   saveOrders();
   renderOrders();
