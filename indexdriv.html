@@ -1585,7 +1585,8 @@ function renderOrders(){
               </div>
               <input class="cc-num" type="number" min="1" value="${items[0].num||''}" title="Order #" onchange="setGroupNum('${esc(date)}','${esc(c)}',${items[0].num||0},this.value)" onclick="this.select()"/>
               <span style="cursor:pointer;user-select:none;padding:4px 6px;background:var(--b1);border-radius:2px;font-size:.75rem;border:1px solid var(--b2);display:inline-block" onclick="openCustModal('${esc(c)}','${esc(date)}')">
-                👤 ${c}<br/><span style="font-size:.6rem;color:var(--muted)">✏️ Edit</span>
+                ${(()=>{const prev=orders.filter(o=>(o.date||'—')===date&&o.customer===c&&(o.num||0)<(items[0].num||0));const orderIdx=prev.length>0?new Set(prev.map(o=>o.num)).size+1:0;return orderIdx>=2?`👤 ${c} <span style="background:var(--amber);color:#000;border-radius:3px;padding:0 4px;font-size:.65rem;font-weight:800">${orderIdx}</span>`:`👤 ${c}`;})()}
+                <br/><span style="font-size:.6rem;color:var(--muted)">✏️ Edit</span>
               </span>
             </span>
             <button class="cc-del" onclick="addProdToOrder('${esc(c)}','${date}',${items[0].num||0})">+ Add</button>
@@ -1667,24 +1668,25 @@ function renumberOrders(date){
 }
 
 function moveGroup(date,cust,num,dir){
-  // جمع المجموعات مرتبة حسب num
-  const seen=[];
-  orders.forEach(o=>{
-    if((o.date||'—')===date){
-      const key=o.customer+'__'+(o.num||0);
-      if(!seen.find(s=>s.key===key))
-        seen.push({key,cust:o.customer,num:o.num||0});
-    }
-  });
-  seen.sort((a,b)=>a.num-b.num);
-  const ci=seen.findIndex(s=>s.cust===cust&&s.num===num);
+  // جمع الأوردرات المرتبة حسب num
+  const groups=[];
+  const seenKeys=new Set();
+  [...orders]
+    .filter(o=>(o.date||'—')===date)
+    .sort((a,b)=>(a.num||0)-(b.num||0))
+    .forEach(o=>{
+      const k=o.customer+'__'+(o.num||0);
+      if(!seenKeys.has(k)){seenKeys.add(k);groups.push({cust:o.customer,num:o.num||0});}
+    });
+  const ci=groups.findIndex(g=>g.cust===cust&&g.num===num);
   if(ci<0)return;
-  const swap=seen[ci+dir];
+  const swap=groups[ci+dir];
   if(!swap)return;
   // تبديل الأرقام
   orders.forEach(o=>{
-    if((o.date||'—')===date&&o.customer===cust&&(o.num||0)===num)o.num=swap.num;
-    else if((o.date||'—')===date&&o.customer===swap.cust&&(o.num||0)===swap.num)o.num=num;
+    if((o.date||'—')!==date)return;
+    if(o.customer===cust&&(o.num||0)===num)o.num=swap.num;
+    else if(o.customer===swap.cust&&(o.num||0)===swap.num)o.num=num;
   });
   saveOrders();
   renderOrders();
@@ -1836,28 +1838,23 @@ function delRow(i){
   renumberOrders(date);
   renderOrders();
 }
-function addProdToOrder(cust,date){
-  // عرض قائمة المنتجات مع بحث
-  const custData=orders.filter(o=>o.customer===cust&&o.date===date);
+function addProdToOrder(cust,date,num){
   const html=`
     <div class="lbl" style="margin-bottom:10px">Add Product for ${cust}</div>
     <input type="text" id="addProdSearch" placeholder="🔍 Search..." style="width:100%;margin-bottom:8px;padding:6px;border:1px solid var(--b2);border-radius:4px" oninput="filterAddProdList()"/>
     <div id="addProdList" style="display:flex;flex-direction:column;gap:4px;max-height:300px;overflow-y:auto">
-      ${products.map(p=>`<button class="btn btn-ghost" style="text-align:left;padding:6px" data-prod="${esc(p)}" onclick="selectProdForAdd('${esc(cust)}','${date}','${esc(p)}')">${p}</button>`).join('')}
+      ${products.map(p=>`<button class="btn btn-ghost" style="text-align:left;padding:6px" data-prod="${esc(p)}" onclick="selectProdForAdd('${esc(cust)}','${date}',${num||0},'${esc(p)}')">${p}</button>`).join('')}
     </div>
     <button class="btn btn-ghost" style="margin-top:10px;width:100%" onclick="hideAddProdDlg()">Cancel</button>
   `;
   const ov=document.getElementById('addProdOv');
   if(!ov){
     const div=document.createElement('div');
-    div.id='addProdOv';
-    div.className='ov';
+    div.id='addProdOv';div.className='ov';
     div.onclick=function(e){if(e.target===this)hideAddProdDlg()};
     div.innerHTML=`<div class="cb2" onclick="event.stopPropagation()">${html}</div>`;
     document.body.appendChild(div);
-  }else{
-    ov.querySelector('.cb2').innerHTML=html;
-  }
+  }else{ov.querySelector('.cb2').innerHTML=html;}
   document.getElementById('addProdOv').classList.add('on');
   setTimeout(()=>document.getElementById('addProdSearch').focus(),100);
 }
@@ -1867,29 +1864,27 @@ function filterAddProdList(){
     btn.style.display=btn.getAttribute('data-prod').toLowerCase().includes(search)?'block':'none';
   });
 }
-function selectProdForAdd(cust,date,prod){
+function selectProdForAdd(cust,date,num,prod){
   if(isCHK(prod)){
-    // للدجاج - اختر القياس أولاً
     const sizeHtml=`
       <div style="margin-bottom:10px">Select Size for ${prod}</div>
       <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">
-        ${SIZES.map(s=>`<button class="btn btn-ghost" style="padding:4px 8px;font-size:.7rem" onclick="finishAddProd('${esc(cust)}','${date}','${esc(prod)}','${s}')">${s}g</button>`).join('')}
+        ${SIZES.map(s=>`<button class="btn btn-ghost" style="padding:4px 8px;font-size:.7rem" onclick="finishAddProd('${esc(cust)}','${date}',${num||0},'${esc(prod)}','${s}')">${s}g</button>`).join('')}
       </div>
       <div style="margin-bottom:10px">
         <span style="font-size:.7rem">أو</span>
         <input type="number" id="customSize" placeholder="Custom size (g)" style="width:100%;padding:4px;margin-top:4px;border:1px solid var(--b2);border-radius:2px"/>
       </div>
-      <button class="btn btn-teal" style="width:100%" onclick="finishAddProd('${esc(cust)}','${date}','${esc(prod)}',document.getElementById('customSize').value)">Continue</button>
+      <button class="btn btn-teal" style="width:100%" onclick="finishAddProd('${esc(cust)}','${date}',${num||0},'${esc(prod)}',document.getElementById('customSize').value)">Continue</button>
     `;
     document.querySelector('#addProdOv .cb2').innerHTML=sizeHtml;
   }else{
-    finishAddProd(cust,date,prod,'');
+    finishAddProd(cust,date,num||0,prod,'');
   }
 }
-function finishAddProd(cust,date,prod,size){
+function finishAddProd(cust,date,num,prod,size){
   const qty=parseFloat(prompt('Quantity (kg):')||'1');
-  const maxNum=orders.filter(o=>o.date===date).reduce((m,o)=>Math.max(m,o.num||0),0);
-  orders.push({num:maxNum,date,customer:cust,product:prod,qty,size:size||'',note:''});
+  orders.push({num:num||0,date,customer:cust,product:prod,qty,size:size||'',note:''});
   saveOrders();renderOrders();renderViewOrders();hideAddProdDlg();toast('✓ Product added','ok');
 }
 function hideAddProdDlg(){
@@ -5152,30 +5147,48 @@ function aiDeleteCustomer(cust) {
 
 function addAIOrdersToEntry() {
   if (!aiExtracted.length) { toast('No items', 'err'); return; }
-  const date = todayStr();
-  // ✅ كل زبون يأخذ num جديد حتى لو موجود مسبقاً
-  const maxNum = orders.filter(o => o.date === date).reduce((m, o) => Math.max(m, o.num || 0), 0);
-  const custNums = new Map();
-  let num = maxNum;
+
+  const date = document.getElementById('orderDate')?.value || todayStr();
+  const maxNum = orders.filter(o=>o.date===date).reduce((m,o)=>Math.max(m,o.num||0),0);
+  const custNums  = new Map();
+  const custFirst = new Set(); // أول منتج لكل زبون في هذا الـ import
+  let nextNum = maxNum;
+
   aiExtracted.forEach(item => {
-    if (!custNums.has(item.customer)) { num++; custNums.set(item.customer, num); }
+    if (!custNums.has(item.customer)) {
+      nextNum++;
+      custNums.set(item.customer, nextNum);
+    }
+
+    // ✅ إذا الزبون موجود قبل → note "order 2" في أول منتج
+    const isFirst = !custFirst.has(item.customer);
+    if(isFirst) custFirst.add(item.customer);
+
+    const prevOrders = orders.filter(o=>o.date===date&&o.customer===item.customer);
+    const orderCount = prevOrders.length > 0
+      ? new Set(prevOrders.map(o=>o.num)).size + 1
+      : 0;
+
+    const note = (isFirst && orderCount >= 2) ? `order ${orderCount}` : (item.note||'');
+
     orders.push({
       customer: item.customer,
-      product: item.product,
-      qty: item.qty || 1,
-      size: item.size || '',
-      note: item.note || '',
+      product:  item.product,
+      qty:      item.qty || 1,
+      size:     item.size || '',
+      note,
       date,
-      num: custNums.get(item.customer),
-      driver: ''
+      num:      custNums.get(item.customer),
+      driver:   ''
     });
     if (item._rawC && item._rawC !== item.customer) learnSave('c', item._rawC, item.customer);
-    if (item._rawP && item._rawP !== item.product) learnSave('p', item._rawP, item.product);
+    if (item._rawP && item._rawP !== item.product)  learnSave('p', item._rawP, item.product);
   });
+
   saveOrders(); renderOrders(); updateBadges(); closeAIImport();
   toast(`✓ Added ${aiExtracted.length} items`, 'ok');
-  document.querySelectorAll('.ntab').forEach(t => t.classList.remove('on'));
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
+  document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.getElementById('pg-orders').classList.add('on');
   document.querySelector('[onclick*="\'orders\'"]')?.classList.add('on');
 }
