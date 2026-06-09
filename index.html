@@ -4947,16 +4947,34 @@ function aiApplyCorrection(type, oldVal, newVal, rawVal) {
   toast('✓ Updated & saved to memory', 'ok');
 }
 
-// Open picker for AI results edit
 function aiEditPicker(idx, type) {
   const item = aiExtracted[idx];
+  if(!item) return;
   const current = type === 'customer' ? item.customer : item.product;
   const list = type === 'customer' ? customers : products;
   const title = type === 'customer' ? '👤 Select Customer' : '🍗 Select Product';
-  const rawVal = type === 'customer' ? item._rawC : item._rawP;
 
   _showPickerWithAdd(list, current, title,
-    val => aiApplyCorrection(type, current, val, rawVal),
+    newVal => {
+      if(!newVal || newVal === current) return;
+      if(type === 'product'){
+        // ✅ تغيير هذا المنتج فقط بـ index
+        if(!aiExtracted[idx]._rawP) aiExtracted[idx]._rawP = current;
+        aiExtracted[idx].product = newVal;
+        learnSave('p', aiExtracted[idx]._rawP || current, newVal);
+      } else {
+        // الزبون → يغير جميع منتجاته
+        aiExtracted.forEach(item => {
+          if(item.customer === current){
+            if(!item._rawC) item._rawC = current;
+            item.customer = newVal;
+          }
+        });
+        learnSave('c', item._rawC || current, newVal);
+      }
+      renderAIResults();
+      toast('✓ Updated', 'ok');
+    },
     type
   );
 }
