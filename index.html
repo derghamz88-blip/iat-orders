@@ -328,9 +328,10 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
   <div class="orders-head">
     <div>
       <div style="font-size:.68rem;font-family:var(--mono);color:var(--muted);letter-spacing:.1em;text-transform:uppercase">All Orders</div>
-      <div style="font-size:.7rem;color:var(--muted);margin-top:2px;font-family:var(--mono)" id="importInfo">—</div>
+      <div style="font-size:.7rem;color:var(--teal);margin-top:2px;font-family:var(--mono)" id="importInfo">—</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-family:var(--mono);font-size:.75rem;color:var(--amber);font-weight:700" id="ordersRange">—</span>
       <label class="import-btn">
         📂 Load Excel
         <input type="file" accept=".xlsx,.xls,.csv" onchange="importXL(event)"/>
@@ -376,6 +377,14 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     <button class="btn btn-ghost btn-sm" style="flex-shrink:0" onclick="exportXL()">⬇ Excel</button>
     <button class="btn btn-red btn-sm" id="clearLoadingBtn" style="flex-shrink:0" onclick="clearLoadingSheet()">🧹 Clear Sheet</button>
     <button class="btn btn-amber btn-sm" id="backupFileBtn" style="flex-shrink:0" onclick="openBackupDialog()">📂 Backup</button>
+  </div>
+  <!-- نطاق طباعة إضافي محفوظ -->
+  <div style="background:var(--s1);border-top:1px solid var(--b1);padding:6px 10px;display:flex;gap:8px;align-items:center;flex-shrink:0;overflow-x:auto;scrollbar-width:none">
+    <label style="font-size:.65rem;color:var(--muted);white-space:nowrap">🔁 Reprint:</label>
+    <input type="number" id="reprintFrom" placeholder="From" min="1" step="1" onclick="this.select()" onchange="LS.set('iat_rpfrom',this.value)" style="width:55px;padding:5px;border:1.5px solid var(--b1);border-radius:5px;font-size:.75rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--teal);font-weight:700;outline:none" value="1"/>
+    <span style="color:var(--muted);font-size:.75rem">→</span>
+    <input type="number" id="reprintTo" placeholder="To" min="1" step="1" onclick="this.select()" onchange="LS.set('iat_rpto',this.value)" style="width:55px;padding:5px;border:1.5px solid var(--b1);border-radius:5px;font-size:.75rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--teal);font-weight:700;outline:none" value="1"/>
+    <button class="btn btn-ghost btn-sm" style="flex-shrink:0;color:var(--teal);font-size:.7rem" onclick="sendReprintRange()">↩ Send</button>
   </div>
 </div>
 
@@ -1039,12 +1048,23 @@ function todayStr(){const d=new Date();return d.toISOString().slice(0,10);}
 function sortedProds(list){return[...list].sort((a,b)=>(freq[b]||0)-(freq[a]||0));}
 
 (()=>{
-  document.getElementById('orderDate').value=todayStr();
+  // ✅ تحميل التاريخ المحفوظ
+  const savedDate=LS.get('iat_date',null);
+  document.getElementById('orderDate').value=savedDate||todayStr();
+  // حفظ عند التغيير
+  document.getElementById('orderDate').addEventListener('change',function(){
+    LS.set('iat_date',this.value);
+  });
   // ✅ تحميل Print Range المحفوظ
   const savedFrom=LS.get('iat_pfrom',null);
   const savedTo=LS.get('iat_pto',null);
   if(savedFrom)document.getElementById('printRangeFrom').value=savedFrom;
   if(savedTo)document.getElementById('printRangeTo').value=savedTo;
+  // ✅ تحميل Reprint Range
+  const rFrom=LS.get('iat_rpfrom',null);
+  const rTo=LS.get('iat_rpto',null);
+  if(rFrom){const el=document.getElementById('reprintFrom');if(el)el.value=rFrom;}
+  if(rTo){const el=document.getElementById('reprintTo');if(el)el.value=rTo;}
   renderCustDL(customers);
   renderPDropList('');
   renderSettC();renderSettP();renderSettD();renderSettTP();
@@ -1896,35 +1916,38 @@ function renderViewOrders(){
   if(!orders.length){el.innerHTML='<div class="empty"><div class="ei">📋</div><p>No orders yet.</p></div>';return;}
   const dateMap=new Map();
   orders.forEach(o=>{
-    const d=o.date||'—';
-    if(!dateMap.has(d))dateMap.set(d,new Map());
-    const cm=dateMap.get(d);
-    if(!cm.has(o.customer))cm.set(o.customer,[]);
-    cm.get(o.customer).push(o);
+    const dk=o.date||'—';
+    if(!dateMap.has(dk))dateMap.set(dk,new Map());
+    const cm=dateMap.get(dk);
+    const gk=o.customer+'__'+(o.num||0);
+    if(!cm.has(gk))cm.set(gk,[]);
+    cm.get(gk).push(o);
   });
-  // ✅ ترتيب حسب num مثل renderOrders
-  const sortedDateMap=new Map();
-  [...dateMap.entries()].forEach(([date,cm])=>{
+  const sorted=new Map();
+  [...dateMap.entries()].forEach(([d,cm])=>{
     const arr=[...cm.entries()].sort((a,b)=>(a[1][0].num||0)-(b[1][0].num||0));
-    sortedDateMap.set(date,new Map(arr));
+    sorted.set(d,new Map(arr));
   });
-  el.innerHTML=[...sortedDateMap.entries()].map(([date,custMap])=>{
-    return `<div style="margin-bottom:2px">
-      <div style="font-family:var(--mono);font-size:.6rem;color:var(--teal);padding:3px 4px;letter-spacing:.08em">📅 ${date}</div>
-      ${[...custMap.entries()].map(([c,items])=>`
-        <div class="cc" style="margin-bottom:2px">
-          <div class="cc-h" style="padding:5px 10px">
-            <span class="cc-name" style="font-size:.8rem">${items[0].num||''} 👤 ${c}</span>
+  el.innerHTML=[...sorted.entries()].map(([date,custMap])=>`
+    <div style="margin-bottom:2px">
+      <div style="font-family:var(--mono);font-size:.6rem;color:var(--teal);padding:3px 6px;letter-spacing:.08em">📅 ${date}</div>
+      ${[...custMap.entries()].map(([,items])=>{
+        const c=items[0].customer; const num=items[0].num||'';
+        return `<div class="cc" style="margin-bottom:2px">
+          <div class="cc-h" style="padding:6px 10px">
+            <span class="cc-name" style="font-size:.8rem">
+              <span style="color:var(--amber);font-family:var(--mono);font-weight:800;margin-right:6px">${num}</span>👤 ${c}
+            </span>
           </div>
-          ${items.map(o=>`<div style="padding:2px 10px;font-size:.7rem;display:flex;gap:8px;align-items:center;border-bottom:1px solid rgba(255,255,255,.03)">
-            <span style="flex:1">${o.product}</span>
-            <span style="color:var(--amber);font-family:var(--mono);font-size:.68rem">${o.qty}kg</span>
-            ${o.size?`<span style="background:var(--s2);padding:1px 4px;border-radius:2px;font-size:.6rem">${o.size}g</span>`:''}
-            ${o.note?`<span style="color:var(--teal);font-size:.6rem" title="${esc2(o.note)}">📝</span>`:''}
+          ${items.map(o=>`<div style="padding:3px 10px;font-size:.7rem;display:flex;gap:8px;align-items:center;border-bottom:1px solid rgba(255,255,255,.03)">
+            <span style="flex:1;font-weight:600">${o.product}</span>
+            <span style="color:var(--amber);font-family:var(--mono);font-size:.68rem;font-weight:700">${o.qty}kg</span>
+            ${o.size?`<span style="background:var(--s2);padding:1px 4px;border-radius:2px;font-size:.6rem;color:var(--muted)">${o.size}g</span>`:''}
+            ${o.note?`<span style="color:var(--teal);font-size:.6rem;font-style:italic">${o.note}</span>`:''}
           </div>`).join('')}
-        </div>`).join('')}
-    </div>`;
-  }).join('');
+        </div>`;
+      }).join('')}
+    </div>`).join('');
 }
 function delCust(c,date,num){
   confDlg(`Remove ${c}?`,()=>{
@@ -1937,14 +1960,18 @@ function delCust(c,date,num){
 }
 function clearAll(){if(!orders.length)return;confDlg('Clear all orders?',()=>{orders=[];saveOrders();renderOrders();updateBadges();toast('Cleared','ok');});}
 function updateBadges(){
-  // عد عدد الزبائن المختلفين (عدد الأوردرات الفريدة)
   const today=todayStr();
   const todayOrders=orders.filter(o=>(o.date||'—')===today);
   const uniqueCustomers=new Set(todayOrders.map(o=>o.customer));
-  const n=uniqueCustomers.size;  // ✅ عدد الزبائن وليس المنتجات
-  
+  const n=uniqueCustomers.size;
   document.getElementById('navBadge').textContent=n;
   document.getElementById('ordBadge').textContent=n;
+  // ✅ آخر رقم في الأوردرات
+  const el=document.getElementById('ordersRange');
+  if(el){
+    const maxNum=orders.length?Math.max(...orders.map(o=>o.num||0)):0;
+    el.textContent=maxNum?`1 → ${maxNum}`:'—';
+  }
 }
 
 // ── ONEDRIVE CONFIG ──
@@ -2284,6 +2311,30 @@ async function printDrivers(){
     if(e.message!=='user_cancelled')toast('Error: '+e.message,'err');
   }finally{
     if(btn){btn.disabled=false;btn.textContent='🚗 Drivers';}
+  }
+}
+
+async function sendReprintRange(){
+  const from=parseInt(document.getElementById('reprintFrom').value)||1;
+  const to=parseInt(document.getElementById('reprintTo').value)||1;
+  if(from>to){toast('Range invalid','err');return;}
+  const btn=document.getElementById('reprintFrom').nextElementSibling?.nextElementSibling?.nextElementSibling;
+  try{
+    // كتابة BS1/BT1 فقط بدون كتابة الأوردرات
+    const token=await getODToken();
+    const fileRes=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,
+      {headers:{'Authorization':'Bearer '+token}});
+    if(!fileRes.ok)throw new Error('File not found');
+    const fileId=(await fileRes.json()).id;
+    const baseUrl=`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/workbook/worksheets/`;
+    await fetch(baseUrl+"Loading/range(address='BS1:BT1')",{
+      method:'PATCH',
+      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:JSON.stringify({values:[[from,to]]})
+    });
+    toast(`✓ Reprint range ${from}→${to} sent`,'ok');
+  }catch(e){
+    if(e.message!=='user_cancelled')toast('Error: '+e.message,'err');
   }
 }
 
