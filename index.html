@@ -237,6 +237,7 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
 
 <nav>
   <div class="logo">IAT<b>.</b>Orders</div>
+  <span id="onlineIndicator" title="Online" style="font-size:.75rem;margin-right:4px;cursor:default">🟢</span>
   <div class="ntab on" onclick="showPage('entry',this)">✏️ Entry</div>
   <div class="ntab" onclick="showPage('orders',this)">📋 Orders <span class="nbadge" id="navBadge">0</span></div>
   <div class="ntab" onclick="showPage('view-orders',this)">👁️ View</div>
@@ -347,6 +348,8 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
   <div class="exp-bar">
     <button class="btn btn-red btn-sm" style="flex-shrink:0" onclick="clearAll()">🗑 Clear</button>
     <button class="btn btn-ghost btn-sm" style="flex-shrink:0" onclick="openAIImport()">📋 Import</button>
+    <button id="undoBtn" class="btn btn-ghost btn-sm" style="flex-shrink:0;opacity:.3" onclick="undoOrders()" title="Undo">↩</button>
+    <button id="redoBtn" class="btn btn-ghost btn-sm" style="flex-shrink:0;opacity:.3" onclick="redoOrders()" title="Redo">↪</button>
   </div>
 </div>
 
@@ -1036,7 +1039,47 @@ async function loadAppFromOneDrive(){
   });
 }
 
+// ── Undo/Redo ──
+const _undoStack=[];
+const _redoStack=[];
+const MAX_UNDO=20;
+
+function pushUndo(){
+  _undoStack.push(JSON.stringify(orders));
+  if(_undoStack.length>MAX_UNDO)_undoStack.shift();
+  _redoStack.length=0; // مسح الـ redo عند تغيير جديد
+  updateUndoButtons();
+}
+
+function undoOrders(){
+  if(!_undoStack.length){toast('Nothing to undo','err');return;}
+  _redoStack.push(JSON.stringify(orders));
+  orders=JSON.parse(_undoStack.pop());
+  LS.set('iat_orders',orders);
+  renderOrders();updateBadges();
+  updateUndoButtons();
+  toast('↩ Undone','ok');
+}
+
+function redoOrders(){
+  if(!_redoStack.length){toast('Nothing to redo','err');return;}
+  _undoStack.push(JSON.stringify(orders));
+  orders=JSON.parse(_redoStack.pop());
+  LS.set('iat_orders',orders);
+  renderOrders();updateBadges();
+  updateUndoButtons();
+  toast('↪ Redone','ok');
+}
+
+function updateUndoButtons(){
+  const u=document.getElementById('undoBtn');
+  const r=document.getElementById('redoBtn');
+  if(u)u.style.opacity=_undoStack.length?'1':'0.3';
+  if(r)r.style.opacity=_redoStack.length?'1':'0.3';
+}
+
 function saveOrders(){
+  pushUndo();
   LS.set('iat_orders',orders);
   if(document.getElementById('pg-combined-qty')?.classList.contains('on'))renderCombinedQtyPage();
 }
@@ -1044,6 +1087,22 @@ function saveTenderOrders(){
   LS.set('iat_to',tenderOrders);
   if(document.getElementById('pg-combined-qty')?.classList.contains('on'))renderCombinedQtyPage();
 }
+
+// ── Offline indicator ──
+function updateOnlineStatus(){
+  const el=document.getElementById('onlineIndicator');
+  if(!el)return;
+  if(navigator.onLine){
+    el.textContent='🟢';
+    el.title='Online';
+  }else{
+    el.textContent='🔴';
+    el.title='Offline';
+    toast('⚠ No internet connection','err');
+  }
+}
+window.addEventListener('online', ()=>{updateOnlineStatus();toast('✓ Back online','ok');});
+window.addEventListener('offline',()=>{updateOnlineStatus();toast('⚠ Offline','err');});
 
 function todayStr(){const d=new Date();return d.toISOString().slice(0,10);}
 function sortedProds(list){return[...list].sort((a,b)=>(freq[b]||0)-(freq[a]||0));}
@@ -1070,6 +1129,8 @@ function sortedProds(list){return[...list].sort((a,b)=>(freq[b]||0)-(freq[a]||0)
   renderPDropList('');
   renderSettC();renderSettP();renderSettD();renderSettTP();
   if(orders.length)renderOrders();
+  updateOnlineStatus();
+  updateUndoButtons();
 })();
 
 async function syncDriversFromProduction(){
@@ -1605,7 +1666,7 @@ function renderOrders(){
                 <button class="cc-mb" ${canDn?'':'disabled'} onclick="moveGroup('${esc(date)}','${esc(c)}',${items[0].num||0},1)">▼</button>
               </div>
               <input class="cc-num" type="number" min="1" value="${items[0].num||''}" title="Order #" onchange="setGroupNum('${esc(date)}','${esc(c)}',${items[0].num||0},this.value)" onclick="this.select()"/>
-              <span style="cursor:pointer;user-select:none;padding:4px 6px;background:var(--b1);border-radius:2px;font-size:.75rem;border:1px solid var(--b2);display:inline-block" onclick="openCustModal('${esc(c)}','${esc(date)}')">
+              <span style="cursor:pointer;user-select:none;padding:4px 6px;background:var(--b1);border-radius:2px;font-size:.75rem;border:1px solid var(--b2);display:inline-block" onclick="openCustModal('${esc(c)}','${esc(date)}',${items[0].num||0})">
                 ${(()=>{const prev=orders.filter(o=>(o.date||'—')===date&&o.customer===c&&(o.num||0)<(items[0].num||0));const orderIdx=prev.length>0?new Set(prev.map(o=>o.num)).size+1:0;return orderIdx>=2?`👤 ${c} <span style="background:var(--amber);color:#000;border-radius:3px;padding:0 4px;font-size:.65rem;font-weight:800">${orderIdx}</span>`:`👤 ${c}`;})()}
                 <br/><span style="font-size:.6rem;color:var(--muted)">✏️ Edit</span>
               </span>
@@ -1733,10 +1794,10 @@ function setOQ(i,v){
 }
 function setOrdProduct(i,v){orders[i].product=v;saveOrders();}
 // ── Global Customer Change Modal ──
-let _gCustCtx={oldCust:'',date:''};
+let _gCustCtx={oldCust:'',date:'',num:0};
 
-function openCustModal(oldCust,date){
-  _gCustCtx={oldCust,date};
+function openCustModal(oldCust,date,num){
+  _gCustCtx={oldCust,date,num:num||0};
   const modal=document.getElementById('gCustModal');
   modal.dataset.mode='orders';
   modal.style.display='flex';
@@ -1784,22 +1845,15 @@ function applyGCustChange(newName){
     closeGCustModal();
     renderTOrdersPage();
   } else {
-    const {oldCust,date}=_gCustCtx;
+    const {oldCust,date,num}=_gCustCtx;
     if(newName===oldCust){closeGCustModal();return;}
-    orders.forEach(o=>{if(o.date===date&&o.customer===oldCust)o.customer=newName;});
+    orders.forEach(o=>{
+      if(o.date===date&&o.customer===oldCust&&(o.num||0)===(num||0))
+        o.customer=newName;
+    });
     saveOrders();
     closeGCustModal();
-    renumberOrders(date);
-    // تحديث اسم الزبون بالـ DOM مباشرة بدون re-render
-    const custSpans=document.querySelectorAll('[onclick*="openCustModal(\''+oldCust.replace(/'/g,"\\'")+'\',"]');
-    if(custSpans.length){
-      custSpans.forEach(s=>{
-        s.innerHTML='👤 '+newName+'<br/><span style="font-size:.6rem;color:var(--muted)">✏️ Edit</span>';
-        // update onclick too
-        const oc=s.getAttribute('onclick')||'';
-        s.setAttribute('onclick',oc.replace(oldCust,newName));
-      });
-    } else renderOrders();
+    renderOrders();
   }
   toast('✓ Updated','ok');
 }
@@ -1961,13 +2015,12 @@ function delCust(c,date,num){
 }
 function clearAll(){if(!orders.length)return;confDlg('Clear all orders?',()=>{orders=[];saveOrders();renderOrders();updateBadges();toast('Cleared','ok');});}
 function updateBadges(){
-  const today=todayStr();
-  const todayOrders=orders.filter(o=>(o.date||'—')===today);
-  const uniqueCustomers=new Set(todayOrders.map(o=>o.customer));
-  const n=uniqueCustomers.size;
+  // ✅ عدد الأوردرات الكلي (عدد الـ nums الفريدة)
+  const uniqueNums=new Set(orders.map(o=>o.num||0)).size;
+  const n=orders.length?uniqueNums:0;
   document.getElementById('navBadge').textContent=n;
   document.getElementById('ordBadge').textContent=n;
-  // ✅ آخر رقم في الأوردرات
+  // آخر رقم
   const el=document.getElementById('ordersRange');
   if(el){
     const maxNum=orders.length?Math.max(...orders.map(o=>o.num||0)):0;
@@ -2327,10 +2380,10 @@ async function addPrintJobWithOrders(job){
 async function sendOrdersDirect(){
   const from=parseInt(document.getElementById('printRangeFrom').value)||1;
   const to=parseInt(document.getElementById('printRangeTo').value)||1;
-  if(!orders.length){toast('No orders','err');return;}
+  if(from>to){toast('Range invalid','err');return;}
   try{
-    const count=await addPrintJobWithOrders({action:'write_orders',from,to});
-    toast(`✓ Orders sent directly (#${count})`,'ok');
+    const count=await addPrintJob({action:'set_range',from,to});
+    toast(`✓ Range ${from}→${to} sent`,'ok');
   }catch(e){
     if(e.message!=='user_cancelled')toast('Error: '+e.message,'err');
   }
