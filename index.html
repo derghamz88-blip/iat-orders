@@ -372,6 +372,7 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     <button class="btn btn-teal btn-sm" style="flex-shrink:0" onclick="manualSaveRange()" id="odBtn">☁ Save</button>
     <button class="btn btn-blue btn-sm" style="flex-shrink:0" onclick="directPrintOrders()">🖨 Orders</button>
     <button class="btn btn-amber btn-sm" style="flex-shrink:0" onclick="directPrintLabels()">🏷 Labels</button>
+    <button class="btn btn-green btn-sm" style="flex-shrink:0" onclick="sendOrdersDirect()" title="Send orders directly to Excel (fast)">📤 Send</button>
     <button class="btn btn-ghost btn-sm" style="flex-shrink:0;color:var(--purple)" onclick="saveProductionDaily()">💾 Archive</button>
     <button class="btn btn-purple btn-sm" style="flex-shrink:0" onclick="printDrivers()">🚗 Drivers</button>
     <button class="btn btn-ghost btn-sm" style="flex-shrink:0" onclick="exportXL()">⬇ Excel</button>
@@ -2279,19 +2280,13 @@ async function saveProductionDaily(){
 // ── دالة مشتركة تضيف Job للقائمة بدل الاستبدال ──
 async function addPrintJob(job){
   const token=await getODToken();
-  // قراءة القائمة الحالية
   let jobs=[];
   try{
     const r=await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',
       {headers:{'Authorization':'Bearer '+token}});
-    if(r.ok){
-      const d=await r.json();
-      jobs=Array.isArray(d.jobs)?d.jobs:[];
-    }
+    if(r.ok){const d=await r.json();jobs=Array.isArray(d.jobs)?d.jobs:[];}
   }catch(e){}
-  // إضافة الـ job الجديد
   jobs.push(job);
-  // كتابة القائمة
   const res=await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',{
     method:'PUT',
     headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
@@ -2299,6 +2294,46 @@ async function addPrintJob(job){
   });
   if(!res.ok)throw new Error('Failed to queue job');
   return jobs.length;
+}
+
+// ✅ طريقة جديدة - نقل الأوردرات مباشرة مع signal
+async function addPrintJobWithOrders(job){
+  const token=await getODToken();
+  let jobs=[];
+  try{
+    const r=await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',
+      {headers:{'Authorization':'Bearer '+token}});
+    if(r.ok){const d=await r.json();jobs=Array.isArray(d.jobs)?d.jobs:[];}
+  }catch(e){}
+  // أضف الأوردرات في الـ job
+  const from=job.from||1;
+  const to=job.to||999;
+  const sorted=[...orders]
+    .filter(o=>(o.num||0)>=from&&(o.num||0)<=to)
+    .sort((a,b)=>(a.num||0)-(b.num||0));
+  job.orders=sorted;
+  job.date=document.getElementById('orderDate')?.value||todayStr();
+  jobs.push(job);
+  const res=await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',{
+    method:'PUT',
+    headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+    body:JSON.stringify({jobs,ts:Date.now()})
+  });
+  if(!res.ok)throw new Error('Failed to queue job');
+  return jobs.length;
+}
+
+// ✅ نقل الأوردرات مباشرة لـ Python يكتبها في Excel (بدون OneDrive API)
+async function sendOrdersDirect(){
+  const from=parseInt(document.getElementById('printRangeFrom').value)||1;
+  const to=parseInt(document.getElementById('printRangeTo').value)||1;
+  if(!orders.length){toast('No orders','err');return;}
+  try{
+    const count=await addPrintJobWithOrders({action:'write_orders',from,to});
+    toast(`✓ Orders sent directly (#${count})`,'ok');
+  }catch(e){
+    if(e.message!=='user_cancelled')toast('Error: '+e.message,'err');
+  }
 }
 
 async function printDrivers(){
