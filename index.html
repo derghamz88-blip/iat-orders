@@ -4060,9 +4060,9 @@ async function extractTenderAI(){
     const quantityMap=new Map(); // {product: {qty, grams}}
     
     for(let line of lines){
-      // 1. البحث عن الزبون من DC
+      // 1. البحث عن الزبون من قائمة customers الكاملة
       let foundCust=false;
-      for(let cust of DC){
+      for(let cust of customers){
         if(line.toLowerCase().includes(cust.toLowerCase())){
           currentCust=cust;
           foundCust=true;
