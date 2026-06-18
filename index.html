@@ -744,7 +744,12 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
       </div>
       <img id="aiImgPreview" style="display:none;width:100%;border-radius:8px;max-height:160px;object-fit:contain;margin-bottom:4px"/>
       <button id="aiImgClear" onclick="clearOrderImage()" style="display:none;width:100%;background:transparent;border:1px solid var(--red);border-radius:6px;color:var(--red);padding:5px;font-size:.72rem;cursor:pointer;margin-bottom:8px">✕ Remove image</button>
-      <textarea id="aiTextInput" placeholder="Paste WhatsApp order text here...&#10;&#10;Example:&#10;UNION Barsha&#10;30kg chicken&#10;4kg leg&#10;4kg thigh&#10;&#10;Aswaaq JVC&#10;Breast 5kg&#10;Wings 2kg" style="width:100%;height:120px;background:var(--s3);border:1.5px solid var(--b2);border-radius:8px;padding:10px;color:var(--txt);font-family:var(--sans);font-size:.82rem;outline:none;resize:none;box-sizing:border-box"></textarea>
+      <div style="position:relative">
+        <textarea id="aiTextInput" placeholder="Paste WhatsApp order text here...&#10;&#10;Example:&#10;UNION Barsha&#10;30kg chicken&#10;4kg leg&#10;4kg thigh&#10;&#10;Aswaaq JVC&#10;Breast 5kg&#10;Wings 2kg" style="width:100%;height:120px;background:var(--s3);border:1.5px solid var(--b2);border-radius:8px;padding:10px;padding-right:32px;color:var(--txt);font-family:var(--sans);font-size:.82rem;outline:none;resize:none;box-sizing:border-box"></textarea>
+        <button onclick="clearAIText()" title="Clear text"
+          style="position:absolute;top:6px;right:6px;background:transparent;border:none;color:var(--muted);font-size:.85rem;cursor:pointer;padding:2px 5px;border-radius:4px;line-height:1"
+          onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--muted)'">✕</button>
+      </div>
     </div>
     <!-- BOF image input -->
     <div id="aiBofSection" style="display:none;flex-direction:column;gap:8px">
@@ -4569,66 +4574,78 @@ async function extractOrdersAI(){
 
 // ── CUSTOMER ALIASES ──
 const CUST_ALIASES = [
-  [/\bunion\s*barsha\s*south\b/i, 'Union barsha south'],
-  [/\bunion\s*barsha\b/i, 'UNION Barsha'],
-  [/\bunion\s*(al\s*)?warqa\b/i, 'UNION Al Warqa'],
-  [/\bunion\s*motor\s*city\b/i, 'UNION MOTOR CITY'],
-  [/\bunion\s*(jumeirah\s*)?safa\b/i, 'UNION Jumeirah Safa'],
+  // ── UNION ──
+  [/\bunion\s*barsha\s*south\b/i,             'Union barsha south'],
+  [/\bunion\s*barsha\b/i,                      'UNION Barsha'],
+  [/\bunion\s*(al\s*)?warqa\b/i,               'UNION Al Warqa'],
+  [/\bunion\s*motor\s*city\b/i,               'UNION MOTOR CITY'],
+  [/\bunion\s*(jumeirah\s*)?safa\b/i,          'UNION Jumeirah Safa'],
   [/\bunion\s*jumeirah\s*first\b|\bunion\s*jumeirah\s*1\b/i, 'UNION Jumeirah First'],
-  [/\bunion\s*jumeirah\b/i, 'UNION Jumeirah First'],
-  [/\bunion\s*nad\s*al\s*sheba\b/i, 'UNION Nad Al Sheba'],
-  [/\bunion\s*nad\s*(al\s*)?hamer?\b/i, 'UNION Nad Al Hamer'],
-  [/\bunion\s*nad\s*hamar\b/i, 'UNION Nad Al Hamer'],
-  [/\bunion\s*hamriya\b/i, 'UNION Hamriya'],
-  [/\bunion\s*mankhool\b/i, 'UNION Mankhool'],
-  [/\bunion\s*rashidiy/i, 'UNION Rashidiya'],
-  [/\bunion\s*nakheel\b/i, 'UNION NAKHEEL'],
-  [/\bunion\s*silicon\b/i, 'Union silicon'],
-  [/\bunion\s*aweer\b/i, 'UNION Aweer'],
-  [/\bunion\s*hessa\b/i, 'UNION Hessa'],
-  [/\bunion\s*towar\b/i, 'UNION Towar'],
-  [/\bunion\s*rukan\b/i, 'UNION RUKAN'],
-  [/\bunion\s*abu\s*hail\b/i, 'Union abu hail'],
-  [/\bunion\s*(al\s*)?nahda\b/i, 'UNION Al Nahda'],
-  [/\bunion\s*(al\s*)?khawaneej\b/i, 'UNION Al khawaneej'],
-  [/\bunion\s*umm\s*suqeim\b/i, 'UNION Umm Suqeim'],
-  [/\bunion\s*(al\s*)?wasl\b/i, 'UNION Al Wasl'],
-  [/\bunion\s*rumailah\b/i, 'union Rumailah'],
-  [/\bunion\s*jurf\b/i, 'UNION Jurf'],
-  [/\bunion\s*(al\s*)?warqa\b/i, 'UNION Al Warqa'],
-  [/\bunion\s*mankhool\b/i, 'UNION Mankhool'],
-  [/\bbaalbak\s*shikh?\s*zaid\b|\bbalbaak\s*shikh?\b/i, 'BAALBAK Shikh zaid'],
-  [/\bbaalbak\s*quoz\b|\bbalbaak\s*quoz\b/i, 'BAALBAK Alqouz'],
-  [/\bbaalbak\s*hessa\b|\bbalbaak\s*hessa\b/i, 'BAALBAK Hessa'],
-  [/\bbaalbak\b|\bbalbaak\b|\bbaalbek\b|\bbalbak\b/i, 'BAALBAK Shikh zaid'],
-  [/\bjabal\s*lubnan\s*jlt\b|\bjabel\s*lubnan\s*jlt\b/i, 'JABAL LUBNAN JLT'],
-  [/\bjabal\s*lubnan\s*arjan\b|\bjabel\s*lubnan\s*arjan\b/i, 'Jabal Lebnan Arjan'],
-  [/\bjabal\s*lubnan\b|\bjabel\s*lubnan\b/i, 'JABAL LUBNAN JLT'],
+  [/\bunion\s*jumeirah\b/i,                    'UNION Jumeirah First'],
+  [/\bunion\s*nad\s*al\s*sheba\b/i,            'UNION Nad Al Sheba'],
+  [/\bunion\s*nad\s*(al\s*)?hamer?\b|\bunion\s*nad\s*hamar\b/i, 'UNION Nad Al Hamer'],
+  [/\bunion\s*hamriya\b/i,                     'UNION Hamriya'],
+  [/\bunion\s*mankhool\b/i,                    'UNION Mankhool'],
+  [/\bunion\s*rashidiy/i,                      'UNION Rashidiya'],
+  [/\bunion\s*nakheel\b/i,                     'UNION NAKHEEL'],
+  [/\bunion\s*silicon\b/i,                     'Union silicon'],
+  [/\bunion\s*aweer\b/i,                       'UNION Aweer'],
+  [/\bunion\s*hessa\b/i,                       'UNION Hessa'],
+  [/\bunion\s*towar\b/i,                       'UNION Towar'],
+  [/\bunion\s*rukan\b/i,                       'UNION RUKAN'],
+  [/\bunion\s*abu\s*hail\b/i,                  'Union abu hail'],
+  [/\bunion\s*(al\s*)?nahda\b/i,               'UNION Al Nahda'],
+  [/\bunion\s*(al\s*)?khawaneej\b/i,           'UNION Al khawaneej'],
+  [/\bunion\s*umm\s*suqeim\b/i,               'UNION Umm Suqeim'],
+  [/\bunion\s*(al\s*)?wasl\b/i,                'UNION Al Wasl'],
+  [/\bunion\s*rumailah\b/i,                    'union Rumailah'],
+  [/\bunion\s*jurf\b/i,                        'UNION Jurf'],
+  [/\bunion\s*international\b/i,               'UNION International'],
+  [/\bunion\s*trolley/i,                       "union TROLLEY'S"],
+
+  // ── BAALBAK - فرع محدد أولاً ─ بدون فرع يذهب لـ similarity ──
+  [/\b(baalbak|balbaak|baalbek|balbak)\s*shikh?\s*zaid\b/i, 'BAALBAK Shikh zaid'],
+  [/\b(baalbak|balbaak|baalbek|balbak)\s*(al\s*)?quoz\b/i,  'BAALBAK Alqouz'],
+  [/\b(baalbak|balbaak|baalbek|balbak)\s*hessa\b/i,         'BAALBAK Hessa'],
+  [/\b(baalbak|balbaak|baalbek|balbak)\s*abu\s*dhabi\b/i,   'BAALBAK Abu Dhabi'],
+
+  // ── JABAL LUBNAN ──
+  [/\b(jabal|jabel)\s*lubnan\s*jlt\b/i,        'JABAL LUBNAN JLT'],
+  [/\b(jabal|jabel)\s*lubnan\s*arjan\b/i,       'Jabal Lebnan Arjan'],
+  [/\b(jabal|jabel)\s*lubnan\b/i,               'JABAL LUBNAN JLT'],
+
+  // ── M L S - بدون فرع يذهب لـ similarity ──
   [/\bm\.?l\.?s\.?\s*motor\s*city\b|\bmls\s*motor\b/i, 'M L S motor city'],
-  [/\bm\.?l\.?s\.?\s*marina\b|\bmls\s*marina\b/i, 'M L S Marina'],
-  [/\bm\.?l\.?s\.?\s*quoz\b|\bmls\s*quoz\b/i, 'M L S Alqouz'],
-  [/\bm\.?l\.?s\.?\s*silicon\b|\bmls\s*silicon\b/i, 'M L S silicon'],
-  [/\bm\.?l\.?s\b|\bmls\b/i, 'M L S motor city'],
-  [/\bgmg\s*geant\s*express\s*emaar\b|\bgmg\s*emaar\b/i, 'GMG EMAAR SOUTH'],
-  [/\bgmg\s*geant\s*express\s*one\s*park\b|\bgmg\s*one\s*park\b/i, 'GEANT-ONE PARK AVE'],
-  [/\bgmg\s*geant\s*(express\s*)?villanova\b|\bgmg\s*villanova\b/i, 'Géant – Villanova'],
-  [/\bgmg\s*geant\s*(super\s*)?al\s*furjan\b|\bgmg\s*furjan\b/i, 'Géant – Al Furjan'],
-  [/\bgmg\s*geant\s*dubai\s*hills\b|\bgmg\s*dubai\s*hills\b/i, 'Géant – Dubai hillS'],
-  [/\bgmg\s*aswaaq\s*hyper\s*umm\s*suqeim\b/i, 'Aswaaq- UMM SUQEIM'],
-  [/\bgmg\s*aswaaq\s*(exp|express)\s*jvc\b/i, 'Aswaaq – (JVC)'],
-  [/\bgmg\s*aswaaq\b/i, 'Aswaaq – (JVC)'],
-  [/\bgmg\b/i, 'Géant – Dubai hillS'],
-  [/\beast\s*meat\s*dubai\s*hills\b/i, 'BEAST MEAT Dubai hills'],
-  [/\beast\s*meat\b/i, 'BEAST MEAT Dubai hills'],
-  [/\bmeat\s*avenue\b/i, 'meat avenue'],
-  [/\bfabrique\b/i, 'FABRIQUE'],
-  [/\bkanz\s*al\s*madam\b|\bkanz\b/i, 'Kanz al madam'],
-  [/\bal\s*madina\b/i, 'AL MADINA'],
+  [/\bm\.?l\.?s\.?\s*marina\b|\bmls\s*marina\b/i,       'M L S Marina'],
+  [/\bm\.?l\.?s\.?\s*(al\s*)?quoz\b|\bmls\s*quoz\b/i,   'M L S Alqouz'],
+  [/\bm\.?l\.?s\.?\s*silicon\b|\bmls\s*silicon\b/i,      'M L S silicon'],
+  [/\bm\.?l\.?s\.?\s*abu\s*dhabi\b/i,                      'M L S Abu Dhabi Mushrif mall'],
+
+  // ── GMG - بفرع محدد أولاً ─ بدون فرع يذهب لـ GMG Logic ──
+  [/\bgmg\s*emaar\b/i,                         'GMG EMAAR SOUTH'],
+  [/\b(geant|géant)\s*[-–]?\s*emaar\b/i,       'GMG EMAAR SOUTH'],
+  [/\b(geant|géant)\s*[-–]?\s*villanova\b/i,   'Géant – Villanova'],
+  [/\btayba\b/i,                                'Tayba'],
+  [/\bm\.?l\.?s\.?\s*(mshrif|mushrif)\b|\bmls\s*(mshrif|mushrif)\b/i, 'M L S Abu Dhabi Mushrif mall'],
+  [/\bgmg\s*one\s*park\b/i,                    'GEANT-ONE PARK AVE'],
+  [/\bgmg\s*villanova\b/i,                     'Géant – Villanova'],
+  [/\bgmg\s*furjan\b/i,                        'Géant – Al Furjan'],
+  [/\bgmg\s*dubai\s*hills\b/i,                 'Géant – Dubai hillS'],
+  [/\bgmg\s*aswaaq\s*(exp|express)?\s*jvc\b/i, 'Aswaaq – (JVC)'],
+  [/\bgmg\s*aswaaq\s*umm\s*suqeim\b/i,         'Aswaaq- UMM SUQEIM'],
+
+  // ── أخرى ──
+  [/\beast\s*meat\s*dubai\s*hills\b/i,         'BEAST MEAT Dubai hills'],
+  [/\beast\s*meat\b/i,                          'BEAST MEAT'],
+  [/\bmeat\s*avenue\b/i,                        'meat avenue'],
+  [/\bfabrique\b/i,                             'FABRIQUE'],
+  [/\bkanz\s*al\s*madam\b|\bkanz\b/i,          'Kanz al madam'],
+  [/\bal\s*madina\b/i,                          'AL MADINA'],
   [/\balam\s*al\s*tawfeer\b|\balam\s*altawfeer\b/i, 'ALAM AL TAWFEER'],
-  [/\bmaryam\s*rash(i|e)d\b/i, 'MARYAM RASHID'],
-  [/\bon\s*mart\b/i, 'On mart'],
-  [/\bnew\s*day\b/i, 'New day'],
-  [/\bhome\s*delivery\b/i, 'Home delivery'],
+  [/\bmaryam\s*rash(i|e)d\b/i,                 'MARYAM RASHID'],
+  [/\bon\s*mart\b/i,                            'On mart'],
+  [/\bnew\s*day\b/i,                            'New day'],
+  [/\bhome\s*delivery\b/i,                      'Home delivery'],
 ];
 
 // ── GMG GROUP: same company, different branch ──
@@ -4649,22 +4666,6 @@ function matchCustomer(raw) {
   const inp = raw.trim();
   if (!inp) return inp;
 
-  // ✅ 0. ابحث في الأوردرات الحالية أولاً
-  const ordCustomers = [...new Set(orders.map(o=>o.customer).filter(Boolean))];
-  const exactInOrds = ordCustomers.find(c=>c.toLowerCase()===inp.toLowerCase());
-  if(exactInOrds) return exactInOrds;
-  // fuzzy في الأوردرات
-  let bestOrd=null, bestOrdScore=0;
-  ordCustomers.forEach(c=>{
-    const s=similarity(inp,c);
-    if(s>bestOrdScore){bestOrdScore=s;bestOrd=c;}
-  });
-  if(bestOrd && bestOrdScore>=50) return bestOrd;
-
-  // 1. Learned corrections (highest priority)
-  const learned = learnLookup('c', inp);
-  if (learned) return learned;
-
   // 2. Exact match (case-insensitive)
   const exact = customers.find(c => c.toLowerCase() === inp.toLowerCase());
   if (exact) return exact;
@@ -4674,11 +4675,11 @@ function matchCustomer(raw) {
     if (re.test(inp)) return val;
   }
 
-  // 4. GMG GROUP LOGIC — strip brand, match by branch only
+  // 4. GMG GROUP LOGIC — strip brand, match by branch across all GMG/Géant/Aswaaq
   if (isGMGBrand(inp)) {
     const inpBranch = extractBranch(inp);
     if (inpBranch.length > 1) {
-      // Only compare against GMG/Géant/Aswaaq entries
+      // قارن مع كل فروع GMG + Géant + Aswaaq بغض النظر عن العلامة التجارية
       const gmgCusts = customers.filter(c => isGMGBrand(c));
       let best = null, bestScore = 0;
       gmgCusts.forEach(c => {
@@ -4686,7 +4687,7 @@ function matchCustomer(raw) {
         const s = similarity(inpBranch, cBranch);
         if (s > bestScore) { bestScore = s; best = c; }
       });
-      if (best && bestScore >= 35) return best;
+      if (best && bestScore >= 50) return best;
     }
   }
 
@@ -4698,7 +4699,7 @@ function matchCustomer(raw) {
     else if (s > secondScore) secondScore = s;
   });
 
-  if (best && bestScore >= 30 && (bestScore - secondScore >= 6 || bestScore >= 55)) {
+  if (best && bestScore >= 40 && (bestScore - secondScore >= 10 || bestScore >= 65)) {
     return best;
   }
 
@@ -4711,6 +4712,9 @@ function matchProduct(raw) {
   const learned = learnLookup('p', raw);
   if (learned) return learned;
   const r = raw.toLowerCase();
+
+  // CTN → Chicken (القياس يُحدد من picker)
+  if(/\bctn\b/i.test(r)) return 'Chicken';
 
   // BL-SL / BL-SO / SL variants first
   const isBLSL = /\bbl[.\-\s]?sl\b|boneless[.\-\s]?skinless|b\/l[.\-\s]?s\/l/i.test(r);
@@ -4776,9 +4780,10 @@ function matchProduct(raw) {
 // ── NORMALIZE: strip noise, lowercase, keep words ──
 function norm(s) {
   return s.toLowerCase()
-    .replace(/[_\-\/\\|]/g, ' ')      // separators → space
-    .replace(/[^a-z0-9 ]/g, '')         // remove non-alphanumeric
-    .replace(/(express|super|hyper|fresh|market|store|shop|rest|restaurant|catering|branch|coop|the|al|el)/g, '') // noise
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // é→e
+    .replace(/[_\-\/\\|\u2013]/g, ' ')
+    .replace(/[^a-z0-9 ]/g, '')
+    .replace(/\b(express|super|hyper|hypermarket|fresh|market|markets|store|stores|shop|shops|rest|restaurant|restaurants|catering|branch|coop|cooperative|the|al|el|gourmet|butchery|butcher|meat|meats|foodstuff|food|supplies|supply|mini|mega|mall|centre|center|project|group|trading|llc|llp|co|corp)\b/g, '')
     .replace(/\s+/g, ' ').trim();
 }
 
@@ -4843,32 +4848,53 @@ function bestMatch(input, list) {
 }
 
 function parseLine(line) {
-  // Returns {qty, prodRaw, note, size} or null
   const clean = line.replace(/\*([^*]*)\*/g, '$1').replace(/\s+/g, ' ').trim();
+  const isCtn  = /\bctn\b/i.test(clean);
+  const note   = isCtn ? 'ctn' : '';
+  const sizeM  = clean.match(/\b(800|900|1000|1100|1200|1300|1400|1500)\b/);
+  const size   = sizeM ? sizeM[1] : '';
 
-  // Detect ctn/tray/whole
-  const isCtn = /ctn/i.test(clean);
-  const isTray = /tray[s]?/i.test(clean);
-  const note = isCtn ? 'ctn' : '';
+  // ✅ CTN: عدد كراتين × 10 × size
+  if (isCtn) {
+    const countM  = clean.match(/^(\d+(?:\.\d+)?)\s/);
+    const count   = countM ? parseFloat(countM[1]) : 1;
+    const sizeVal = size ? parseInt(size) : 0;
+    const qty     = sizeVal ? +(count * 10 * sizeVal / 1000).toFixed(2) : count * 10;
+    return { qty, prodRaw: 'chicken', note:'ctn', size: String(sizeVal||'') };
+  }
 
-  // Size detection: "whole chicken 1100" or "1 ctn 1100"
-  const sizeM = clean.match(/(800|900|1000|1100|1200|1300|1400|1500)/);
-  const size = sizeM ? sizeM[1] : '';
+  // ✅ قطع مفردة مع size: "5 pcs 1100" أو "10 whole chicken 1100"
+  const isPcs = /\bpcs?\b|\bpieces?\b|\bحبات?\b|\bwhole\s*chicken\b/i.test(clean);
+  if (isPcs && size) {
+    const countM = clean.match(/^(\d+(?:\.\d+)?)\s/);
+    const count  = countM ? parseFloat(countM[1]) : 1;
+    const sizeVal= parseInt(size);
+    const qty    = +(count * sizeVal / 1000).toFixed(2);
+    return { qty, prodRaw: 'chicken', note:'', size: String(sizeVal) };
+  }
 
-  // Pattern 1: NUMBER [unit] PRODUCT — e.g. "10 kg breast", "5 tray liver", "2 ctn 1100"
-  const p1 = clean.match(/^(\d+(?:\.\d+)?)\s*(?:kg|kgs|tray[s]?|ctn|whole|pcs?)?\s+(.+)$/i);
+  // ✅ "10 whole chicken 1100" بدون كلمة pcs
+  if (/\bwhole\b/i.test(clean) && size) {
+    const countM = clean.match(/^(\d+(?:\.\d+)?)\s/);
+    const count  = countM ? parseFloat(countM[1]) : 1;
+    const sizeVal= parseInt(size);
+    const qty    = +(count * sizeVal / 1000).toFixed(2);
+    return { qty, prodRaw: 'chicken', note:'', size: String(sizeVal) };
+  }
+
+  // Pattern 1: NUMBER [unit] PRODUCT
+  const p1 = clean.match(/^(\d+(?:\.\d+)?)\s*(?:kg|kgs|tray[s]?|whole|pcs?)?\s+(.+)$/i);
   if (p1) {
-    const qty = parseFloat(p1[1]);
-    let prodRaw = p1[2].replace(/(kg|kgs|tray[s]?|ctn|whole|pcs?)/gi, '').trim();
+    const qty    = parseFloat(p1[1]);
+    let prodRaw  = p1[2].replace(/(kg|kgs|tray[s]?|whole|pcs?)/gi, '').trim();
     if (qty > 0 && prodRaw.length > 0) return { qty, prodRaw, note, size };
   }
 
-  // Pattern 2: PRODUCT NUMBER [unit] — e.g. "breast 10 kg", "liver 2"
+  // Pattern 2: PRODUCT NUMBER [unit]
   const p2 = clean.match(/^(.+?)\s+(\d+(?:\.\d+)?)\s*(?:kg|kgs|tray[s]?|ctn)?$/i);
   if (p2) {
-    const qty = parseFloat(p2[2]);
-    let prodRaw = p2[1].replace(/(kg|kgs|tray[s]?|ctn|whole|pcs?)/gi, '').trim();
-    // Make sure prodRaw isn't just a number
+    const qty    = parseFloat(p2[2]);
+    let prodRaw  = p2[1].replace(/(kg|kgs|tray[s]?|ctn|whole|pcs?)/gi, '').trim();
     if (qty > 0 && prodRaw.length > 1 && !/^\d+$/.test(prodRaw)) return { qty, prodRaw, note, size };
   }
   return null;
@@ -4907,8 +4933,12 @@ function parseOrdersFromText(text) {
     parts.forEach(msg => {
       const lines = msg.split(/\n/).map(cleanLine).filter(l => l && !skipRe.test(l));
       if (!lines.length) return;
-      // First non-empty line = customer
-      const custRaw = lines[0].replace(/order\s*\d+/gi, '').replace(/^\d+[\.\)]\s*/, '').trim();
+      // ✅ اسم الزبون: نحذف الأقواس فقط لا محتواها
+      const custRaw = lines[0]
+        .replace(/[()[\]]/g, ' ')
+        .replace(/order\s*\d+/gi, '')
+        .replace(/^\d+[\.\)]\s*/, '')
+        .replace(/\s+/g,' ').trim();
       if (!custRaw) return;
       const customer = matchCustomer(custRaw);
       for (let i = 1; i < lines.length; i++) {
@@ -4935,6 +4965,13 @@ function parseOrdersFromText(text) {
     });
   }
   return results;
+}
+
+function clearAIText(){
+  document.getElementById('aiTextInput').value='';
+  document.getElementById('aiResults').style.display='none';
+  document.getElementById('aiStatus').textContent='';
+  clearOrderImage();
 }
 
 function extractWhatsApp(status) {
@@ -5284,10 +5321,18 @@ function renderAIResults() {
               style="flex:1;color:var(--teal);font-size:.79rem;font-weight:600;cursor:pointer;padding:2px 0">
               🍗 ${esc2(item.product)}
             </div>
-            <input type="number" value="${item.qty}" min="0" step="0.5"
+            ${isCHK(item.product)?`<select onchange="aiExtracted[${item._idx}].size=this.value"
+              style="background:var(--s2);border:1px solid var(--b2);border-radius:4px;padding:2px 3px;font-size:.62rem;color:var(--muted);outline:none">
+              <option value="">sz</option>
+              ${[800,900,1000,1100,1200,1300].map(s=>`<option value="${s}" ${item.size==s?'selected':''}>${s}</option>`).join('')}
+            </select>`:''}
+            ${item.note==='ctn'
+              ? `<span style="font-size:.65rem;color:var(--teal);font-weight:700">10 pcs</span>`
+              : `<input type="number" value="${item.qty}" min="0" step="0.5"
               style="width:48px;background:var(--s2);border:1.5px solid var(--b2);border-radius:6px;padding:4px;color:var(--amber);font-size:.85rem;font-weight:800;outline:none;text-align:center"
               onchange="aiExtracted[${item._idx}].qty=parseFloat(this.value)||0"/>
-            <span style="font-size:.6rem;color:var(--muted)">kg</span>
+            <span style="font-size:.6rem;color:var(--muted)">kg</span>`
+            }
             <button onclick="aiExtracted.splice(${item._idx},1);renderAIResults()"
               style="background:transparent;border:none;color:var(--faint);font-size:.85rem;cursor:pointer;padding:2px 6px">✕</button>
           </div>`).join('')}
