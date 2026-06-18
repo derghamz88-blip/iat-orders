@@ -1412,8 +1412,8 @@ function addToOrder(){
   if(!selCust){toast('Select a customer first','err');return;}
   if(!selProds.size){toast('Select at least one product','err');return;}
   const date=document.getElementById('orderDate').value||todayStr();
-  // always assign next sequential number
-  const maxNum=orders.filter(o=>o.date===date).reduce((m,o)=>Math.max(m,o.num||0),0);
+  // ✅ ترقيم مستمر بغض النظر عن التاريخ
+  const maxNum=orders.reduce((m,o)=>Math.max(m,o.num||0),0);
   const num=maxNum+1;
   selProds.forEach((d,p)=>{
     orders.push({num,date,customer:selCust,product:p,qty:d.qty,size:d.size,note:d.note});
@@ -1443,9 +1443,17 @@ function closeTCDrop(){
   document.getElementById('tCustBtn').classList.remove('open');
 }
 function filterTCust(){
-  const q=(document.getElementById('tCustSrch').value||'').toLowerCase();
-  const filtered=q?customers.filter(c=>c.toLowerCase().includes(q)):customers;
-  renderTCustDL(filtered);
+  const q=(document.getElementById('tCustSrch').value||'').trim();
+  if(!q){ renderTCustDL(customers); return; }
+  // ✅ نفس matchCustomer - يجد أقرب اسم ويضعه أول
+  const best = matchCustomer(q);
+  const others = customers.filter(c=>
+    c !== best &&
+    (c.toLowerCase().includes(q.toLowerCase()) ||
+     similarity(q,c) > 25)
+  ).sort((a,b)=>similarity(q,b)-similarity(q,a));
+  const list = best ? [best, ...others.filter(c=>c!==best)] : others;
+  renderTCustDL(list.length ? list : customers.filter(c=>c.toLowerCase().includes(q.toLowerCase())));
 }
 function renderTCustDL(list){
   const el=document.getElementById('tCustDL');
@@ -5319,10 +5327,12 @@ function addAIOrdersToEntry() {
   if (!aiExtracted.length) { toast('No items', 'err'); return; }
 
   const date = document.getElementById('orderDate')?.value || todayStr();
-  const maxNum = orders.filter(o=>o.date===date).reduce((m,o)=>Math.max(m,o.num||0),0);
+
+  // ✅ ترقيم مستمر بغض النظر عن التاريخ
+  let nextNum = orders.reduce((m,o)=>Math.max(m,o.num||0), 0);
+
   const custNums  = new Map();
-  const custFirst = new Set(); // أول منتج لكل زبون في هذا الـ import
-  let nextNum = maxNum;
+  const custFirst = new Set();
 
   aiExtracted.forEach(item => {
     if (!custNums.has(item.customer)) {
@@ -5330,15 +5340,12 @@ function addAIOrdersToEntry() {
       custNums.set(item.customer, nextNum);
     }
 
-    // ✅ إذا الزبون موجود قبل → note "order 2" في أول منتج
     const isFirst = !custFirst.has(item.customer);
     if(isFirst) custFirst.add(item.customer);
 
-    const prevOrders = orders.filter(o=>o.date===date&&o.customer===item.customer);
-    const orderCount = prevOrders.length > 0
-      ? new Set(prevOrders.map(o=>o.num)).size + 1
-      : 0;
-
+    // ✅ إذا الزبون موجود قبل → note "order 2" في أول منتج
+    const prevNums = new Set(orders.filter(o=>o.customer===item.customer).map(o=>o.num));
+    const orderCount = prevNums.size > 0 ? prevNums.size + 1 : 0;
     const note = (isFirst && orderCount >= 2) ? `order ${orderCount}` : (item.note||'');
 
     orders.push({
@@ -5351,8 +5358,7 @@ function addAIOrdersToEntry() {
       num:      custNums.get(item.customer),
       driver:   ''
     });
-    if (item._rawC && item._rawC !== item.customer) learnSave('c', item._rawC, item.customer);
-    if (item._rawP && item._rawP !== item.product)  learnSave('p', item._rawP, item.product);
+    if (item._rawP && item._rawP !== item.product) learnSave('p', item._rawP, item.product);
   });
 
   saveOrders(); renderOrders(); updateBadges(); closeAIImport();
