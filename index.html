@@ -1263,7 +1263,9 @@ function saveNC(){
   if(!n){toast('Enter a name','err');return;}
   if(customers.includes(n)){toast('Already exists','err');return;}
   customers.push(n);LS.set('iat_c',customers);
-  renderCustDL(customers);pickCust(n);hideNC();toast('✓ Customer added','ok');
+  renderCustDL(customers);
+  renderTCustDL(customers); // ✅ تحديث Tender أيضاً
+  pickCust(n);hideNC();toast('✓ Customer added','ok');
 }
 
 // ── PRODUCT DROPDOWN ──
@@ -5304,40 +5306,52 @@ function renderAIResults() {
     grouped.get(item.customer).push({...item, _idx: i});
   });
 
-  document.getElementById('aiResultItems').innerHTML = [...grouped.entries()].map(([cust, items]) => `
-    <div style="background:var(--s3);border:1.5px solid var(--blue);border-radius:10px;overflow:hidden;margin-bottom:4px">
+  let html = '';
+  grouped.forEach((items, cust) => {
+    html += `<div style="background:var(--s3);border:1.5px solid var(--blue);border-radius:10px;overflow:hidden;margin-bottom:4px">
       <div style="display:flex;align-items:center;gap:8px;padding:9px 11px;background:rgba(77,124,254,.12);border-bottom:1px solid var(--b1)">
-        <div onclick="aiEditCustomer('${esc2(cust)}')"
-          style="flex:1;color:var(--blue2);font-size:.85rem;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:6px;padding:4px 0">
+        <div onclick="aiEditCustomer('${esc2(cust)}')" style="flex:1;color:var(--blue2);font-size:.85rem;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:6px;padding:4px 0">
           👤 ${esc2(cust)} <span style="font-size:.65rem;color:var(--muted)">✏️</span>
         </div>
-        <button onclick="aiDeleteCustomer('${esc2(cust)}')"
-          style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:.75rem;padding:4px 8px">✕</button>
+        <button onclick="aiDeleteCustomer('${esc2(cust)}')" style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:.75rem;padding:4px 8px">✕</button>
       </div>
-      <div style="padding:6px 11px;display:flex;flex-direction:column;gap:4px">
-        ${items.map(item => `
-          <div style="display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04)">
-            <div onclick="aiEditPicker(${item._idx},'product')"
-              style="flex:1;color:var(--teal);font-size:.79rem;font-weight:600;cursor:pointer;padding:2px 0">
-              🍗 ${esc2(item.product)}
-            </div>
-            ${isCHK(item.product)?`<select onchange="aiExtracted[${item._idx}].size=this.value"
-              style="background:var(--s2);border:1px solid var(--b2);border-radius:4px;padding:2px 3px;font-size:.62rem;color:var(--muted);outline:none">
-              <option value="">sz</option>
-              ${[800,900,1000,1100,1200,1300].map(s=>`<option value="${s}" ${item.size==s?'selected':''}>${s}</option>`).join('')}
-            </select>`:''}
-            ${item.note==='ctn'
-              ? `<span style="font-size:.65rem;color:var(--teal);font-weight:700">10 pcs</span>`
-              : `<input type="number" value="${item.qty}" min="0" step="0.5"
-              style="width:48px;background:var(--s2);border:1.5px solid var(--b2);border-radius:6px;padding:4px;color:var(--amber);font-size:.85rem;font-weight:800;outline:none;text-align:center"
-              onchange="aiExtracted[${item._idx}].qty=parseFloat(this.value)||0"/>
-            <span style="font-size:.6rem;color:var(--muted)">kg</span>`
-            }
-            <button onclick="aiExtracted.splice(${item._idx},1);renderAIResults()"
-              style="background:transparent;border:none;color:var(--faint);font-size:.85rem;cursor:pointer;padding:2px 6px">✕</button>
-          </div>`).join('')}
-      </div>
-    </div>`).join('');
+      <div style="padding:6px 11px;display:flex;flex-direction:column;gap:4px">`;
+
+    items.forEach(item => {
+      const isChk = isCHK(item.product);
+      const isCtn = item.note === 'ctn';
+      const sizeOpts = [800,900,1000,1100,1200,1300].map(s =>
+        `<option value="${s}" ${String(item.size)==String(s)?'selected':''}>${s}</option>`
+      ).join('');
+
+      html += `<div style="display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04)">
+        <div onclick="aiEditPicker(${item._idx},'product')" style="flex:1;color:var(--teal);font-size:.79rem;font-weight:600;cursor:pointer;padding:2px 0">
+          🍗 ${esc2(item.product)}
+        </div>`;
+
+      if (isChk) {
+        html += `<select onchange="aiExtracted[${item._idx}].size=this.value" style="background:var(--s2);border:1px solid var(--b2);border-radius:4px;padding:2px 3px;font-size:.62rem;color:var(--muted);outline:none">
+          <option value="">sz</option>${sizeOpts}
+        </select>`;
+      }
+
+      if (isCtn) {
+        html += `<span style="font-size:.65rem;color:var(--teal);font-weight:700">10 pcs</span>`;
+      } else {
+        html += `<input type="number" value="${item.qty}" min="0" step="0.5"
+          style="width:48px;background:var(--s2);border:1.5px solid var(--b2);border-radius:6px;padding:4px;color:var(--amber);font-size:.85rem;font-weight:800;outline:none;text-align:center"
+          onchange="aiExtracted[${item._idx}].qty=parseFloat(this.value)||0"/>
+          <span style="font-size:.6rem;color:var(--muted)">kg</span>`;
+      }
+
+      html += `<button onclick="aiExtracted.splice(${item._idx},1);renderAIResults()" style="background:transparent;border:none;color:var(--faint);font-size:.85rem;cursor:pointer;padding:2px 6px">✕</button>
+      </div>`;
+    });
+
+    html += `</div></div>`;
+  });
+
+  document.getElementById('aiResultItems').innerHTML = html;
 }
 
 // تعديل اسم زبون لجميع items بنفس الاسم
