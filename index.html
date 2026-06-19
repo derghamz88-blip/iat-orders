@@ -3573,12 +3573,11 @@ function clearAllTender(){
 
 function mergeTenderToOrders(){
   if(!tenderOrders.length){toast('No tender orders','err');return;}
-  const date=todayStr();
-  const maxNum=orders.filter(o=>o.date===date).reduce((m,o)=>Math.max(m,o.num||0),0);
-  let num=maxNum;
+  const date=document.getElementById('orderDate')?.value||todayStr();
+  // ✅ ترقيم مستمر بغض النظر عن التاريخ
+  let num=orders.reduce((m,o)=>Math.max(m,o.num||0),0);
   const custNums=new Map();
   tenderOrders.forEach(o=>{
-    // احسب الكغ
     let kg=0;
     const key=o.product||'';
     if(key.toUpperCase().includes('KG')){kg=parseInt(o.qty)||0;}
