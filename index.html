@@ -2346,7 +2346,17 @@ async function saveProductionDaily(){
   }
 }
 // ── دالة مشتركة تضيف Job للقائمة بدل الاستبدال ──
+// ✅ قفل لمنع تضارب الكتابة عند ضغط أكثر من زر بسرعة
+let _printJobLock = Promise.resolve();
+
 async function addPrintJob(job){
+  // ننتظر أي عملية سابقة تخلص قبل ما نبدأ
+  const myTurn = _printJobLock.then(() => _addPrintJobInner(job));
+  _printJobLock = myTurn.catch(() => {}); // حتى لو فشلت، نكمل للي بعدها
+  return myTurn;
+}
+
+async function _addPrintJobInner(job){
   const token=await getODToken();
   let jobs=[];
   try{
