@@ -381,6 +381,8 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     <button class="btn btn-ghost btn-sm" style="flex-shrink:0" onclick="exportXL()">⬇ Excel</button>
     <button class="btn btn-red btn-sm" id="clearLoadingBtn" style="flex-shrink:0" onclick="clearLoadingSheet()">🧹 Clear Sheet</button>
     <button class="btn btn-amber btn-sm" id="backupFileBtn" style="flex-shrink:0" onclick="openBackupDialog()">📂 Backup</button>
+    <button class="btn btn-green btn-sm" style="flex-shrink:0" onclick="printFolderPDF('invoices')">🧾 Invoices</button>
+    <button class="btn btn-purple btn-sm" style="flex-shrink:0" onclick="printFolderPDF('lpo')">📋 LPO</button>
   </div>
   <!-- نطاق طباعة إضافي محفوظ -->
   <div style="background:var(--s1);border-top:1px solid var(--b1);padding:6px 10px;display:flex;gap:8px;align-items:center;flex-shrink:0;overflow-x:auto;scrollbar-width:none">
@@ -2483,6 +2485,17 @@ async function directPrintLabels(){
   try{
     const count=await addPrintJob({action:'print_labels',from,to});
     toast(`✓ Labels ${from}-${to} queued (#${count})`,'ok');
+  }catch(e){
+    if(e.message!=='user_cancelled')toast('Error: '+e.message,'err');
+  }
+}
+
+async function printFolderPDF(folder){
+  const label = folder==='invoices' ? 'Invoices' : 'LPO';
+  const action = folder==='invoices' ? 'print_invoices' : 'print_lpo';
+  try{
+    const count=await addPrintJob({action});
+    toast(`✓ ${label} PDF queued (#${count})`,'ok');
   }catch(e){
     if(e.message!=='user_cancelled')toast('Error: '+e.message,'err');
   }
