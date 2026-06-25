@@ -2570,9 +2570,9 @@ async function tenderSaveToExcel(){
     const startRow=5;
     const seenCust=new Set();
     const values=sorted.map(o=>{
-      const key=(o.num||'')+'_'+(o.customer||'');
-      const isFirst=!seenCust.has(key);
-      if(isFirst)seenCust.add(key);
+      const custKey=o.customer||'';
+      const isFirst=!seenCust.has(custKey);
+      if(isFirst)seenCust.add(custKey);
       // حساب AR - عدد الكراتين
       const prod=(o.product||'').toLowerCase();
       const qty=parseFloat(o.qty)||0;
