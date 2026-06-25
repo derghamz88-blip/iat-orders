@@ -245,6 +245,7 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
   <!-- Qty tab removed - use All Qty -->
   <div class="ntab" onclick="showPage('tender',this)">🏷 Tender</div>
   <div class="ntab" onclick="showPage('tender-orders',this)">📋 T.Orders</div>
+  <div class="ntab" onclick="showPage('tender-view',this)">👁 T.View</div>
   <!-- T.Qty tab removed - use All Qty -->
   <div class="ntab" onclick="showPage('combined-qty',this)">📊 All Qty</div>
   <!-- Report tab removed -->
@@ -504,17 +505,29 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
 <div class="page" id="pg-tender-view">
   <div class="orders-head">
     <div>
-      <div style="font-size:.68rem;font-family:var(--mono);color:var(--muted);letter-spacing:.1em;text-transform:uppercase">Tender Orders Preview</div>
+      <div style="font-size:.68rem;font-family:var(--mono);color:var(--muted);letter-spacing:.1em;text-transform:uppercase">Tender View</div>
     </div>
     <div style="display:flex;gap:7px">
       <span class="badge" id="tenderViewBadge">0</span>
     </div>
   </div>
-  <div style="flex:1;overflow-y:auto;padding:8px">
-    <div id="tenderViewList"></div>
+  <div style="flex:1;overflow-y:auto;">
+    <div class="olist" id="tenderViewList">
+      <div class="empty"><div class="ei">🏷</div><p>No tender orders yet.</p></div>
+    </div>
   </div>
-  <div style="padding:8px;flex-shrink:0">
-    <button class="btn btn-purple" style="width:100%" onclick="mergeTenderToOrders()">➕ Add All to Orders</button>
+  <div class="exp-bar">
+    <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
+      <label style="font-size:.7rem;color:var(--amber);white-space:nowrap;font-weight:700">🏷 Print:</label>
+      <input type="number" id="tenderPrintFrom" placeholder="From" min="1" step="1" onclick="this.select()" style="width:60px;padding:6px;border:1.5px solid var(--b2);border-radius:6px;font-size:.8rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--amber);font-weight:700;outline:none" value="1"/>
+      <span style="color:var(--muted);font-size:.8rem">→</span>
+      <input type="number" id="tenderPrintTo" placeholder="To" min="1" step="1" onclick="this.select()" style="width:60px;padding:6px;border:1.5px solid var(--b2);border-radius:6px;font-size:.8rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--amber);font-weight:700;outline:none" value="100"/>
+    </div>
+    <button class="btn btn-teal btn-sm" style="flex-shrink:0" onclick="tenderSaveToExcel()">☁ Save</button>
+    <button class="btn btn-blue btn-sm" style="flex-shrink:0" onclick="tenderDirectPrintOrders()">🖨 Orders</button>
+    <button class="btn btn-amber btn-sm" style="flex-shrink:0" onclick="tenderDirectPrintLabels()">🏷 Labels</button>
+    <button class="btn btn-purple btn-sm" style="flex-shrink:0" onclick="mergeTenderToOrders()">➕ Add to Orders</button>
+    <button class="btn btn-red btn-sm" style="flex-shrink:0" onclick="clearTenderSheet()">🧹 Clear Sheet</button>
   </div>
 </div>
 
@@ -2262,6 +2275,30 @@ async function clearLoadingSheet(){
   });
 }
 
+async function clearTenderSheet(){
+  confDlg('Clear AI5:AR1000 from tender order sheet?', async ()=>{
+    try{
+      const token=await getODToken();
+      const fileRes=await fetch(
+        `https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,
+        {headers:{'Authorization':'Bearer '+token}}
+      );
+      if(!fileRes.ok) throw new Error('production.xlsm not found');
+      const fileId=(await fileRes.json()).id;
+      const clearUrl=`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/workbook/worksheets/tender order/range(address='AI5:AR1000')/clear`;
+      const r=await fetch(clearUrl,{
+        method:'POST',
+        headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+        body:JSON.stringify({applyTo:'Contents'})
+      });
+      if(!r.ok){const err=await r.text();throw new Error(err);}
+      toast('✓ Tender sheet cleared (AI5:AR1000)','ok');
+    }catch(e){
+      toast('Error: '+e.message,'err');
+    }
+  });
+}
+
 // ── Backup Production File ──
 function openBackupDialog(){
   const d=document.getElementById('orderDate')?.value||todayStr();
@@ -2490,12 +2527,108 @@ async function directPrintLabels(){
   }
 }
 
+// ── PDF Folder Print ──
 async function printFolderPDF(folder){
   const label = folder==='invoices' ? 'Invoices' : 'LPO';
   const action = folder==='invoices' ? 'print_invoices' : 'print_lpo';
   try{
     const count=await addPrintJob({action});
     toast(`✓ ${label} PDF queued (#${count})`,'ok');
+  }catch(e){
+    if(e.message!=='user_cancelled')toast('Error: '+e.message,'err');
+  }
+}
+
+// ── Tender Save + Print ──
+async function tenderSaveToExcel(){
+  if(!tenderOrders.length){toast('No tender orders','err');return;}
+  const from=parseInt(document.getElementById('tenderPrintFrom').value)||1;
+  const to=parseInt(document.getElementById('tenderPrintTo').value)||999;
+  const btn=event?.target;
+  if(btn){btn.disabled=true;btn.textContent='⏳...';}
+  try{
+    const token=await getODToken();
+    const sorted=[...tenderOrders].sort((a,b)=>(a.num||0)-(b.num||0));
+    if(!sorted.length){toast('No tender orders','err');return;}
+    const fileRes=await fetch(
+      `https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,
+      {headers:{'Authorization':'Bearer '+token}}
+    );
+    if(!fileRes.ok) throw new Error('production.xlsm not found');
+    const fileId=(await fileRes.json()).id;
+    const baseUrl=`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/workbook/worksheets/`;
+    // كتابة الأوردرات في tender order شيت - نفس columns الـ Loading
+    const startRow=5;
+    const seenCust=new Set();
+    const values=sorted.map(o=>{
+      const key=(o.num||'')+'_'+(o.customer||'');
+      const isFirst=!seenCust.has(key);
+      if(isFirst)seenCust.add(key);
+      // حساب AR - عدد الكراتين
+      const prod=(o.product||'').toLowerCase();
+      const qty=parseFloat(o.qty)||0;
+      let ar='';
+      if(prod.includes('zaki')||prod.includes('chickenco')||prod.includes('chickenko')){
+        ar=Math.ceil(qty/25)||1;
+      }else if(prod.includes('kg')){
+        ar=Math.ceil(qty/10)||1;
+      }
+      return [
+        o.driver||'',          // AI
+        o.num||'',             // AJ
+        isFirst?o.num||'':'',  // AK
+        o.customer||'',        // AL
+        o.customer||'',        // AM
+        o.product||'',         // AN
+        o.qty||0,              // AO
+        o.size||'',            // AP
+        o.note||'',            // AQ
+        ar                     // AR
+      ];
+    });
+    const lastRow=startRow+values.length-1;
+    const rangeAddr=`AI${startRow}:AR${lastRow}`;
+    const r1=await fetch(baseUrl+`tender order/range(address='${rangeAddr}')`,{
+      method:'PATCH',
+      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:JSON.stringify({values})
+    });
+    if(!r1.ok){const e=await r1.text();throw new Error('Tender write failed: '+e);}
+    // كتابة BS1=from, BT1=to في شيت tender order
+    const r2=await fetch(baseUrl+`tender order/range(address='BS1:BT1')`,{
+      method:'PATCH',
+      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:JSON.stringify({values:[[from,to]]})
+    });
+    if(!r2.ok) throw new Error('Failed BS1:BT1 tender');
+    toast(`✓ Saved ${sorted.length} rows → tender order`,'ok');
+  }catch(e){
+    if(e.message!=='user_cancelled')toast('Error: '+e.message,'err');
+    console.error(e);
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='☁ Save';}
+  }
+}
+
+async function tenderDirectPrintOrders(){
+  const from=parseInt(document.getElementById('tenderPrintFrom').value);
+  const to=parseInt(document.getElementById('tenderPrintTo').value);
+  if(!from||!to||from>to){toast('Set valid range first','err');return;}
+  try{
+    const count=await addPrintJob({action:'print_tender_orders',from,to});
+    toast(`✓ Tender Orders ${from}-${to} queued (#${count})`,'ok');
+  }catch(e){
+    if(e.message!=='user_cancelled')toast('Error: '+e.message,'err');
+  }
+}
+
+async function tenderDirectPrintLabels(){
+  const from=parseInt(document.getElementById('tenderPrintFrom').value);
+  const to=parseInt(document.getElementById('tenderPrintTo').value);
+  if(!from||!to||from>to){toast('Set valid range first','err');return;}
+  try{
+    const count=await addPrintJob({action:'print_tender_labels',from,to});
+    toast(`✓ Tender Labels ${from}-${to} queued (#${count})`,'ok');
   }catch(e){
     if(e.message!=='user_cancelled')toast('Error: '+e.message,'err');
   }
