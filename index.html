@@ -3749,7 +3749,7 @@ function mergeTenderToOrders(){
     else{let g=400;if(key.includes('450'))g=450;else if(key.includes('500'))g=500;kg=(parseInt(o.qty)||0)*(g/1000);}
     if(!custNums.has(o.customer)){num++;custNums.set(o.customer,num);}
     const custName=(o.customer||'')+' tender';
-    orders.push({customer:custName,product:o.product,qty:kg||o.qty,size:'',note:'',date,num:custNums.get(o.customer),driver:'',isTender:true,tQty:parseInt(o.qty)||0});
+    orders.push({customer:custName,product:o.product,qty:kg||o.qty,size:'',note:`Tender # ${o.num||'?'}`,date,num:custNums.get(o.customer),driver:'',isTender:true,tQty:parseInt(o.qty)||0});
   });
   saveOrders();
   toast(`✓ ${tenderOrders.length} rows added to Orders`,'ok');
@@ -4428,12 +4428,19 @@ function filterTenderProdModal(idx,q){
 function addTenderAIToList(){
   if(!window.tenderAIExtracted?.length)return;
   const now=new Date().toISOString().slice(0,10);
+  // ترقيم مستقل - كل زبون جديد يأخذ رقم جديد
+  let maxNum=tenderOrders.reduce((m,o)=>Math.max(m,o.num||0),0);
+  const custNums=new Map();
+  // زبائن موجودين مسبقاً
+  tenderOrders.forEach(o=>{if(o.num&&o.customer)custNums.set(o.customer,o.num);});
   window.tenderAIExtracted.forEach(item=>{
+    if(!custNums.has(item.customer)){maxNum++;custNums.set(item.customer,maxNum);}
     tenderOrders.push({
       date:now,
       customer:item.customer,
       product:item.product,
-      qty:item.qty
+      qty:item.qty,
+      num:custNums.get(item.customer)
     });
   });
   LS.set('iat_to',tenderOrders);
@@ -4579,41 +4586,33 @@ function applyTProdEdit(idx,prod){
 function renderTenderViewList(){
   const el=document.getElementById('tenderViewList');
   document.getElementById('tenderViewBadge').textContent=tenderOrders.length;
-  
   if(!tenderOrders.length){el.innerHTML='<div style="color:var(--muted);font-size:.8rem;text-align:center;padding:20px">No orders</div>';return;}
-  
-  let html='';
-  const groupedByDate=new Map();
-  tenderOrders.forEach(order=>{
-    const date=order.date||'—';
-    if(!groupedByDate.has(date))groupedByDate.set(date,[]);
-    groupedByDate.get(date).push(order);
+
+  // تجميع حسب الزبون مع الرقم
+  const byCustomer=new Map();
+  tenderOrders.forEach(o=>{
+    if(!byCustomer.has(o.customer))byCustomer.set(o.customer,{num:o.num,items:[]});
+    byCustomer.get(o.customer).items.push(o);
   });
-  
-  [...groupedByDate.entries()].forEach(([date,orders])=>{
-    html+='<div style="margin-bottom:8px">';
-    html+='<div style="font-family:var(--mono);font-size:.65rem;color:var(--teal);padding:4px;letter-spacing:.08em">📅 '+date+'</div>';
-    
-    const byCustomer=new Map();
-    orders.forEach(order=>{
-      if(!byCustomer.has(order.customer))byCustomer.set(order.customer,[]);
-      byCustomer.get(order.customer).push(order);
-    });
-    
-    [...byCustomer.entries()].forEach(([cust,custOrders])=>{
-      html+='<div style="background:var(--s1);border-radius:3px;padding:4px;margin-bottom:4px">';
-      html+='<div style="font-weight:600;font-size:.7rem;margin-bottom:2px">👤 '+cust+'</div>';
-      custOrders.forEach(o=>{
-        html+='<div style="display:flex;gap:6px;padding:2px;font-size:.65rem">';
-        html+='<span style="flex:1">'+o.product+'</span>';
-        html+='<span style="color:var(--muted)">'+o.qty+'</span>';
-        html+='</div>';
-      });
-      html+='</div>';
-    });
-    html+='</div>';
-  });
-  el.innerHTML=html;
+
+  // ترتيب حسب الرقم
+  const sorted=[...byCustomer.entries()].sort((a,b)=>(a[1].num||0)-(b[1].num||0));
+
+  el.innerHTML=sorted.map(([cust,data])=>`
+    <div class="cc" style="margin-bottom:6px;border-color:rgba(251,191,36,.2)">
+      <div class="cc-h" style="background:linear-gradient(90deg,rgba(251,191,36,.12),transparent);border-bottom-color:rgba(251,191,36,.2);padding:7px 10px">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-family:var(--mono);font-size:.68rem;color:var(--amber);background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.3);border-radius:4px;padding:2px 7px;font-weight:700">#${data.num||'?'}</span>
+          <span style="font-weight:700;font-size:.78rem;color:#fcd34d">👤 ${cust}</span>
+        </div>
+      </div>
+      ${data.items.map(o=>`
+        <div style="display:flex;gap:8px;align-items:center;padding:5px 10px;font-size:.75rem;border-bottom:1px solid var(--faint)">
+          <span style="flex:1;color:var(--txt)">${o.product||'?'}</span>
+          <span style="font-family:var(--mono);font-weight:700;color:var(--amber)">${o.qty}</span>
+          <span style="font-size:.65rem;color:var(--muted)">trays</span>
+        </div>`).join('')}
+    </div>`).join('');
 }
 
 function switchAITab(tab){
