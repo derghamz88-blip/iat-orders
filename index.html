@@ -2146,10 +2146,11 @@ async function saveOrdersToLoading(from,to,dateVal){
       const key=(o.num||'')+'_'+(o.customer||'');
       const isFirst=!seenCust.has(key);
       if(isFirst)seenCust.add(key);
+      const akVal=isFirst?(o.isTender?`T${o.tNum||o.num||''}`:o.num||''):'';
       return [
         o.driver||'',          // AI
         o.num||'',             // AJ - رقم الأوردر في كل صف
-        isFirst?o.num||'':'',  // AK - رقم الأوردر أول صف فقط
+        akVal,                 // AK - رقم الأوردر أول صف فقط (T3 للتندر)
         o.customer||'',        // AL
         o.customer||'',        // AM
         o.product||'',         // AN
@@ -3749,7 +3750,7 @@ function mergeTenderToOrders(){
     else{let g=400;if(key.includes('450'))g=450;else if(key.includes('500'))g=500;kg=(parseInt(o.qty)||0)*(g/1000);}
     if(!custNums.has(o.customer)){num++;custNums.set(o.customer,num);}
     const custName=(o.customer||'')+' tender';
-    orders.push({customer:custName,product:o.product,qty:kg||o.qty,size:'',note:`Tender # ${o.num||'?'}`,date,num:custNums.get(o.customer),driver:'',isTender:true,tQty:parseInt(o.qty)||0});
+    orders.push({customer:custName,product:o.product,qty:kg||o.qty,size:'',note:`Tender # ${o.num||'?'}`,date,num:custNums.get(o.customer),tNum:o.num,driver:'',isTender:true,tQty:parseInt(o.qty)||0});
   });
   saveOrders();
   toast(`✓ ${tenderOrders.length} rows added to Orders`,'ok');
