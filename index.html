@@ -1597,9 +1597,18 @@ function setTSelProdNote(idx,v){
 function addTenderOrder(){
   if(!tSelCust){toast('Select a customer','err');return;}
   if(!tSelProds.size){toast('Select products','err');return;}
-  
+
+  // ترقيم مستقل للتندر - كل زبون جديد يأخذ رقم جديد
+  const existingNums=tenderOrders.filter(o=>o.customer===tSelCust).map(o=>o.num).filter(Boolean);
+  let tNum;
+  if(existingNums.length){
+    tNum=existingNums[0]; // نفس الرقم إذا الزبون موجود
+  }else{
+    tNum=tenderOrders.reduce((m,o)=>Math.max(m,o.num||0),0)+1;
+  }
+
   tSelProds.forEach((d,p)=>{
-    tenderOrders.push({customer:tSelCust,product:p,qty:d.qty,note:d.note});
+    tenderOrders.push({customer:tSelCust,product:p,qty:d.qty,note:d.note,num:tNum});
   });
   
   saveTenderOrders(); // ✅ يحفظ + يحدث Combined Qty إذا مفتوح
@@ -4454,6 +4463,7 @@ function renderTOrdersPage(){
     <div class="cc" style="border-color:rgba(251,191,36,.25)">
       <div class="cc-h" style="background:linear-gradient(90deg,rgba(251,191,36,.15),transparent);border-bottom-color:rgba(251,191,36,.2)">
         <span class="cc-name" style="display:flex;align-items:center;gap:4px;color:#fcd34d">
+          <span style="font-family:var(--mono);font-size:.7rem;color:var(--amber);background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.3);border-radius:4px;padding:2px 7px;font-weight:700">#${items[0].num||'?'}</span>
           <span style="cursor:pointer;padding:5px 8px;background:rgba(251,191,36,.1);border-radius:5px;font-size:.78rem;font-weight:700;border:1.5px solid rgba(251,191,36,.35);display:inline-block;color:#fcd34d" onclick="openTCustEdit('${esc(c)}')">
             👤 ${c}<br/><span style="font-size:.6rem;color:var(--muted);font-weight:400">✏️ Edit</span>
           </span>
