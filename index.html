@@ -1671,49 +1671,38 @@ function renderOrders(){
   updateBadges();
   if(!orders.length){el.innerHTML='<div class="empty"><div class="ei">📋</div><p>No orders yet.</p></div>';return;}
 
-  // ✅ تجميع بـ (customer + num) - كل num منفصل حتى لو نفس الزبون
-  const dateMap=new Map();
+  // تجميع بـ (customer + num) مرتب حسب num تصاعدياً
+  const custMap=new Map();
   orders.forEach((o,i)=>{
-    const dk=o.date||'—';
-    if(!dateMap.has(dk))dateMap.set(dk,new Map());
-    const cm=dateMap.get(dk);
-    const groupKey=`${o.customer}__${o.num||0}`;  // ✅ مفتاح مركب
-    if(!cm.has(groupKey))cm.set(groupKey,[]);
-    cm.get(groupKey).push({...o,idx:i});
+    const groupKey=`${o.customer}__${o.num||0}`;
+    if(!custMap.has(groupKey))custMap.set(groupKey,[]);
+    custMap.get(groupKey).push({...o,idx:i});
   });
+  const sortedGroups=[...custMap.entries()].sort((a,b)=>(a[1][0].num||0)-(b[1][0].num||0));
+  const groupKeys=sortedGroups.map(([k])=>k);
 
-  // ✅ ترتيب حسب num تصاعدياً
-  const sortedDateMap=new Map();
-  [...dateMap.entries()].forEach(([date,cm])=>{
-    const arr=[...cm.entries()].sort((a,b)=>(a[1][0].num||0)-(b[1][0].num||0));
-    sortedDateMap.set(date,new Map(arr));
-  });
-
-  el.innerHTML=[...sortedDateMap.entries()].map(([date,custMap])=>{
-    const custKeys=[...custMap.keys()];
-    return `<div style="margin-bottom:4px">
-      <div style="font-family:var(--mono);font-size:.65rem;color:var(--teal);padding:6px 4px;letter-spacing:.08em">📅 ${date}</div>
-      ${custKeys.map((groupKey,ci)=>{
-        const c=custMap.get(groupKey)[0].customer;  // اسم الزبون الحقيقي
-        const items=custMap.get(groupKey);
-        const canUp=ci>0; const canDn=ci<custKeys.length-1;
-        return `<div class="cc">
-          <div class="cc-h">
-            <span class="cc-name" style="display:flex;align-items:center;gap:4px">
-              <div class="cc-move">
-                <button class="cc-mb" ${canUp?'':'disabled'} onclick="moveGroup('${esc(date)}','${esc(c)}',${items[0].num||0},-1)">▲</button>
-                <button class="cc-mb" ${canDn?'':'disabled'} onclick="moveGroup('${esc(date)}','${esc(c)}',${items[0].num||0},1)">▼</button>
-              </div>
-              <input class="cc-num" type="number" min="1" value="${items[0].num||''}" title="Order #" onchange="setGroupNum('${esc(date)}','${esc(c)}',${items[0].num||0},this.value)" onclick="this.select()"/>
-              <span style="cursor:pointer;user-select:none;padding:4px 6px;background:var(--b1);border-radius:2px;font-size:.75rem;border:1px solid var(--b2);display:inline-block" onclick="openCustModal('${esc(c)}','${esc(date)}',${items[0].num||0})">
-                ${(()=>{const prev=orders.filter(o=>(o.date||'—')===date&&o.customer===c&&(o.num||0)<(items[0].num||0));const orderIdx=prev.length>0?new Set(prev.map(o=>o.num)).size+1:0;return orderIdx>=2?`👤 ${c} <span style="background:var(--amber);color:#000;border-radius:3px;padding:0 4px;font-size:.65rem;font-weight:800">${orderIdx}</span>`:`👤 ${c}`;})()}
-                <br/><span style="font-size:.6rem;color:var(--muted)">✏️ Edit</span>
-              </span>
-            </span>
-            <button class="cc-del" onclick="addProdToOrder('${esc(c)}','${date}',${items[0].num||0})">+ Add</button>
-            <button class="cc-del" onclick="delCust('${esc(c)}','${date}',${items[0].num||0})">Remove ✕</button>
+  el.innerHTML=sortedGroups.map(([groupKey,items],ci)=>{
+    const c=items[0].customer;
+    const date=items[0].date||'—';
+    const canUp=ci>0; const canDn=ci<groupKeys.length-1;
+    return `<div class="cc">
+      <div class="cc-h">
+        <span class="cc-name" style="display:flex;align-items:center;gap:4px">
+          <div class="cc-move">
+            <button class="cc-mb" ${canUp?'':'disabled'} onclick="moveGroup('${esc(date)}','${esc(c)}',${items[0].num||0},-1)">▲</button>
+            <button class="cc-mb" ${canDn?'':'disabled'} onclick="moveGroup('${esc(date)}','${esc(c)}',${items[0].num||0},1)">▼</button>
           </div>
-          ${items.map(o=>`<div data-oidx="${o.idx}" style="display:flex;gap:3px;align-items:center;padding:3px 4px;background:var(--s1);border-radius:2px;font-size:.68rem;margin-bottom:1px">
+          <input class="cc-num" type="number" min="1" value="${items[0].num||''}" title="Order #" onchange="setGroupNum('${esc(date)}','${esc(c)}',${items[0].num||0},this.value)" onclick="this.select()"/>
+          <span style="cursor:pointer;user-select:none;padding:4px 6px;background:var(--b1);border-radius:2px;font-size:.75rem;border:1px solid var(--b2);display:inline-block" onclick="openCustModal('${esc(c)}','${esc(date)}',${items[0].num||0})">
+            👤 ${c}
+            <br/><span style="font-size:.6rem;color:var(--muted)">✏️ Edit</span>
+          </span>
+          <span style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">${date}</span>
+        </span>
+        <button class="cc-del" onclick="addProdToOrder('${esc(c)}','${date}',${items[0].num||0})">+ Add</button>
+        <button class="cc-del" onclick="delCust('${esc(c)}','${date}',${items[0].num||0})">Remove ✕</button>
+      </div>
+      ${items.map(o=>`<div data-oidx="${o.idx}" style="display:flex;gap:3px;align-items:center;padding:3px 4px;background:var(--s1);border-radius:2px;font-size:.68rem;margin-bottom:1px">
             <button class="pr-del" onclick="delRow(${o.idx})" style="flex-shrink:0;padding:1px 3px;font-size:.65rem">✕</button>
             <div style="display:flex;flex-direction:column;gap:1px;flex-shrink:0;margin-right:1px">
               <button onclick="moveProd(${o.idx},-1)" style="background:var(--s3);border:1px solid var(--b2);border-radius:2px;padding:0 3px;cursor:pointer;color:var(--muted);font-size:.55rem;line-height:1.4">▲</button>
@@ -1741,8 +1730,6 @@ function renderOrders(){
             ${isCHK(o.product)?'<select class="pr-qi" value="'+o.size+'" onchange="setOrdSize('+o.idx+',this.value)" style="width:60px;flex-shrink:0;font-size:.62rem"><option value="">Size</option>'+SIZES.map(s=>'<option value="'+s+'" '+(o.size===s?'selected':'')+'>'+s+'g</option>').join('')+'<option value="">Custom</option></select>'+(o.size&&!SIZES.includes(o.size)?'<span style="width:60px;flex-shrink:0;padding:2px;text-align:center;font-size:.62rem">'+o.size+'g</span>':''):''}
           </div>`).join('')}
         </div>`;
-      }).join('')}
-    </div>`;
   }).join('');
   if(par) par.scrollTop = scrollTop;
 }
@@ -2008,40 +1995,33 @@ function hideAddProdDlg(){
 function renderViewOrders(){
   const el=document.getElementById('viewList');
   if(!orders.length){el.innerHTML='<div class="empty"><div class="ei">📋</div><p>No orders yet.</p></div>';return;}
-  const dateMap=new Map();
+
+  // تجميع حسب الزبون+الرقم مرتب تصاعدياً بالرقم
+  const custMap=new Map();
   orders.forEach(o=>{
-    const dk=o.date||'—';
-    if(!dateMap.has(dk))dateMap.set(dk,new Map());
-    const cm=dateMap.get(dk);
     const gk=o.customer+'__'+(o.num||0);
-    if(!cm.has(gk))cm.set(gk,[]);
-    cm.get(gk).push(o);
+    if(!custMap.has(gk))custMap.set(gk,[]);
+    custMap.get(gk).push(o);
   });
-  const sorted=new Map();
-  [...dateMap.entries()].forEach(([d,cm])=>{
-    const arr=[...cm.entries()].sort((a,b)=>(a[1][0].num||0)-(b[1][0].num||0));
-    sorted.set(d,new Map(arr));
-  });
-  el.innerHTML=[...sorted.entries()].map(([date,custMap])=>`
-    <div style="margin-bottom:2px">
-      <div style="font-family:var(--mono);font-size:.6rem;color:var(--teal);padding:3px 6px;letter-spacing:.08em">📅 ${date}</div>
-      ${[...custMap.entries()].map(([,items])=>{
-        const c=items[0].customer; const num=items[0].num||'';
-        return `<div class="cc" style="margin-bottom:2px">
-          <div class="cc-h" style="padding:6px 10px">
-            <span class="cc-name" style="font-size:.8rem">
-              <span style="color:var(--amber);font-family:var(--mono);font-weight:800;margin-right:6px">${num}</span>👤 ${c}
-            </span>
-          </div>
-          ${items.map(o=>`<div style="padding:3px 10px;font-size:.7rem;display:flex;gap:8px;align-items:center;border-bottom:1px solid rgba(255,255,255,.03)">
-            <span style="flex:1;font-weight:600">${o.product}</span>
-            <span style="color:var(--amber);font-family:var(--mono);font-size:.68rem;font-weight:700">${o.qty}kg</span>
-            ${o.size?`<span style="background:var(--s2);padding:1px 4px;border-radius:2px;font-size:.6rem;color:var(--muted)">${o.size}g</span>`:''}
-            ${o.note?`<span style="color:var(--teal);font-size:.6rem;font-style:italic">${o.note}</span>`:''}
-          </div>`).join('')}
-        </div>`;
-      }).join('')}
-    </div>`).join('');
+  const sorted=[...custMap.entries()].sort((a,b)=>(a[1][0].num||0)-(b[1][0].num||0));
+  el.innerHTML=sorted.map(([,items])=>{
+    const c=items[0].customer; const num=items[0].num||'';
+    const date=items[0].date||'';
+    return `<div class="cc" style="margin-bottom:2px">
+      <div class="cc-h" style="padding:6px 10px">
+        <span class="cc-name" style="font-size:.8rem">
+          <span style="color:var(--amber);font-family:var(--mono);font-weight:800;margin-right:6px">${num}</span>👤 ${c}
+        </span>
+        ${date?`<span style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">${date}</span>`:''}
+      </div>
+      ${items.map(o=>`<div style="padding:3px 10px;font-size:.7rem;display:flex;gap:8px;align-items:center;border-bottom:1px solid rgba(255,255,255,.03)">
+        <span style="flex:1;font-weight:600">${o.product}</span>
+        <span style="color:var(--amber);font-family:var(--mono);font-size:.68rem;font-weight:700">${o.qty}kg</span>
+        ${o.size?`<span style="background:var(--s2);padding:1px 4px;border-radius:2px;font-size:.6rem;color:var(--muted)">${o.size}g</span>`:''}
+        ${o.note?`<span style="color:var(--teal);font-size:.6rem;font-style:italic">${o.note}</span>`:''}
+      </div>`).join('')}
+    </div>`;
+  }).join('');
 }
 function delCust(c,date,num){
   confDlg(`Remove ${c}?`,()=>{
