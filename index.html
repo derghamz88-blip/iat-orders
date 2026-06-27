@@ -519,9 +519,9 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
   <div class="exp-bar">
     <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
       <label style="font-size:.7rem;color:var(--amber);white-space:nowrap;font-weight:700">🏷 Print:</label>
-      <input type="number" id="tenderPrintFrom" placeholder="From" min="1" step="1" onclick="this.select()" style="width:60px;padding:6px;border:1.5px solid var(--b2);border-radius:6px;font-size:.8rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--amber);font-weight:700;outline:none" value="1"/>
+      <input type="number" id="tenderPrintFrom" placeholder="From" min="1" step="1" onclick="this.select()" onchange="LS.set('iat_tpr_from',this.value)" style="width:60px;padding:6px;border:1.5px solid var(--b2);border-radius:6px;font-size:.8rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--amber);font-weight:700;outline:none" value="1"/>
       <span style="color:var(--muted);font-size:.8rem">→</span>
-      <input type="number" id="tenderPrintTo" placeholder="To" min="1" step="1" onclick="this.select()" style="width:60px;padding:6px;border:1.5px solid var(--b2);border-radius:6px;font-size:.8rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--amber);font-weight:700;outline:none" value="100"/>
+      <input type="number" id="tenderPrintTo" placeholder="To" min="1" step="1" onclick="this.select()" onchange="LS.set('iat_tpr_to',this.value)" style="width:60px;padding:6px;border:1.5px solid var(--b2);border-radius:6px;font-size:.8rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--amber);font-weight:700;outline:none" value="100"/>
     </div>
     <button class="btn btn-teal btn-sm" style="flex-shrink:0" onclick="tenderSaveToExcel()">☁ Save</button>
     <button class="btn btn-blue btn-sm" style="flex-shrink:0" onclick="tenderDirectPrintOrders()">🖨 Orders</button>
@@ -1225,7 +1225,13 @@ function showPage(n,t){
     renderTenderOrdersList();
   }
   if(n==='tender-orders'){tenderProds=LS.get('iat_tp',DTP);renderTOrdersPage();}
-  if(n==='tender-view'){renderTenderViewList();}
+  if(n==='tender-view'){
+    renderTenderViewList();
+    const savedFrom=LS.get('iat_tpr_from',null);
+    const savedTo=LS.get('iat_tpr_to',null);
+    if(savedFrom)document.getElementById('tenderPrintFrom').value=savedFrom;
+    if(savedTo)document.getElementById('tenderPrintTo').value=savedTo;
+  }
   if(n==='tqty')renderTQtyPage();
   if(n==='combined-qty'){
     orders=LS.get('iat_orders',[]);
@@ -1438,7 +1444,7 @@ function addToOrder(){
   const maxNum=orders.reduce((m,o)=>Math.max(m,o.num||0),0);
   const num=maxNum+1;
   selProds.forEach((d,p)=>{
-    orders.push({num,date,customer:selCust,product:p,qty:d.qty,size:d.size,note:d.note});
+    orders.push({num,customer:selCust,product:p,qty:d.qty,size:d.size,note:d.note});
     freq[p]=(freq[p]||0)+1;
   });
   LS.set('iat_freq',freq);
@@ -1985,7 +1991,7 @@ function selectProdForAdd(cust,date,num,prod){
 }
 function finishAddProd(cust,date,num,prod,size){
   const qty=parseFloat(prompt('Quantity (kg):')||'1');
-  orders.push({num:num||0,date,customer:cust,product:prod,qty,size:size||'',note:''});
+  orders.push({num:num||0,customer:cust,product:prod,qty,size:size||'',note:''});
   saveOrders();renderOrders();renderViewOrders();hideAddProdDlg();toast('✓ Product added','ok');
 }
 function hideAddProdDlg(){
@@ -3727,7 +3733,7 @@ function mergeTenderToOrders(){
   tenderOrders.forEach(o=>{
     if(!custNums.has(o.customer)){num++;custNums.set(o.customer,num);}
     const custName=(o.customer||'')+' tender';
-    orders.push({customer:custName,product:o.product,qty:o.qty,size:'',note:`Tender # ${o.num||'?'}`,date,num:custNums.get(o.customer),tNum:o.num,driver:'',isTender:true,tQty:parseInt(o.qty)||0});
+    orders.push({customer:custName,product:o.product,qty:o.qty,size:'',note:`Tender # ${o.num||'?'}`,num:custNums.get(o.customer),tNum:o.num,driver:'',isTender:true,tQty:parseInt(o.qty)||0});
   });
   saveOrders();
   toast(`✓ ${tenderOrders.length} rows added to Orders`,'ok');
@@ -4414,7 +4420,6 @@ function addTenderAIToList(){
   window.tenderAIExtracted.forEach(item=>{
     if(!custNums.has(item.customer)){maxNum++;custNums.set(item.customer,maxNum);}
     tenderOrders.push({
-      date:now,
       customer:item.customer,
       product:item.product,
       qty:item.qty,
@@ -5555,7 +5560,6 @@ function addAIOrdersToEntry() {
       qty:      item.qty || 1,
       size:     item.size || '',
       note,
-      date,
       num:      custNums.get(item.customer),
       driver:   ''
     });
