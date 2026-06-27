@@ -1700,10 +1700,9 @@ function renderOrders(){
           </div>
           <input class="cc-num" type="number" min="1" value="${items[0].num||''}" title="Order #" onchange="setGroupNum('${esc(date)}','${esc(c)}',${items[0].num||0},this.value)" onclick="this.select()"/>
           <span style="cursor:pointer;user-select:none;padding:4px 6px;background:var(--b1);border-radius:2px;font-size:.75rem;border:1px solid var(--b2);display:inline-block" onclick="openCustModal('${esc(c)}','${esc(date)}',${items[0].num||0})">
-            👤 ${c}
+            ${(()=>{const prevNums=new Set(orders.filter(o=>o.customer===c&&(o.num||0)<(items[0].num||0)).map(o=>o.num));const orderIdx=prevNums.size>0?prevNums.size+1:0;return orderIdx>=2?`👤 ${c} <span style="background:var(--amber);color:#000;border-radius:3px;padding:0 4px;font-size:.65rem;font-weight:800">${orderIdx}</span>`:`👤 ${c}`;})()}
             <br/><span style="font-size:.6rem;color:var(--muted)">✏️ Edit</span>
           </span>
-          <span style="font-family:var(--mono);font-size:.58rem;color:var(--muted)">${date}</span>
         </span>
         <button class="cc-del" onclick="addProdToOrder('${esc(c)}','${date}',${items[0].num||0})">+ Add</button>
         <button class="cc-del" onclick="delCust('${esc(c)}','${date}',${items[0].num||0})">Remove ✕</button>
