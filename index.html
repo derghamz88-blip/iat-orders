@@ -2381,45 +2381,56 @@ async function saveProductionDaily(){
   }
 }
 // ── دالة مشتركة تضيف Job للقائمة بدل الاستبدال ──
-// ✅ قفل لمنع تضارب الكتابة عند ضغط أكثر من زر بسرعة
+// قفل + قائمة محلية لمنع تضارب النقرات السريعة
 let _printJobLock = Promise.resolve();
+let _localJobs = []; // قائمة محلية مؤقتة
+let _flushTimeout = null;
 
 async function addPrintJob(job){
-  // ننتظر أي عملية سابقة تخلص قبل ما نبدأ
-  const myTurn = _printJobLock.then(() => _addPrintJobInner(job));
-  _printJobLock = myTurn.catch(() => {}); // حتى لو فشلت، نكمل للي بعدها
-  return myTurn;
-}
-
-async function _addPrintJobInner(job){
-  const token=await getODToken();
-  let jobs=[];
-  try{
-    const r=await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',
-      {headers:{'Authorization':'Bearer '+token}});
-    if(r.ok){const d=await r.json();jobs=Array.isArray(d.jobs)?d.jobs:[];}
-  }catch(e){}
-
-  // ✅ أضف الأوردرات للـ job عند Orders أو Labels
+  // أضف الـ job للقائمة المحلية فوراً
   const action=job.action||'';
   if(action===''||action==='print_labels'){
     const from=job.from||1;
     const to=job.to||999;
-    const sorted=[...orders]
-      .filter(o=>(o.num||0)>=from&&(o.num||0)<=to)
-      .sort((a,b)=>(a.num||0)-(b.num||0));
-    job.orders = sorted;
-    job.date   = document.getElementById('orderDate')?.value||todayStr();
+    const sorted=[...orders].filter(o=>(o.num||0)>=from&&(o.num||0)<=to).sort((a,b)=>(a.num||0)-(b.num||0));
+    job.orders=sorted;
+    job.date=document.getElementById('orderDate')?.value||todayStr();
   }
+  _localJobs.push(job);
+  toast(`✓ Job #${_localJobs.length} queued`,'ok');
 
-  jobs.push(job);
-  const res=await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',{
-    method:'PUT',
-    headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
-    body:JSON.stringify({jobs,ts:Date.now()})
+  // انتظر 400ms بعد آخر نقرة ثم اكتب كلهم مرة وحدة
+  clearTimeout(_flushTimeout);
+  _flushTimeout=setTimeout(()=>_flushJobs(), 400);
+  return _localJobs.length;
+}
+
+async function _flushJobs(){
+  if(!_localJobs.length)return;
+  const myTurn=_printJobLock.then(async ()=>{
+    const jobsToSend=[..._localJobs];
+    _localJobs=[];
+    try{
+      const token=await getODToken();
+      let existingJobs=[];
+      try{
+        const r=await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',{headers:{'Authorization':'Bearer '+token}});
+        if(r.ok){const d=await r.json();existingJobs=Array.isArray(d.jobs)?d.jobs:[];}
+      }catch(e){}
+      const allJobs=[...existingJobs,...jobsToSend];
+      const res=await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',{
+        method:'PUT',
+        headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+        body:JSON.stringify({jobs:allJobs,ts:Date.now()})
+      });
+      if(!res.ok)throw new Error('Failed to flush jobs');
+    }catch(e){
+      // إذا فشل، رجع الـ jobs
+      _localJobs=[...jobsToSend,..._localJobs];
+      toast('Error: '+e.message,'err');
+    }
   });
-  if(!res.ok)throw new Error('Failed to queue job');
-  return jobs.length;
+  _printJobLock=myTurn.catch(()=>{});
 }
 
 // ✅ طريقة جديدة - نقل الأوردرات مباشرة مع signal
