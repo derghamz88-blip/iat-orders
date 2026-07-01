@@ -2254,24 +2254,15 @@ async function clearLoadingSheet(){
     if(btn){btn.disabled=true;btn.textContent='⏳...';}
     try{
       const token=await getODToken();
-      const fileRes=await fetch(
-        `https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,
-        {headers:{'Authorization':'Bearer '+token}}
-      );
+      const fileRes=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,{headers:{'Authorization':'Bearer '+token}});
       if(!fileRes.ok) throw new Error('production.xlsm not found');
       const fileId=(await fileRes.json()).id;
-      const clearUrl=`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/workbook/worksheets/Loading/range(address='A5:AQ1000')/clear`;
-      const r=await fetch(clearUrl,{
-        method:'POST',
-        headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
-        body:JSON.stringify({applyTo:'Contents'})
-      });
-      if(!r.ok){const err=await r.text();throw new Error(err);}
-      toast('\u2713 Loading sheet cleared (A5:AQ1000)','ok');
+      await _clearLoadingSheetInner(token, fileId);
+      toast('✓ Loading sheet cleared','ok');
     }catch(e){
       toast('Error: '+e.message,'err');
     }finally{
-      if(btn){btn.disabled=false;btn.textContent='\ud83e\uddf9 Clear Sheet';}
+      if(btn){btn.disabled=false;btn.textContent='🧹 Clear Sheet';}
     }
   });
 }
@@ -2280,20 +2271,11 @@ async function clearTenderSheet(){
   confDlg('Clear AI5:AR1000 from tender order sheet?', async ()=>{
     try{
       const token=await getODToken();
-      const fileRes=await fetch(
-        `https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,
-        {headers:{'Authorization':'Bearer '+token}}
-      );
+      const fileRes=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,{headers:{'Authorization':'Bearer '+token}});
       if(!fileRes.ok) throw new Error('production.xlsm not found');
       const fileId=(await fileRes.json()).id;
-      const clearUrl=`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/workbook/worksheets/tender order/range(address='AI5:AR1000')/clear`;
-      const r=await fetch(clearUrl,{
-        method:'POST',
-        headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
-        body:JSON.stringify({applyTo:'Contents'})
-      });
-      if(!r.ok){const err=await r.text();throw new Error(err);}
-      toast('✓ Tender sheet cleared (AI5:AR1000)','ok');
+      await _clearTenderSheetInner(token, fileId);
+      toast('✓ Tender sheet cleared','ok');
     }catch(e){
       toast('Error: '+e.message,'err');
     }
@@ -2568,24 +2550,42 @@ async function printAllTender(){
 }
 
 // ── Reset All ──
+async function _clearLoadingSheetInner(token, fileId){
+  const base=`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/workbook/worksheets/`;
+  const r=await fetch(base+`Loading/range(address='A5:AQ1000')/clear`,{
+    method:'POST',
+    headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+    body:JSON.stringify({applyTo:'Contents'})
+  });
+  if(!r.ok){const e=await r.text();throw new Error('Loading: '+e);}
+}
+
+async function _clearTenderSheetInner(token, fileId){
+  const base=`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/workbook/worksheets/`;
+  const r=await fetch(base+`tender%20order/range(address='AI5:AR1000')/clear`,{
+    method:'POST',
+    headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+    body:JSON.stringify({applyTo:'Contents'})
+  });
+  if(!r.ok){const e=await r.text();throw new Error('Tender: '+e);}
+}
+
 function resetAll(){
-  confDlg('Reset ALL?\n• Fresh orders cleared\n• Tender orders cleared\n• Loading sheet cleared\n• Tender sheet cleared', async ()=>{
+  confDlg('Reset ALL?\n• Fresh orders\n• Tender orders\n• Loading sheet\n• Tender sheet', async ()=>{
     try{
       toast('⏳ Resetting...','ok');
 
-      // 1. مسح التطبيق
+      // مسح التطبيق
       orders=[];
       tenderOrders=[];
       localStorage.removeItem('iat_o');
       localStorage.removeItem('iat_to');
-      localStorage.setItem('iat_o','[]');
-      localStorage.setItem('iat_to','[]');
       renderOrders();
       renderTOrdersPage();
       renderTenderViewList();
       updateBadges();
 
-      // 2. مسح الإكسيل - نفس طريقة clearLoadingSheet و clearTenderSheet
+      // مسح الإكسيل
       const token=await getODToken();
       const fileRes=await fetch(
         `https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,
@@ -2593,23 +2593,9 @@ function resetAll(){
       );
       if(!fileRes.ok) throw new Error('production.xlsm not found');
       const fileId=(await fileRes.json()).id;
-      const base=`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/workbook/worksheets/`;
 
-      // مسح Loading
-      const r1=await fetch(base+`Loading/range(address='A5:AQ1000')/clear`,{
-        method:'POST',
-        headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
-        body:JSON.stringify({applyTo:'Contents'})
-      });
-      if(!r1.ok){const e=await r1.text();throw new Error('Loading clear: '+e);}
-
-      // مسح tender order
-      const r2=await fetch(base+`tender%20order/range(address='AI5:AR1000')/clear`,{
-        method:'POST',
-        headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
-        body:JSON.stringify({applyTo:'Contents'})
-      });
-      if(!r2.ok){const e=await r2.text();throw new Error('Tender clear: '+e);}
+      await _clearLoadingSheetInner(token, fileId);
+      await _clearTenderSheetInner(token, fileId);
 
       toast('✓ Reset All done!','ok');
     }catch(e){
