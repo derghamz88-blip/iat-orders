@@ -2586,8 +2586,17 @@ function resetAll(){
       const fileId=(await fileRes.json()).id;
       const base=`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/workbook/worksheets/`;
 
-      await fetch(base+`Loading/range(address='AI5:AQ1000')/clear`,{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({applyTo:'Contents'})});
-      await fetch(base+`tender order/range(address='AI5:AR1000')/clear`,{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({applyTo:'Contents'})});
+      const r1=await fetch(base+`Loading/range(address='AI5:AQ1000')/clear`,{
+        method:'POST',
+        headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+        body:JSON.stringify({applyTo:'Contents'})
+      });
+      const r2=await fetch(base+`tender%20order/range(address='AI5:AR1000')/clear`,{
+        method:'POST',
+        headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+        body:JSON.stringify({applyTo:'Contents'})
+      });
+      if(!r1.ok||!r2.ok) throw new Error('Excel clear failed');
 
       toast('✓ Reset All done!','ok');
     }catch(e){
@@ -4298,11 +4307,22 @@ async function extractTenderAI(){
     // نظف النص - شيل timestamps واسماء المرسلين
     const lines=cleanText
       .split('\n')
-      .map(l=>l
-        .replace(/\[\d{1,2}\/\d{1,2}(?:\/\d{2,4})?,\s*\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?\]\s*/i,'')
-        .replace(/^[A-Z][A-Z\s'\.]+:\s*/,'') // شيل اسم المرسل بالكابس
-        .trim()
-      )
+      .map(l=>{
+        // شيل timestamp
+        l=l.replace(/\[\d{1,2}\/\d{1,2}(?:\/\d{2,4})?,\s*\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?\]\s*/i,'');
+        // شيل اسم المرسل (النص قبل أول : إذا كان اسم شخص مو مكان)
+        // اسم المرسل: كلمتين أو أكثر قبل :، لا يحتوي على أرقام، أقل من 35 حرف
+        const senderMatch=l.match(/^([^:]{2,35}):\s*(.*)/);
+        if(senderMatch){
+          const possibleSender=senderMatch[1].trim();
+          const rest=senderMatch[2].trim();
+          // إذا المحتوى بعد : فيه محتوى حقيقي، شيل المرسل
+          if(rest.length>0&&!/^\d/.test(possibleSender)){
+            l=rest;
+          }
+        }
+        return l.trim();
+      })
       .filter(l=>l);
 
     const extracted=[];
@@ -4512,6 +4532,7 @@ function renderTOrdersPage(){
             <button onclick="adjTO(${o.idx},1)" style="padding:4px 9px;background:transparent;border:none;cursor:pointer;color:var(--amber);font-weight:800;font-size:1rem">+</button>
           </div>
           <span style="font-size:.68rem;color:var(--teal);font-family:var(--mono);font-weight:600;flex-shrink:0">trays</span>
+          <input type="text" placeholder="Note" value="${o.note||''}" onchange="setTONote(${o.idx},this.value)" style="width:70px;padding:3px 5px;border:1px solid var(--b2);border-radius:4px;font-size:.65rem;background:var(--s1);color:var(--muted);outline:none"/>
         </div>`).join('')}
     </div>`).join('');
 }
@@ -4526,6 +4547,11 @@ function adjTO(i,d){
   const inps=document.querySelectorAll('input[onchange*="setTOQ('+i+',"]');
   if(inps.length){inps.forEach(inp=>inp.value=nq);}
   else renderTOrdersPage();
+}
+function setTONote(i,v){
+  if(i<0||i>=tenderOrders.length)return;
+  tenderOrders[i].note=v.trim();
+  saveTenderOrders();
 }
 function setTOQ(i,v){
   if(i<0||i>=tenderOrders.length)return;
