@@ -2575,26 +2575,28 @@ function resetAll(){
     try{
       toast('⏳ Resetting...','ok');
 
-      // مسح التطبيق
+      // 1. clearAll (بدون confDlg)
       orders=[];
-      tenderOrders=[];
-      localStorage.removeItem('iat_o');
-      localStorage.removeItem('iat_to');
+      saveOrders();
       renderOrders();
-      renderTOrdersPage();
-      renderTenderViewList();
       updateBadges();
 
-      // مسح الإكسيل
+      // 2. clearAllTender (بدون confDlg)
+      tenderOrders=[];
+      LS.set('iat_to',[]);
+      renderTQtyPage();
+      renderTOrdersPage();
+      renderTenderViewList();
+
+      // 3. clearLoadingSheet (بدون confDlg)
       const token=await getODToken();
-      const fileRes=await fetch(
-        `https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,
-        {headers:{'Authorization':'Bearer '+token}}
-      );
+      const fileRes=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,{headers:{'Authorization':'Bearer '+token}});
       if(!fileRes.ok) throw new Error('production.xlsm not found');
       const fileId=(await fileRes.json()).id;
 
       await _clearLoadingSheetInner(token, fileId);
+
+      // 4. clearTenderSheet (بدون confDlg)
       await _clearTenderSheetInner(token, fileId);
 
       toast('✓ Reset All done!','ok');
