@@ -2575,29 +2575,45 @@ function resetAll(){
     try{
       toast('⏳ Resetting...','ok');
 
-      // 1. clearAll (بدون confDlg)
+      // 1. clearAll
       orders=[];
       saveOrders();
       renderOrders();
       updateBadges();
 
-      // 2. clearAllTender (بدون confDlg)
+      // 2. clearAllTender
       tenderOrders=[];
       LS.set('iat_to',[]);
       renderTQtyPage();
       renderTOrdersPage();
       renderTenderViewList();
 
-      // 3. clearLoadingSheet (بدون confDlg)
+      // 3+4. Excel clear - نفس كود clearLoadingSheet و clearTenderSheet بالضبط
       const token=await getODToken();
-      const fileRes=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,{headers:{'Authorization':'Bearer '+token}});
+      const fileRes=await fetch(
+        `https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,
+        {headers:{'Authorization':'Bearer '+token}}
+      );
       if(!fileRes.ok) throw new Error('production.xlsm not found');
       const fileId=(await fileRes.json()).id;
+      const base=`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/workbook/worksheets/`;
 
-      await _clearLoadingSheetInner(token, fileId);
+      // Loading sheet
+      const r1=await fetch(base+`Loading/range(address='A5:AQ1000')/clear`,{
+        method:'POST',
+        headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+        body:JSON.stringify({applyTo:'Contents'})
+      });
+      if(!r1.ok){const e=await r1.text();throw new Error('Loading: '+e);}
+      toast('✓ Loading cleared','ok');
 
-      // 4. clearTenderSheet (بدون confDlg)
-      await _clearTenderSheetInner(token, fileId);
+      // Tender sheet
+      const r2=await fetch(base+`tender%20order/range(address='AI5:AR1000')/clear`,{
+        method:'POST',
+        headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+        body:JSON.stringify({applyTo:'Contents'})
+      });
+      if(!r2.ok){const e=await r2.text();throw new Error('Tender: '+e);}
 
       toast('✓ Reset All done!','ok');
     }catch(e){
