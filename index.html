@@ -2569,38 +2569,52 @@ async function printAllTender(){
 
 // ── Reset All ──
 function resetAll(){
-  confDlg('Reset ALL? This clears:\n• All fresh orders\n• All tender orders\n• Loading sheet\n• Tender order sheet', async ()=>{
+  confDlg('Reset ALL?\n• Fresh orders cleared\n• Tender orders cleared\n• Loading sheet cleared\n• Tender sheet cleared', async ()=>{
     try{
-      // مسح الأوردرات من التطبيق
-      orders=[];LS.set('iat_o',[]);
-      tenderOrders=[];LS.set('iat_to',[]);
+      toast('⏳ Resetting...','ok');
+
+      // 1. مسح التطبيق
+      orders=[];
+      tenderOrders=[];
+      localStorage.removeItem('iat_o');
+      localStorage.removeItem('iat_to');
+      localStorage.setItem('iat_o','[]');
+      localStorage.setItem('iat_to','[]');
       renderOrders();
       renderTOrdersPage();
       renderTenderViewList();
       updateBadges();
 
-      // مسح شيتين من الإكسيل
+      // 2. مسح الإكسيل - نفس طريقة clearLoadingSheet و clearTenderSheet
       const token=await getODToken();
-      const fileRes=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,{headers:{'Authorization':'Bearer '+token}});
+      const fileRes=await fetch(
+        `https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,
+        {headers:{'Authorization':'Bearer '+token}}
+      );
       if(!fileRes.ok) throw new Error('production.xlsm not found');
       const fileId=(await fileRes.json()).id;
       const base=`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/workbook/worksheets/`;
 
-      const r1=await fetch(base+`Loading/range(address='AI5:AQ1000')/clear`,{
+      // مسح Loading
+      const r1=await fetch(base+`Loading/range(address='A5:AQ1000')/clear`,{
         method:'POST',
         headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
         body:JSON.stringify({applyTo:'Contents'})
       });
+      if(!r1.ok){const e=await r1.text();throw new Error('Loading clear: '+e);}
+
+      // مسح tender order
       const r2=await fetch(base+`tender%20order/range(address='AI5:AR1000')/clear`,{
         method:'POST',
         headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
         body:JSON.stringify({applyTo:'Contents'})
       });
-      if(!r1.ok||!r2.ok) throw new Error('Excel clear failed');
+      if(!r2.ok){const e=await r2.text();throw new Error('Tender clear: '+e);}
 
       toast('✓ Reset All done!','ok');
     }catch(e){
       toast('Error: '+e.message,'err');
+      console.error(e);
     }
   });
 }
