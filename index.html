@@ -380,6 +380,7 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     </div>
     <button class="btn btn-teal btn-sm" style="flex-shrink:0" onclick="manualSaveRange()" id="odBtn">☁ Save</button>
     <button class="btn btn-teal btn-sm" style="flex-shrink:0;background:rgba(20,184,166,.25)" onclick="saveAll()">💾 Save All</button>
+    <button class="btn btn-teal btn-sm" style="flex-shrink:0;background:rgba(20,184,166,.4);border-color:var(--teal)" onclick="saveAllThenPrint()">💾🖨 Save+Print</button>
     <button class="btn btn-blue btn-sm" style="flex-shrink:0" onclick="directPrintOrders()">🖨 Orders</button>
     <button class="btn btn-amber btn-sm" style="flex-shrink:0" onclick="directPrintLabels()">🏷 Labels</button>
     <button class="btn btn-blue btn-sm" style="flex-shrink:0;background:rgba(59,130,246,.25)" onclick="printAllFresh()">🖨×2+🏷 Fresh</button>
@@ -2178,6 +2179,7 @@ async function saveOrdersToLoading(from,to,dateVal){
     });
     if(!r3.ok) throw new Error('Failed H1 Production');
 
+    window._lastSaveTs=Date.now();
     toast(`✓ Saved ${sorted.length} rows → Loading (${rangeAddr})`,'ok');
   }catch(e){
     if(e.message!=='user_cancelled')toast('Error: '+e.message,'err');
@@ -2387,7 +2389,6 @@ async function addPrintJob(job){
   }
   _localJobs.push(job);
   toast(`✓ Job #${_localJobs.length} queued`,'ok');
-
   // انتظر 400ms بعد آخر نقرة ثم اكتب كلهم مرة وحدة
   clearTimeout(_flushTimeout);
   _flushTimeout=setTimeout(()=>_flushJobs(), 400);
@@ -2407,10 +2408,12 @@ async function _flushJobs(){
         if(r.ok){const d=await r.json();existingJobs=Array.isArray(d.jobs)?d.jobs:[];}
       }catch(e){}
       const allJobs=[...existingJobs,...jobsToSend];
+      // save_ts بس لما يكون من Save+Print، مو من طباعة عادية
+      const signalSaveTs = jobsToSend.some(j=>j._includeSaveTs) ? (window._lastSaveTs||0) : 0;
       const res=await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',{
         method:'PUT',
         headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
-        body:JSON.stringify({jobs:allJobs,ts:Date.now()})
+        body:JSON.stringify({jobs:allJobs,ts:Date.now(),save_ts:signalSaveTs})
       });
       if(!res.ok)throw new Error('Failed to flush jobs');
     }catch(e){
@@ -2521,6 +2524,31 @@ async function directPrintLabels(){
   }catch(e){
     if(e.message!=='user_cancelled')toast('Error: '+e.message,'err');
   }
+}
+
+// ── Save All then Print All ──
+async function saveAllThenPrint(){
+  // 1. Save
+  const from=parseInt(document.getElementById('printRangeFrom')?.value)||1;
+  const to=parseInt(document.getElementById('printRangeTo')?.value)||999;
+  const date=document.getElementById('orderDate')?.value||todayStr();
+  if(orders.length) await saveOrdersToLoading(from,to,date);
+  if(tenderOrders.length) await tenderSaveToExcel();
+  toast('✓ Saved - queuing print jobs...','ok');
+
+  // 2. Print All Fresh (×2 Orders + Labels) - مع save_ts
+  await addPrintJob({action:'',from,to,_includeSaveTs:true});
+  await addPrintJob({action:'',from,to,_includeSaveTs:true});
+  await addPrintJob({action:'print_labels',from,to,_includeSaveTs:true});
+
+  // 3. Print All Tender (×2 Orders + Labels)
+  const tf=parseInt(document.getElementById('tenderPrintFrom')?.value)||1;
+  const tt=parseInt(document.getElementById('tenderPrintTo')?.value)||999;
+  await addPrintJob({action:'print_tender_orders',from:tf,to:tt,_includeSaveTs:true});
+  await addPrintJob({action:'print_tender_orders',from:tf,to:tt,_includeSaveTs:true});
+  await addPrintJob({action:'print_tender_labels',from:tf,to:tt,_includeSaveTs:true});
+
+  toast('✓ Save + Print All queued!','ok');
 }
 
 // ── Save All (فريش + تندر) ──
@@ -2702,6 +2730,7 @@ async function tenderSaveToExcel(){
       body:JSON.stringify({values:[[from,to]]})
     });
     if(!r2.ok) throw new Error('Failed BS1:BT1 tender');
+    window._lastSaveTs=Date.now();
     toast(`✓ Saved ${sorted.length} rows → tender order`,'ok');
   }catch(e){
     if(e.message!=='user_cancelled')toast('Error: '+e.message,'err');
