@@ -2525,8 +2525,11 @@ async function directPrintLabels(){
 
 // ── Save All (فريش + تندر) ──
 async function saveAll(){
-  await manualSaveRange();
-  await tenderSaveToExcel();
+  const from=parseInt(document.getElementById('printRangeFrom')?.value)||1;
+  const to=parseInt(document.getElementById('printRangeTo')?.value)||999;
+  const date=document.getElementById('orderDate')?.value||todayStr();
+  if(orders.length) await saveOrdersToLoading(from,to,date);
+  if(tenderOrders.length) await tenderSaveToExcel();
   toast('✓ Fresh + Tender saved','ok');
 }
 
