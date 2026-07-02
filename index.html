@@ -426,6 +426,7 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
       </select>
       <button class="btn btn-ghost btn-sm" id="drvViewBtn" onclick="toggleDrvView()" style="font-size:.68rem;padding:4px 8px">🗂 Board</button>
       <button class="btn btn-purple btn-sm" onclick="printDriversPDF()" style="padding:4px 8px">⬇ PDF</button>
+      <button class="btn btn-green btn-sm" onclick="sendDriversWhatsApp()" style="padding:4px 8px">📤 WA</button>
     </div>
   </div>
 
@@ -3061,6 +3062,35 @@ function renderDriversPage(){
       </select>
     </div>`).join('');
 }
+function sendDriversWhatsApp(){
+  // جمع الأوردرات حسب السائق
+  const byDriver=new Map();
+  const seen=new Set();
+  [...orders]
+    .sort((a,b)=>(a.num||0)-(b.num||0))
+    .forEach(o=>{
+      if(!o.driver||!o.customer) return;
+      const displayNum=o.isTender?`T${o.tNum||o.num||''}`:(o.num||'');
+      const key=`${o.driver}_${displayNum}_${o.customer}`;
+      if(seen.has(key)) return;
+      seen.add(key);
+      if(!byDriver.has(o.driver)) byDriver.set(o.driver,[]);
+      byDriver.get(o.driver).push({num:displayNum,customer:o.customer});
+    });
+
+  if(!byDriver.size){toast('No drivers assigned yet','err');return;}
+
+  let msg='';
+  byDriver.forEach((items,drv)=>{
+    msg+=`🚗 ${drv}\n`;
+    items.forEach(i=>msg+=`${i.num} - ${i.customer}\n`);
+    msg+='\n';
+  });
+
+  const url='https://wa.me/?text='+encodeURIComponent(msg.trim());
+  window.open(url,'_blank');
+}
+
 function assignDriver(date,cust,driver){
   orders.forEach(o=>{if((o.date||'—')===date&&o.customer===cust)o.driver=driver;});
   renderDriversPage();
@@ -5068,15 +5098,26 @@ function bestMatch(input, list) {
   const exact = list.find(l => l.toLowerCase() === inp.toLowerCase());
   if (exact) return exact;
 
-  // 2. Score every entry with full name comparison
+  // 2. Normalized exact
+  const exactN = list.find(l => norm(l) === inpN);
+  if (exactN) return exactN;
+
+  // 3. Normalized contains
+  const contains = list.find(l => norm(l).includes(inpN) || inpN.includes(norm(l)));
+  if (contains) return contains;
+
+  // 4. Score with normalized strings
   let best = null, bestScore = 0;
   list.forEach(l => {
-    const s = similarity(inp, l);
+    // score مع النص الأصلي
+    const s1 = similarity(inp, l);
+    // score مع النص المنظف
+    const s2 = similarity(inpN, norm(l));
+    const s = Math.max(s1, s2);
     if (s > bestScore) { bestScore = s; best = l; }
   });
 
-  // Only return if score is meaningful
-  return bestScore >= 30 ? best : inp;
+  return bestScore >= 25 ? best : inp;
 }
 
 function parseLine(line) {
@@ -5752,7 +5793,26 @@ function parseDriverAssignment(){
 
   lines.forEach(line=>{
     const drvMatch=line.match(/^\*+([^*]+)\*+\s*$/)||line.match(/^_([^_]+)_\s*$/);
-    if(drvMatch){currentDriver=drvMatch[1].trim();return;}
+    if(drvMatch){
+      const rawDrv=drvMatch[1].trim();
+      // طابق مع قائمة السائقين
+      if(drivers.length){
+        const exactDrv=drivers.find(d=>d.toLowerCase()===rawDrv.toLowerCase());
+        if(exactDrv){currentDriver=exactDrv;}
+        else{
+          // similarity مع السائقين
+          let bestDrv=null,bestScore=0;
+          drivers.forEach(d=>{
+            const s=similarity(rawDrv,d);
+            if(s>bestScore){bestScore=s;bestDrv=d;}
+          });
+          currentDriver=bestScore>=40?bestDrv:rawDrv;
+        }
+      }else{
+        currentDriver=rawDrv;
+      }
+      return;
+    }
     if(line.match(/^\*?\d+\/\d+\*?\s*$/)||line.match(/^\d+\/\d+\s*$/))return;
     if(!line||line.length<2)return;
     if(currentDriver&&line){
@@ -5821,6 +5881,38 @@ function parseDriverAssignment(){
     renderDriversPage();
     toast(`✓ وزّع ${matchedCount} زبون`,'ok');
   }
+
+  // زر واتساب - رسالة وحدة لكل السائقين
+  const waBtn=document.createElement('button');
+  waBtn.className='btn btn-green';
+  waBtn.style.cssText='width:100%;margin-top:6px;font-size:.8rem';
+  waBtn.textContent='📤 Send via WhatsApp';
+  waBtn.onclick=()=>{
+    let msg='';
+    byDriver.forEach((items,drv)=>{
+      msg+=`🚗 ${drv}\n`;
+      // أخذ الأوردرات المطابقة مع أرقامها
+      const matched=items.filter(a=>a.ordersFound>0);
+      // جمع الأرقام الفريدة لكل زبون
+      const seen=new Set();
+      matched.forEach(a=>{
+        const custOrders=orders.filter(o=>o.customer===a.customer);
+        const seen2=new Set();
+        custOrders.forEach(o=>{
+          const dispNum=o.isTender?`T${o.tNum||o.num||''}`:(o.num||'');
+          const key=`${dispNum}_${a.customer}`;
+          if(!seen2.has(key)){
+            seen2.add(key);
+            msg+=`${dispNum} - ${a.customer}\n`;
+          }
+        });
+      });
+      msg+='\n';
+    });
+    const url='https://wa.me/?text='+encodeURIComponent(msg.trim());
+    window.open(url,'_blank');
+  };
+  resultEl.appendChild(waBtn);
 }
 </script>
 </body>
