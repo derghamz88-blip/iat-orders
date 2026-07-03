@@ -6011,9 +6011,15 @@ function parseDriverAssignment(){
 let _waOrder = new Map();
 
 function initWASend(){
-  // إذا في بيانات موجودة، احتفظ بالترتيب
-  if(_waOrder.size>0){renderWASend();return;}
+  // حاول تحميل الترتيب المحفوظ أولاً
+  const saved = LS.get('iat_waorder', null);
+  if(saved && Array.isArray(saved) && saved.length > 0){
+    _waOrder = new Map(saved);
+    renderWASend();
+    return;
+  }
 
+  // أول مرة - ابنِ من الأوردرات
   _waOrder = new Map();
   const seen = new Set();
   [...orders]
@@ -6028,15 +6034,19 @@ function initWASend(){
       _waOrder.get(o.driver).push({num:displayNum, customer:o.customer});
     });
 
-  // رتب السائقين حسب أصغر رقم أوردر عندهم
+  // رتب حسب أصغر رقم
   const sorted = [..._waOrder.entries()].sort((a,b)=>{
     const aMin = Math.min(...a[1].map(i=>parseInt(i.num)||999));
     const bMin = Math.min(...b[1].map(i=>parseInt(i.num)||999));
     return aMin - bMin;
   });
   _waOrder = new Map(sorted);
-
+  saveWAOrder();
   renderWASend();
+}
+
+function saveWAOrder(){
+  LS.set('iat_waorder', [..._waOrder.entries()]);
 }
 
 function renderWASend(){
@@ -6071,6 +6081,7 @@ function moveWAItem(drv, idx, dir){
   const newIdx = idx+dir;
   if(newIdx<0||newIdx>=items.length) return;
   [items[idx],items[newIdx]] = [items[newIdx],items[idx]];
+  saveWAOrder();
   renderWASend();
 }
 
@@ -6079,6 +6090,7 @@ function removeWAItem(drv, idx){
   if(!items) return;
   items.splice(idx,1);
   if(!items.length) _waOrder.delete(drv);
+  saveWAOrder();
   renderWASend();
 }
 
@@ -6099,7 +6111,7 @@ function sendDriversWhatsAppFromPage(){
 <div class="page" id="pg-wa-send">
   <div class="orders-head">
     <div><div style="font-size:.68rem;font-family:var(--mono);color:var(--muted);letter-spacing:.1em;text-transform:uppercase">📤 WA Send</div></div>
-    <button class="btn btn-ghost btn-sm" onclick="_waOrder=new Map();initWASend()" style="font-size:.7rem;padding:4px 8px">🔄 Reset</button>
+    <button class="btn btn-ghost btn-sm" onclick="_waOrder=new Map();LS.set('iat_waorder',null);initWASend()" style="font-size:.7rem;padding:4px 8px">🔄 Reset</button>
   </div>
   <div style="flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:8px" id="waSendList"></div>
   <div style="padding:8px;flex-shrink:0">
