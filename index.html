@@ -1770,27 +1770,30 @@ function moveProd(idx, dir){
   renderOrders();
 }
 
-function setGroupNum(date,cust,v){
+function setGroupNum(date,cust,oldNum,v){
   const n=parseInt(v)||0;
-  orders.forEach(o=>{if((o.date||'—')===date&&o.customer===cust)o.num=n;});
+  // تأكد إن الرقم الجديد ما مستخدم من زبون ثاني
+  const taken=orders.some(o=>o.customer!==cust&&(o.num||0)===n);
+  if(taken){toast('رقم مستخدم من زبون ثاني','err');renderOrders();return;}
+  orders.forEach(o=>{if(o.customer===cust&&(o.num||0)===(oldNum||0))o.num=n;});
+  saveOrders();
   renderOrders();
 }
 function setOrdNote(i,v){orders[i].note=v;saveOrders();}
 function setOrdSize(i,v){orders[i].size=v;saveOrders();}
-// ✅ إعادة ترقيم الأوردرات (1, 2, 3...)
-function renumberOrders(date){
-  // اجمع الزبائن بالترتيب الحالي حسب num
-  const dateOrders=orders.filter(o=>(o.date||'—')===date);
-  if(!dateOrders.length)return;
-  // رتّب حسب num الحالي أولاً
-  const custSeen=[];
-  [...dateOrders].sort((a,b)=>(a.num||0)-(b.num||0)).forEach(o=>{
-    if(!custSeen.includes(o.customer))custSeen.push(o.customer);
+
+function renumberOrders(){
+  // اجمع الـ groups بالترتيب الحالي حسب num - كل group هو customer+oldNum
+  const groups=[];
+  const seenKeys=new Set();
+  [...orders].sort((a,b)=>(a.num||0)-(b.num||0)).forEach(o=>{
+    const k=o.customer+'__'+(o.num||0);
+    if(!seenKeys.has(k)){seenKeys.add(k);groups.push({cust:o.customer,oldNum:o.num||0});}
   });
-  // أعد الترقيم 1,2,3...
-  custSeen.forEach((cust,i)=>{
+  // أعد الترقيم 1,2,3... لكل group
+  groups.forEach(({cust,oldNum},i)=>{
     orders.forEach(o=>{
-      if((o.date||'—')===date && o.customer===cust)o.num=i+1;
+      if(o.customer===cust&&(o.num||0)===oldNum) o.num=i+1;
     });
   });
 }
@@ -1800,7 +1803,6 @@ function moveGroup(date,cust,num,dir){
   const groups=[];
   const seenKeys=new Set();
   [...orders]
-    .filter(o=>(o.date||'—')===date)
     .sort((a,b)=>(a.num||0)-(b.num||0))
     .forEach(o=>{
       const k=o.customer+'__'+(o.num||0);
@@ -1810,12 +1812,11 @@ function moveGroup(date,cust,num,dir){
   if(ci<0)return;
   const swap=groups[ci+dir];
   if(!swap)return;
-  // تبديل الأرقام
-  orders.forEach(o=>{
-    if((o.date||'—')!==date)return;
-    if(o.customer===cust&&(o.num||0)===num)o.num=swap.num;
-    else if(o.customer===swap.cust&&(o.num||0)===swap.num)o.num=num;
-  });
+  // تبديل الأرقام - نستخدم رقم مؤقت لتجنب التعارض
+  const tmpNum=-9999;
+  orders.forEach(o=>{if(o.customer===cust&&(o.num||0)===num)o.num=tmpNum;});
+  orders.forEach(o=>{if(o.customer===swap.cust&&(o.num||0)===swap.num)o.num=num;});
+  orders.forEach(o=>{if(o.customer===cust&&(o.num||0)===tmpNum)o.num=swap.num;});
   saveOrders();
   renderOrders();
 }
@@ -1835,7 +1836,7 @@ function setOQ(i,v){
   const qty=Math.max(0.5,parseFloat(v)||0.5);
   orders[i].qty=Math.round(qty*10)/10;
   saveOrders();
-  renumberOrders(orders[i].date||'—');
+  renumberOrders();
   // لا نعمل renderOrders هون عشان المستخدم لسا عم يكتب
 }
 function setOrdProduct(i,v){orders[i].product=v;saveOrders();}
@@ -1891,10 +1892,10 @@ function applyGCustChange(newName){
     closeGCustModal();
     renderTOrdersPage();
   } else {
-    const {oldCust,date,num}=_gCustCtx;
+    const {oldCust,num}=_gCustCtx;
     if(newName===oldCust){closeGCustModal();return;}
     orders.forEach(o=>{
-      if(o.date===date&&o.customer===oldCust&&(o.num||0)===(num||0))
+      if(o.customer===oldCust&&(o.num||0)===(num||0))
         o.customer=newName;
     });
     saveOrders();
@@ -1956,7 +1957,7 @@ function delRow(i){
   const date=orders[i].date||'—';
   orders.splice(i,1);
   saveOrders();
-  renumberOrders(date);
+  renumberOrders();
   renderOrders();
 }
 function addProdToOrder(cust,date,num){
@@ -2047,7 +2048,7 @@ function delCust(c,date,num){
   confDlg(`Remove ${c}?`,()=>{
     orders=orders.filter(o=>!(o.customer===c&&(o.date||'—')===date&&(o.num||0)===(num||0)));
     saveOrders();
-    renumberOrders(date);
+    renumberOrders();
     renderOrders();
     toast('✓ Removed','ok');
   });
