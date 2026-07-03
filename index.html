@@ -2570,7 +2570,7 @@ async function saveAllThenPrint(){
 
   // 3. بعدها احفظ الأوردرات للإكسيل
   if(orders.length) await saveOrdersToLoading(from,to,date);
-  if(tenderOrders.length) await tenderSaveToExcel();
+  if(tenderOrders.length) await tenderSaveToExcel(tf,tt);
 
   toast('✓ Saved! Python waiting for sync then will print...','ok');
 }
@@ -2579,9 +2579,11 @@ async function saveAllThenPrint(){
 async function saveAll(){
   const from=parseInt(document.getElementById('printRangeFrom')?.value)||1;
   const to=parseInt(document.getElementById('printRangeTo')?.value)||999;
+  const tf=parseInt(document.getElementById('tenderPrintFrom')?.value)||parseInt(LS.get('iat_tpr_from','1'))||1;
+  const tt=parseInt(document.getElementById('tenderPrintTo')?.value)||parseInt(LS.get('iat_tpr_to','100'))||100;
   const date=document.getElementById('orderDate')?.value||todayStr();
   if(orders.length) await saveOrdersToLoading(from,to,date);
-  if(tenderOrders.length) await tenderSaveToExcel();
+  if(tenderOrders.length) await tenderSaveToExcel(tf,tt);
   toast('✓ Fresh + Tender saved','ok');
 }
 
@@ -2636,8 +2638,8 @@ async function printAllTender(){
     });
   }catch(e){toast('Error: '+e.message,'err');return;}
 
-  // 2. Save تندر
-  if(tenderOrders.length) await tenderSaveToExcel();
+  // 2. Save تندر مع النطاق الصح
+  if(tenderOrders.length) await tenderSaveToExcel(tf,tt);
   toast(`✓ Tender queued: 2×Orders + Labels (${tf}-${tt})`,'ok');
 }
 
@@ -2728,10 +2730,10 @@ async function printFolderPDF(folder){
 }
 
 // ── Tender Save + Print ──
-async function tenderSaveToExcel(){
+async function tenderSaveToExcel(fromOverride, toOverride){
   if(!tenderOrders.length){toast('No tender orders','err');return;}
-  const from=parseInt(document.getElementById('tenderPrintFrom').value)||1;
-  const to=parseInt(document.getElementById('tenderPrintTo').value)||999;
+  const from=fromOverride||parseInt(document.getElementById('tenderPrintFrom')?.value)||parseInt(LS.get('iat_tpr_from','1'))||1;
+  const to=toOverride||parseInt(document.getElementById('tenderPrintTo')?.value)||parseInt(LS.get('iat_tpr_to','100'))||100;
   const btn=event?.target;
   if(btn){btn.disabled=true;btn.textContent='⏳...';}
   try{
