@@ -6011,10 +6011,11 @@ function parseDriverAssignment(){
 let _waOrder = new Map();
 
 function initWASend(){
+  // إذا في بيانات موجودة، احتفظ بالترتيب
+  if(_waOrder.size>0){renderWASend();return;}
+
   _waOrder = new Map();
   const seen = new Set();
-  // جمع كل الزبائن الفريدين لكل سائق
-  const driverCusts = new Map(); // driver → Set of {num, customer}
   [...orders]
     .sort((a,b)=>(a.num||0)-(b.num||0))
     .forEach(o=>{
@@ -6026,6 +6027,15 @@ function initWASend(){
       if(!_waOrder.has(o.driver)) _waOrder.set(o.driver,[]);
       _waOrder.get(o.driver).push({num:displayNum, customer:o.customer});
     });
+
+  // رتب السائقين حسب أصغر رقم أوردر عندهم
+  const sorted = [..._waOrder.entries()].sort((a,b)=>{
+    const aMin = Math.min(...a[1].map(i=>parseInt(i.num)||999));
+    const bMin = Math.min(...b[1].map(i=>parseInt(i.num)||999));
+    return aMin - bMin;
+  });
+  _waOrder = new Map(sorted);
+
   renderWASend();
 }
 
@@ -6089,7 +6099,7 @@ function sendDriversWhatsAppFromPage(){
 <div class="page" id="pg-wa-send">
   <div class="orders-head">
     <div><div style="font-size:.68rem;font-family:var(--mono);color:var(--muted);letter-spacing:.1em;text-transform:uppercase">📤 WA Send</div></div>
-    <button class="btn btn-ghost btn-sm" onclick="initWASend()" style="font-size:.7rem;padding:4px 8px">🔄 Refresh</button>
+    <button class="btn btn-ghost btn-sm" onclick="_waOrder=new Map();initWASend()" style="font-size:.7rem;padding:4px 8px">🔄 Reset</button>
   </div>
   <div style="flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:8px" id="waSendList"></div>
   <div style="padding:8px;flex-shrink:0">
