@@ -371,33 +371,37 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
       <div class="empty"><div class="ei">📋</div><p>No orders yet.</p></div>
     </div>
   </div>
+  <!-- صف 1: نطاق + حفظ + طباعة -->
   <div class="exp-bar">
-    <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
-      <label style="font-size:.7rem;color:var(--blue2);white-space:nowrap;font-weight:700">📍 Print:</label>
-      <input type="number" id="printRangeFrom" placeholder="From" min="1" step="1" onclick="this.select()" onchange="LS.set('iat_pfrom',this.value)" style="width:60px;padding:6px;border:1.5px solid var(--b2);border-radius:6px;font-size:.8rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--amber);font-weight:700;outline:none" value="1"/>
-      <span style="color:var(--muted);font-size:.8rem">→</span>
-      <input type="number" id="printRangeTo" placeholder="To" min="1" step="1" onclick="this.select()" onchange="LS.set('iat_pto',this.value)" style="width:60px;padding:6px;border:1.5px solid var(--b2);border-radius:6px;font-size:.8rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--amber);font-weight:700;outline:none" value="100"/>
+    <div style="display:flex;gap:4px;align-items:center;flex-shrink:0">
+      <label style="font-size:.65rem;color:var(--blue2);white-space:nowrap;font-weight:700">📍</label>
+      <input type="number" id="printRangeFrom" placeholder="From" min="1" step="1" onclick="this.select()" onchange="LS.set('iat_pfrom',this.value)" style="width:46px;padding:4px;border:1.5px solid var(--b2);border-radius:6px;font-size:.75rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--amber);font-weight:700;outline:none" value="1"/>
+      <span style="color:var(--muted);font-size:.75rem">→</span>
+      <input type="number" id="printRangeTo" placeholder="To" min="1" step="1" onclick="this.select()" onchange="LS.set('iat_pto',this.value)" style="width:46px;padding:4px;border:1.5px solid var(--b2);border-radius:6px;font-size:.75rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--amber);font-weight:700;outline:none" value="100"/>
     </div>
     <button class="btn btn-teal btn-sm" style="flex-shrink:0" onclick="manualSaveRange()" id="odBtn">☁ Save</button>
-    <button class="btn btn-teal btn-sm" style="flex-shrink:0;background:rgba(20,184,166,.25)" onclick="saveAll()">💾 Save All</button>
-    <button class="btn btn-teal btn-sm" style="flex-shrink:0;background:rgba(20,184,166,.4);border-color:var(--teal)" onclick="saveAllThenPrint()">💾🖨 Save+Print</button>
     <button class="btn btn-blue btn-sm" style="flex-shrink:0" onclick="directPrintOrders()">🖨 Orders</button>
     <button class="btn btn-amber btn-sm" style="flex-shrink:0" onclick="directPrintLabels()">🏷 Labels</button>
-    <button class="btn btn-blue btn-sm" style="flex-shrink:0;background:rgba(59,130,246,.25)" onclick="printAllFresh()">🖨×2+🏷 Fresh</button>
     <button class="btn btn-purple btn-sm" style="flex-shrink:0" onclick="printDrivers()">🚗 Drivers</button>
-    <button class="btn btn-green btn-sm" style="flex-shrink:0" onclick="sendOrdersDirect()" title="Send orders directly to Excel (fast)">📤 Send</button>
-    <button class="btn btn-red btn-sm" id="clearLoadingBtn" style="flex-shrink:0" onclick="clearLoadingSheet()">🧹 Clear Sheet</button>
-    <button class="btn btn-green btn-sm" style="flex-shrink:0" onclick="printFolderPDF('invoices')">🧾 Invoices</button>
+    <button class="btn btn-green btn-sm" style="flex-shrink:0" onclick="sendOrdersDirect()">📤 Send</button>
+    <button class="btn btn-red btn-sm" id="clearLoadingBtn" style="flex-shrink:0" onclick="clearLoadingSheet()">🧹 Clear</button>
+    <button class="btn btn-green btn-sm" style="flex-shrink:0" onclick="printFolderPDF('invoices')">🧾 INV</button>
     <button class="btn btn-purple btn-sm" style="flex-shrink:0" onclick="printFolderPDF('lpo')">📋 LPO</button>
-    <button class="btn btn-ghost btn-sm" style="flex-shrink:0" onclick="exportXL()">⬇ Excel</button>
+    <button class="btn btn-ghost btn-sm" style="flex-shrink:0" onclick="exportXL()">⬇ XL</button>
   </div>
-  <!-- نطاق طباعة إضافي محفوظ -->
-  <div style="background:var(--s1);border-top:1px solid var(--b1);padding:6px 10px;display:flex;gap:8px;align-items:center;flex-shrink:0;overflow-x:auto;scrollbar-width:none">
-    <label style="font-size:.65rem;color:var(--muted);white-space:nowrap">🔁 Reprint:</label>
-    <input type="number" id="reprintFrom" placeholder="From" min="1" step="1" onclick="this.select()" onchange="LS.set('iat_rpfrom',this.value)" style="width:55px;padding:5px;border:1.5px solid var(--b1);border-radius:5px;font-size:.75rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--teal);font-weight:700;outline:none" value="1"/>
-    <span style="color:var(--muted);font-size:.75rem">→</span>
-    <input type="number" id="reprintTo" placeholder="To" min="1" step="1" onclick="this.select()" onchange="LS.set('iat_rpto',this.value)" style="width:55px;padding:5px;border:1.5px solid var(--b1);border-radius:5px;font-size:.75rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--teal);font-weight:700;outline:none" value="1"/>
+  <!-- صف 2: Reprint -->
+  <div style="background:var(--s1);border-top:1px solid var(--b1);padding:5px 10px;display:flex;gap:6px;align-items:center;flex-shrink:0;overflow-x:auto;scrollbar-width:none">
+    <label style="font-size:.62rem;color:var(--muted);white-space:nowrap">🔁</label>
+    <input type="number" id="reprintFrom" placeholder="From" min="1" step="1" onclick="this.select()" onchange="LS.set('iat_rpfrom',this.value)" style="width:44px;padding:4px;border:1.5px solid var(--b1);border-radius:5px;font-size:.72rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--teal);font-weight:700;outline:none" value="1"/>
+    <span style="color:var(--muted);font-size:.72rem">→</span>
+    <input type="number" id="reprintTo" placeholder="To" min="1" step="1" onclick="this.select()" onchange="LS.set('iat_rpto',this.value)" style="width:44px;padding:4px;border:1.5px solid var(--b1);border-radius:5px;font-size:.72rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--teal);font-weight:700;outline:none" value="1"/>
     <button class="btn btn-ghost btn-sm" style="flex-shrink:0;color:var(--teal);font-size:.7rem" onclick="sendReprintRange()">↩ Send</button>
+  </div>
+  <!-- صف 3: حفظ وطباعة -->
+  <div style="background:var(--s1);border-top:1px solid var(--b1);padding:5px 10px;display:flex;gap:6px;align-items:center;flex-shrink:0">
+    <button class="btn btn-teal btn-sm" style="flex:1" onclick="saveAll()">💾 Save All</button>
+    <button class="btn btn-blue btn-sm" style="flex:1;background:rgba(59,130,246,.35)" onclick="printAllFresh()">🖨×2+🏷 Fresh</button>
+    <button class="btn btn-teal btn-sm" style="flex:1;background:rgba(20,184,166,.4);border-color:var(--teal)" onclick="saveAllThenPrint()">💾🖨 All</button>
   </div>
 </div>
 
@@ -524,18 +528,21 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     </div>
   </div>
   <div class="exp-bar">
-    <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
-      <label style="font-size:.7rem;color:var(--amber);white-space:nowrap;font-weight:700">🏷 Print:</label>
-      <input type="number" id="tenderPrintFrom" placeholder="From" min="1" step="1" onclick="this.select()" onchange="LS.set('iat_tpr_from',this.value)" style="width:60px;padding:6px;border:1.5px solid var(--b2);border-radius:6px;font-size:.8rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--amber);font-weight:700;outline:none" value="1"/>
-      <span style="color:var(--muted);font-size:.8rem">→</span>
-      <input type="number" id="tenderPrintTo" placeholder="To" min="1" step="1" onclick="this.select()" onchange="LS.set('iat_tpr_to',this.value)" style="width:60px;padding:6px;border:1.5px solid var(--b2);border-radius:6px;font-size:.8rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--amber);font-weight:700;outline:none" value="100"/>
+    <div style="display:flex;gap:4px;align-items:center;flex-shrink:0">
+      <label style="font-size:.65rem;color:var(--amber);white-space:nowrap;font-weight:700">🏷</label>
+      <input type="number" id="tenderPrintFrom" placeholder="From" min="1" step="1" onclick="this.select()" onchange="LS.set('iat_tpr_from',this.value)" style="width:46px;padding:4px;border:1.5px solid var(--b2);border-radius:6px;font-size:.75rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--amber);font-weight:700;outline:none" value="1"/>
+      <span style="color:var(--muted);font-size:.75rem">→</span>
+      <input type="number" id="tenderPrintTo" placeholder="To" min="1" step="1" onclick="this.select()" onchange="LS.set('iat_tpr_to',this.value)" style="width:46px;padding:4px;border:1.5px solid var(--b2);border-radius:6px;font-size:.75rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--amber);font-weight:700;outline:none" value="100"/>
     </div>
     <button class="btn btn-teal btn-sm" style="flex-shrink:0" onclick="tenderSaveToExcel()">☁ Save</button>
     <button class="btn btn-blue btn-sm" style="flex-shrink:0" onclick="tenderDirectPrintOrders()">🖨 Orders</button>
     <button class="btn btn-amber btn-sm" style="flex-shrink:0" onclick="tenderDirectPrintLabels()">🏷 Labels</button>
-    <button class="btn btn-amber btn-sm" style="flex-shrink:0;background:rgba(251,191,36,.25)" onclick="printAllTender()">🖨×2+🏷 Tender</button>
-    <button class="btn btn-purple btn-sm" style="flex-shrink:0" onclick="mergeTenderToOrders()">➕ Add to Orders</button>
-    <button class="btn btn-red btn-sm" style="flex-shrink:0" onclick="clearTenderSheet()">🧹 Clear Sheet</button>
+    <button class="btn btn-purple btn-sm" style="flex-shrink:0" onclick="mergeTenderToOrders()">➕ Add</button>
+    <button class="btn btn-red btn-sm" style="flex-shrink:0" onclick="clearTenderSheet()">🧹 Clear</button>
+  </div>
+  <!-- صف 2: حفظ وطباعة تندر -->
+  <div style="background:var(--s1);border-top:1px solid var(--b1);padding:5px 10px;display:flex;gap:6px;align-items:center;flex-shrink:0">
+    <button class="btn btn-amber btn-sm" style="flex:1;background:rgba(251,191,36,.35)" onclick="printAllTender()">🖨×2+🏷 Tender</button>
   </div>
 </div>
 
@@ -2528,27 +2535,44 @@ async function directPrintLabels(){
 
 // ── Save All then Print All ──
 async function saveAllThenPrint(){
-  // 1. Save
   const from=parseInt(document.getElementById('printRangeFrom')?.value)||1;
   const to=parseInt(document.getElementById('printRangeTo')?.value)||999;
-  const date=document.getElementById('orderDate')?.value||todayStr();
-  if(orders.length) await saveOrdersToLoading(from,to,date);
-  if(tenderOrders.length) await tenderSaveToExcel();
-  toast('✓ Saved - queuing print jobs...','ok');
-
-  // 2. Print All Fresh (×2 Orders + Labels) - مع save_ts
-  await addPrintJob({action:'',from,to,_includeSaveTs:true});
-  await addPrintJob({action:'',from,to,_includeSaveTs:true});
-  await addPrintJob({action:'print_labels',from,to,_includeSaveTs:true});
-
-  // 3. Print All Tender (×2 Orders + Labels)
   const tf=parseInt(document.getElementById('tenderPrintFrom')?.value)||1;
   const tt=parseInt(document.getElementById('tenderPrintTo')?.value)||999;
-  await addPrintJob({action:'print_tender_orders',from:tf,to:tt,_includeSaveTs:true});
-  await addPrintJob({action:'print_tender_orders',from:tf,to:tt,_includeSaveTs:true});
-  await addPrintJob({action:'print_tender_labels',from:tf,to:tt,_includeSaveTs:true});
+  const date=document.getElementById('orderDate')?.value||todayStr();
 
-  toast('✓ Save + Print All queued!','ok');
+  // 1. سجل timestamp الـ signal قبل الحفظ
+  const signalTs=Date.now();
+  window._lastSaveTs=signalTs;
+
+  // 2. أرسل signal أول مع كل الـ jobs
+  const jobs=[
+    {action:'',from,to,_includeSaveTs:true},
+    {action:'',from,to,_includeSaveTs:true},
+    {action:'print_labels',from,to,_includeSaveTs:true},
+    {action:'print_tender_orders',from:tf,to:tt,_includeSaveTs:true},
+    {action:'print_tender_orders',from:tf,to:tt,_includeSaveTs:true},
+    {action:'print_tender_labels',from:tf,to:tt,_includeSaveTs:true}
+  ];
+
+  try{
+    const token=await getODToken();
+    await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',{
+      method:'PUT',
+      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:JSON.stringify({jobs,ts:signalTs,save_ts:signalTs})
+    });
+    toast('✓ Signal sent - saving...','ok');
+  }catch(e){
+    toast('Error sending signal: '+e.message,'err');
+    return;
+  }
+
+  // 3. بعدها احفظ الأوردرات للإكسيل
+  if(orders.length) await saveOrdersToLoading(from,to,date);
+  if(tenderOrders.length) await tenderSaveToExcel();
+
+  toast('✓ Saved! Python waiting for sync then will print...','ok');
 }
 
 // ── Save All (فريش + تندر) ──
@@ -2565,21 +2589,56 @@ async function saveAll(){
 async function printAllFresh(){
   const from=parseInt(document.getElementById('printRangeFrom').value)||1;
   const to=parseInt(document.getElementById('printRangeTo').value)||999;
-  await directPrintOrders();
-  await directPrintOrders();
-  await directPrintLabels();
+  const date=document.getElementById('orderDate')?.value||todayStr();
+  const signalTs=Date.now();
+  window._lastSaveTs=signalTs;
+
+  // 1. Signal أول
+  try{
+    const token=await getODToken();
+    const jobs=[
+      {action:'',from,to,_includeSaveTs:true},
+      {action:'',from,to,_includeSaveTs:true},
+      {action:'print_labels',from,to,_includeSaveTs:true}
+    ];
+    await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',{
+      method:'PUT',
+      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:JSON.stringify({jobs,ts:signalTs,save_ts:signalTs})
+    });
+  }catch(e){toast('Error: '+e.message,'err');return;}
+
+  // 2. Save فريش
+  if(orders.length) await saveOrdersToLoading(from,to,date);
   toast(`✓ Fresh queued: 2×Orders + Labels (${from}-${to})`,'ok');
 }
 
 // ── Print All Tender (Orders×2 + Labels×1) ──
 async function printAllTender(){
-  const from=parseInt(document.getElementById('tenderPrintFrom').value)||1;
-  const to=parseInt(document.getElementById('tenderPrintTo').value)||999;
-  if(!from||!to||from>to){toast('Set valid range first','err');return;}
-  await tenderDirectPrintOrders();
-  await tenderDirectPrintOrders();
-  await tenderDirectPrintLabels();
-  toast(`✓ Tender queued: 2×Orders + Labels (${from}-${to})`,'ok');
+  const tf=parseInt(document.getElementById('tenderPrintFrom').value)||1;
+  const tt=parseInt(document.getElementById('tenderPrintTo').value)||999;
+  if(!tf||!tt||tf>tt){toast('Set valid range first','err');return;}
+  const signalTs=Date.now();
+  window._lastSaveTs=signalTs;
+
+  // 1. Signal أول
+  try{
+    const token=await getODToken();
+    const jobs=[
+      {action:'print_tender_orders',from:tf,to:tt,_includeSaveTs:true},
+      {action:'print_tender_orders',from:tf,to:tt,_includeSaveTs:true},
+      {action:'print_tender_labels',from:tf,to:tt,_includeSaveTs:true}
+    ];
+    await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',{
+      method:'PUT',
+      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:JSON.stringify({jobs,ts:signalTs,save_ts:signalTs})
+    });
+  }catch(e){toast('Error: '+e.message,'err');return;}
+
+  // 2. Save تندر
+  if(tenderOrders.length) await tenderSaveToExcel();
+  toast(`✓ Tender queued: 2×Orders + Labels (${tf}-${tt})`,'ok');
 }
 
 // ── Reset All ──
