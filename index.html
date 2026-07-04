@@ -569,6 +569,7 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
       <button class="btn btn-teal btn-sm" id="btnDownloadImg" onclick="downloadCombinedImage()">⬇ Save Image</button>
       <button class="btn btn-green btn-sm" id="btnShareWA" onclick="shareCombinedImageWhatsApp()">💬 WhatsApp</button>
+      <button class="btn btn-purple btn-sm" onclick="sendToInventory()">📤 Inventory</button>
     </div>
   </div>
   <div style="flex:1;overflow-y:auto;padding:10px" id="combinedQtyScroll">
@@ -6010,7 +6011,81 @@ function parseDriverAssignment(){
   resultEl.appendChild(waBtn);
 }
 
-// ══ WA Send Page ══
+// ══ Firebase Inventory Integration ══
+const _INV_FC={apiKey:"AIzaSyDGX7RpEnmflXboLVUkaYjxhllMzvj0cBQ",authDomain:"iat-inventory-cbbd5.firebaseapp.com",projectId:"iat-inventory-cbbd5",storageBucket:"iat-inventory-cbbd5.firebasestorage.app",messagingSenderId:"138687412839",appId:"1:138687412839:web:ffe1a58ba3a3e1d52df2c2"};
+
+let _invDb=null;
+
+async function _getInvDb(){
+  if(_invDb) return _invDb;
+  const {initializeApp,getApps}=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
+  const {getFirestore}=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+  const existing=getApps().find(a=>a.name==='inv');
+  const app=existing||initializeApp(_INV_FC,'inv');
+  _invDb=getFirestore(app);
+  return _invDb;
+}
+
+async function sendToInventory(){
+  if(!orders.length&&!tenderOrders.length){toast('No orders to send','err');return;}
+
+  // حساب إجماليات بنفس format الإنفنتوري
+  const items={};
+
+  orders.forEach(o=>{
+    if(!o.product||!o.qty) return;
+    const prod=o.product.trim();
+    if(!items[prod]) items[prod]={kg:'',pcs:''};
+    items[prod].kg=Math.round(((parseFloat(items[prod].kg)||0)+(parseFloat(o.qty)||0))*100)/100;
+  });
+
+  tenderOrders.forEach(o=>{
+    if(!o.product||!o.qty) return;
+    const prod=o.product.trim();
+    let kg=0;
+    if(prod.toUpperCase().includes('KG')){
+      kg=parseFloat(o.qty)||0;
+    }else{
+      let g=400;
+      if(prod.includes('450'))g=450;
+      else if(prod.includes('500'))g=500;
+      kg=(parseFloat(o.qty)||0)*(g/1000);
+    }
+    if(!items[prod]) items[prod]={kg:'',pcs:''};
+    items[prod].kg=Math.round(((parseFloat(items[prod].kg)||0)+kg)*100)/100;
+  });
+
+  Object.keys(items).forEach(k=>{if(!items[k].kg&&!items[k].pcs)delete items[k];});
+
+  if(!Object.keys(items).length){toast('No quantities to send','err');return;}
+
+  const dateStr=new Date().toISOString().slice(0,10);
+  const payload={
+    id:'orders_'+Date.now().toString(36),
+    date:dateStr,
+    notes:'IAT Orders '+dateStr,
+    items,
+    type:'orders',
+    createdAt:new Date().toISOString()
+  };
+
+  try{
+    toast('⏳ Saving to OneDrive...','ok');
+    const token=await getODToken();
+    const res=await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/orders_total.json:/content',{
+      method:'PUT',
+      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:JSON.stringify(payload)
+    });
+    if(!res.ok) throw new Error('Failed to save');
+    toast(`✓ Saved orders_total.json to OneDrive!`,'ok');
+  }catch(e){
+    toast('Error: '+e.message,'err');
+    console.error(e);
+  }
+}
+
+
 let _waOrder = new Map();
 
 function initWASend(){
@@ -6071,11 +6146,35 @@ function renderWASend(){
           </div>
           <span style="font-family:var(--mono);font-size:.72rem;color:var(--amber);font-weight:800;min-width:32px">${item.num}</span>
           <span style="flex:1;font-size:.75rem;font-weight:600">${item.customer}</span>
+          <select onchange="changeWADriver('${esc(drv)}',${i},this.value)" style="font-size:.65rem;padding:2px 4px;background:var(--s2);border:1px solid var(--b2);border-radius:4px;color:var(--muted);max-width:90px;outline:none">
+            <option value="${esc(drv)}" selected>${drv}</option>
+            ${drivers.filter(d=>d!==drv).map(d=>`<option value="${esc(d)}">${d}</option>`).join('')}
+          </select>
           <button onclick="removeWAItem('${esc(drv)}',${i})" style="background:none;border:none;color:var(--red);font-size:.9rem;cursor:pointer;padding:2px 6px;flex-shrink:0">✕</button>
         </div>`).join('')}
     </div>`;
   });
   el.innerHTML=html;
+}
+
+function changeWADriver(oldDrv, idx, newDrv){
+  if(oldDrv===newDrv) return;
+  const items=_waOrder.get(oldDrv);
+  if(!items) return;
+  // أخذ الأوردر
+  const item=items.splice(idx,1)[0];
+  if(!items.length) _waOrder.delete(oldDrv);
+  // أضفه لآخر قائمة السائق الجديد
+  if(!_waOrder.has(newDrv)) _waOrder.set(newDrv,[]);
+  _waOrder.get(newDrv).push(item);
+  // حدّث orders في التطبيق
+  orders.forEach(o=>{
+    if(o.customer===item.customer&&String(o.num||'')==String(item.num).replace('T',''))
+      o.driver=newDrv;
+  });
+  saveOrders();
+  saveWAOrder();
+  renderWASend();
 }
 
 function moveWAItem(drv, idx, dir){
