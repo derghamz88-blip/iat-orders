@@ -6125,17 +6125,25 @@ function renderFamilyTotal(){
     qtys[p]=(qtys[p]||0)+kg;
   });
 
-  // حساب الفاميليات
-  const families=[];
-  Object.entries(FAMILY_MAP).forEach(([family,variants])=>{
-    let total=0;
-    variants.forEach(v=>{ total+=(qtys[v]||0); });
-    if(total>0.001) families.push({family,total});
+  // تجميع تلقائي: كل منتج + نسخته 500
+  const families={};
+  Object.entries(qtys).forEach(([prod,qty])=>{
+    if(!qty) return;
+    // إذا المنتج ينتهي بـ " 500" → أضفه لأصله بـ ×0.5
+    if(/\s500$/.test(prod)){
+      const base=prod.replace(/\s500$/,'').trim();
+      if(!families[base]) families[base]=0;
+      families[base]+=qty*0.5;
+    } else {
+      if(!families[prod]) families[prod]=0;
+      families[prod]+=qty;
+    }
   });
 
-  if(!families.length){el.innerHTML='<div style="color:var(--muted);font-size:.8rem;text-align:center;padding:10px">No orders yet</div>';return;}
+  const entries=Object.entries(families).filter(([,v])=>v>0.001).sort((a,b)=>b[1]-a[1]);
+  if(!entries.length){el.innerHTML='<div style="color:var(--muted);font-size:.8rem;text-align:center;padding:10px">No orders yet</div>';return;}
 
-  const grandTotal=families.reduce((s,f)=>s+f.total,0);
+  const grandTotal=entries.reduce((s,[,v])=>s+v,0);
 
   el.innerHTML=`
     <div style="background:var(--s1);border:1.5px solid rgba(251,191,36,.3);border-radius:10px;overflow:hidden;margin-bottom:4px">
@@ -6143,10 +6151,10 @@ function renderFamilyTotal(){
         <span style="font-weight:700;font-size:.8rem;color:var(--amber)">📊 Family Total</span>
         <span style="font-family:var(--mono);font-size:.8rem;color:var(--amber);font-weight:800">${grandTotal.toFixed(2)} kg</span>
       </div>
-      ${families.map((f,i)=>`
+      ${entries.map(([prod,total],i)=>`
         <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;font-size:.75rem;border-bottom:1px solid var(--faint);background:${i%2?'var(--s2)':'transparent'}">
-          <span style="color:var(--txt);font-weight:600">${f.family}</span>
-          <span style="font-family:var(--mono);font-weight:700;color:var(--teal)">${f.total.toFixed(2)} kg</span>
+          <span style="color:var(--txt);font-weight:600">${prod}</span>
+          <span style="font-family:var(--mono);font-weight:700;color:var(--teal)">${total.toFixed(2)} kg</span>
         </div>`).join('')}
     </div>`;
 }
