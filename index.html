@@ -6110,37 +6110,39 @@ function renderFamilyTotal(){
   const el=document.getElementById('familyTotalDiv');
   if(!el) return;
 
-  // جمع الكميات - فريش فقط بالـ kg
-  const qtys={};
+  const FROZEN_PRODS=['Breast Frozen','Whole Chicken Frozen','french fries'];
+
+  // فريش orders
+  const freshQtys={};
+  const frozenQtys={};
   orders.forEach(o=>{
     if(!o.product||!o.qty) return;
     const prod=o.product.trim();
     const qty=parseFloat(o.qty)||0;
-    if(!qtys[prod]) qtys[prod]=0;
-    // إذا المنتج ينتهي بـ " 500" → كل وحدة = 0.5 kg
-    if(/\s500$/.test(prod)){
-      qtys[prod]+=qty*0.5;
-    } else {
-      qtys[prod]+=qty;
+    if(FROZEN_PRODS.includes(prod)){
+      frozenQtys[prod]=(frozenQtys[prod]||0)+qty;
+      return;
     }
+    if(!freshQtys[prod]) freshQtys[prod]=0;
+    if(/\s500$/.test(prod)) freshQtys[prod]+=qty*0.5;
+    else freshQtys[prod]+=qty;
   });
 
-  // تندر orders - تحويل للـ kg حسب الجرامات
+  // تندر
+  const tenderQtys={};
   tenderOrders.forEach(o=>{
     if(!o.product||!o.qty) return;
     const prod=o.product.trim();
     let kg=0;
     if(prod.toUpperCase().includes('KG')){kg=parseFloat(o.qty)||0;}
     else{let g=400;if(prod.includes('450'))g=450;else if(prod.includes('500'))g=500;kg=(parseFloat(o.qty)||0)*(g/1000);}
-    if(!qtys[prod]) qtys[prod]=0;
-    qtys[prod]+=kg;
+    tenderQtys[prod]=(tenderQtys[prod]||0)+kg;
   });
 
-  // تجميع: الاسم الأصلي + نسخته 500 (بس الـ 500 تمت معالجتها بالأعلى)
+  // دمج الفريش 500 مع أصله
   const families={};
-  Object.entries(qtys).forEach(([prod,qty])=>{
+  Object.entries(freshQtys).forEach(([prod,qty])=>{
     if(!qty) return;
-    // إذا المنتج ينتهي بـ " 500" → أضفه لأصله
     if(/\s500$/.test(prod)){
       const base=prod.replace(/\s500$/,'').trim();
       if(!families[base]) families[base]=0;
@@ -6151,23 +6153,37 @@ function renderFamilyTotal(){
     }
   });
 
-  const entries=Object.entries(families).filter(([,v])=>v>0.001).sort((a,b)=>b[1]-a[1]);
-  if(!entries.length){el.innerHTML='<div style="color:var(--muted);font-size:.8rem;text-align:center;padding:10px">No orders yet</div>';return;}
+  const freshEntries=Object.entries(families).filter(([,v])=>v>0.001).sort((a,b)=>b[1]-a[1]);
+  const frozenEntries=Object.entries(frozenQtys).filter(([,v])=>v>0.001).sort((a,b)=>b[1]-a[1]);
+  const tenderEntries=Object.entries(tenderQtys).filter(([,v])=>v>0.001).sort((a,b)=>b[1]-a[1]);
 
-  const grandTotal=entries.reduce((s,[,v])=>s+v,0);
+  if(!freshEntries.length&&!frozenEntries.length&&!tenderEntries.length){
+    el.innerHTML='<div style="color:var(--muted);font-size:.8rem;text-align:center;padding:10px">No orders yet</div>';return;
+  }
 
-  el.innerHTML=`
-    <div style="background:var(--s1);border:1.5px solid rgba(251,191,36,.3);border-radius:10px;overflow:hidden;margin-bottom:4px">
+  const freshTotal=freshEntries.reduce((s,[,v])=>s+v,0);
+  const frozenTotal=frozenEntries.reduce((s,[,v])=>s+v,0);
+  const tenderTotal=tenderEntries.reduce((s,[,v])=>s+v,0);
+
+  function makeTable(title,emoji,entries,total,color){
+    if(!entries.length) return '';
+    return`<div style="background:var(--s1);border:1.5px solid rgba(251,191,36,.3);border-radius:10px;overflow:hidden;margin-bottom:8px">
       <div style="padding:8px 12px;background:rgba(251,191,36,.12);border-bottom:1px solid rgba(251,191,36,.2);display:flex;justify-content:space-between;align-items:center">
-        <span style="font-weight:700;font-size:.8rem;color:var(--amber)">📊 Family Total</span>
-        <span style="font-family:var(--mono);font-size:.8rem;color:var(--amber);font-weight:800">${grandTotal.toFixed(2)} kg</span>
+        <span style="font-weight:700;font-size:.8rem;color:var(--amber)">${emoji} ${title}</span>
+        <span style="font-family:var(--mono);font-size:.8rem;color:var(--amber);font-weight:800">${total.toFixed(2)} kg</span>
       </div>
-      ${entries.map(([prod,total],i)=>`
+      ${entries.map(([prod,qty],i)=>`
         <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;font-size:.75rem;border-bottom:1px solid var(--faint);background:${i%2?'var(--s2)':'transparent'}">
           <span style="color:var(--txt);font-weight:600">${prod}</span>
-          <span style="font-family:var(--mono);font-weight:700;color:var(--teal)">${total.toFixed(2)} kg</span>
+          <span style="font-family:var(--mono);font-weight:700;color:${color}">${qty.toFixed(2)} kg</span>
         </div>`).join('')}
     </div>`;
+  }
+
+  el.innerHTML=
+    makeTable('Fresh','🍗',freshEntries,freshTotal,'var(--teal)')+
+    makeTable('Frozen','❄️',frozenEntries,frozenTotal,'#4FC3F7')+
+    makeTable('Tender','🏷',tenderEntries,tenderTotal,'var(--amber)');
 }
 
 // ══ Firebase Inventory Integration ══
