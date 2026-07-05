@@ -6110,30 +6110,41 @@ function renderFamilyTotal(){
   const el=document.getElementById('familyTotalDiv');
   if(!el) return;
 
-  // جمع الكميات من orders وtenderOrders
+  // جمع الكميات - فريش فقط بالـ kg
   const qtys={};
   orders.forEach(o=>{
     if(!o.product||!o.qty) return;
-    qtys[o.product]=(qtys[o.product]||0)+(parseFloat(o.qty)||0);
-  });
-  tenderOrders.forEach(o=>{
-    if(!o.product||!o.qty) return;
-    const p=o.product;
-    let kg=0;
-    if(p.toUpperCase().includes('KG')){kg=parseFloat(o.qty)||0;}
-    else{let g=400;if(p.includes('450'))g=450;else if(p.includes('500'))g=500;kg=(parseFloat(o.qty)||0)*(g/1000);}
-    qtys[p]=(qtys[p]||0)+kg;
+    const prod=o.product.trim();
+    const qty=parseFloat(o.qty)||0;
+    if(!qtys[prod]) qtys[prod]=0;
+    // إذا المنتج ينتهي بـ " 500" → كل وحدة = 0.5 kg
+    if(/\s500$/.test(prod)){
+      qtys[prod]+=qty*0.5;
+    } else {
+      qtys[prod]+=qty;
+    }
   });
 
-  // تجميع تلقائي: كل منتج + نسخته 500
+  // تندر orders - تحويل للـ kg حسب الجرامات
+  tenderOrders.forEach(o=>{
+    if(!o.product||!o.qty) return;
+    const prod=o.product.trim();
+    let kg=0;
+    if(prod.toUpperCase().includes('KG')){kg=parseFloat(o.qty)||0;}
+    else{let g=400;if(prod.includes('450'))g=450;else if(prod.includes('500'))g=500;kg=(parseFloat(o.qty)||0)*(g/1000);}
+    if(!qtys[prod]) qtys[prod]=0;
+    qtys[prod]+=kg;
+  });
+
+  // تجميع: الاسم الأصلي + نسخته 500 (بس الـ 500 تمت معالجتها بالأعلى)
   const families={};
   Object.entries(qtys).forEach(([prod,qty])=>{
     if(!qty) return;
-    // إذا المنتج ينتهي بـ " 500" → أضفه لأصله بـ ×0.5
+    // إذا المنتج ينتهي بـ " 500" → أضفه لأصله
     if(/\s500$/.test(prod)){
       const base=prod.replace(/\s500$/,'').trim();
       if(!families[base]) families[base]=0;
-      families[base]+=qty*0.5;
+      families[base]+=qty;
     } else {
       if(!families[prod]) families[prod]=0;
       families[prod]+=qty;
