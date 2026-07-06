@@ -28,7 +28,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);display:flex;
 nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display:flex;align-items:stretch;height:var(--nav-h);flex-shrink:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;}
 .logo{display:flex;align-items:center;font-weight:800;font-size:.95rem;color:var(--blue2);margin-right:8px;letter-spacing:-.02em;}
 .logo b{color:var(--teal);}
-.ntab{display:flex;align-items:center;gap:4px;padding:0 9px;font-size:.72rem;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2.5px solid transparent;transition:all .17s;white-space:nowrap;flex-shrink:0;}
+.ntab{display:flex;align-items:center;gap:4px;padding:0 12px;font-size:.78rem;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2.5px solid transparent;transition:all .17s;white-space:nowrap;flex-shrink:0;min-height:36px;}
 .ntab:hover{color:var(--txt);}
 .ntab.on{color:var(--blue2);border-bottom-color:var(--blue);}
 .nbadge{background:var(--blue);color:#fff;border-radius:10px;padding:1px 6px;font-size:.62rem;font-family:var(--mono);}
@@ -235,23 +235,65 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
 </head>
 <body>
 
-<nav>
-  <div class="logo">IAT<b>.</b>Orders</div>
-  <span id="onlineIndicator" title="Online" style="font-size:.75rem;margin-right:4px;cursor:default">🟢</span>
-  <div class="ntab on" onclick="showPage('entry',this)">✏️ Entry</div>
-  <div class="ntab" onclick="showPage('orders',this)">📋 Orders <span class="nbadge" id="navBadge">0</span></div>
-  <div class="ntab" onclick="showPage('view-orders',this)">👁️ View</div>
-  <div class="ntab" onclick="showPage('drivers',this)">🚗 Drivers</div>
-  <div class="ntab" onclick="showPage('wa-send',this);initWASend()">📤 WA Send</div>
-  <!-- Qty tab removed - use All Qty -->
-  <div class="ntab" onclick="showPage('tender',this)">🏷 Tender</div>
-  <div class="ntab" onclick="showPage('tender-orders',this)">📋 T.Orders</div>
-  <div class="ntab" onclick="showPage('tender-view',this)">👁 T.View</div>
-  <!-- T.Qty tab removed - use All Qty -->
-  <div class="ntab" onclick="showPage('combined-qty',this)">📊 All Qty</div>
-  <!-- Report tab removed -->
-  <div class="ntab" onclick="showPage('invoice',this)">🧾 Invoice</div>
-  <div class="ntab" onclick="showPage('settings',this)">⚙️ Settings</div>
+<nav style="flex-direction:column;height:auto;padding:0">
+  <!-- صف 1: Fresh/Tender/Drivers -->
+  <div style="display:flex;align-items:stretch;overflow-x:auto;scrollbar-width:none;flex-shrink:0;border-bottom:1px solid var(--b1)">
+    <span id="onlineIndicator" title="Online" style="font-size:.7rem;cursor:default;display:flex;align-items:center;padding:0 5px;flex-shrink:0">🟢</span>
+    <!-- Entry pair -->
+    <div style="display:flex;flex-direction:column;flex-shrink:0;min-width:60px">
+      <div class="ntab on" style="flex:1;font-size:.72rem;padding:7px 8px;border-bottom:1px solid var(--b1);justify-content:center;display:flex;align-items:center" onclick="showPage('entry',this)">✏️ Entry</div>
+      <div class="ntab" style="flex:1;font-size:.68rem;padding:6px 8px;color:var(--amber);justify-content:center;display:flex;align-items:center" onclick="showPage('tender',this)">🏷 T.Entry</div>
+    </div>
+    <!-- Orders pair -->
+    <div style="display:flex;flex-direction:column;flex-shrink:0;min-width:72px">
+      <div class="ntab" style="flex:1;font-size:.72rem;padding:7px 8px;border-bottom:1px solid var(--b1);justify-content:center;display:flex;align-items:center" onclick="showPage('orders',this)">📋 Orders <span class="nbadge" id="navBadge">0</span></div>
+      <div class="ntab" style="flex:1;font-size:.68rem;padding:6px 8px;color:var(--amber);justify-content:center;display:flex;align-items:center" onclick="showPage('tender-orders',this)">📋 T.Orders</div>
+    </div>
+    <!-- View pair -->
+    <div style="display:flex;flex-direction:column;flex-shrink:0;min-width:54px">
+      <div class="ntab" style="flex:1;font-size:.72rem;padding:7px 8px;border-bottom:1px solid var(--b1);justify-content:center;display:flex;align-items:center" onclick="showPage('view-orders',this)">👁 View</div>
+      <div class="ntab" style="flex:1;font-size:.68rem;padding:6px 8px;color:var(--amber);justify-content:center;display:flex;align-items:center" onclick="showPage('tender-view',this)">👁 T.View</div>
+    </div>
+    <!-- All Qty pair -->
+    <div style="display:flex;flex-direction:column;flex-shrink:0;min-width:60px">
+      <div class="ntab" style="flex:1;font-size:.72rem;padding:7px 8px;border-bottom:1px solid var(--b1);justify-content:center;display:flex;align-items:center" onclick="showPage('combined-qty',this)">📊 Qty</div>
+      <div class="ntab" style="flex:1;font-size:.68rem;padding:6px 8px;justify-content:center;display:flex;align-items:center" onclick="showPage('dispatch',this);initDispatch()">📦 Dispatch</div>
+    </div>
+    <!-- Drivers pair -->
+    <div style="display:flex;flex-direction:column;flex-shrink:0;min-width:66px">
+      <div class="ntab" style="flex:1;font-size:.72rem;padding:7px 8px;border-bottom:1px solid var(--b1);justify-content:center;display:flex;align-items:center" onclick="showPage('drivers',this)">🚗 Drivers</div>
+      <div class="ntab" style="flex:1;font-size:.68rem;padding:6px 8px;justify-content:center;display:flex;align-items:center" onclick="showPage('wa-send',this);initWASend()">📤 WA Send</div>
+    </div>
+    <!-- Invoice pair -->
+    <div style="display:flex;flex-direction:column;flex-shrink:0;min-width:60px">
+      <div class="ntab" style="flex:1;font-size:.72rem;padding:7px 8px;border-bottom:1px solid var(--b1);justify-content:center;display:flex;align-items:center" onclick="showPage('invoice',this)">🧾 Invoice</div>
+      <div class="ntab" style="flex:1;font-size:.68rem;padding:6px 8px;justify-content:center;display:flex;align-items:center" onclick="showPage('settings',this)">⚙️ Settings</div>
+    </div>
+  </div>
+  <!-- صف النطاقات - مخفي، بس يظهر بصفحة View -->
+  <div id="navRangeBar" style="display:none;align-items:center;gap:3px;padding:4px 8px;background:var(--s2);border-bottom:1px solid var(--b1);flex-shrink:0;overflow-x:auto;scrollbar-width:none">
+    <span style="font-size:.62rem;color:var(--blue2);font-weight:700;white-space:nowrap">📍</span>
+    <input type="number" id="printRangeFrom" placeholder="F" min="1" step="1" onclick="this.select()" onfocus="this.select()" onkeydown="if(event.key==='Enter'||event.key==='Tab'){event.preventDefault();document.getElementById('printRangeTo').select();}" onchange="LS.set('iat_pfrom',this.value)" style="width:40px;padding:3px;border:1.5px solid var(--b2);border-radius:5px;font-size:.75rem;font-family:monospace;text-align:center;background:var(--s1);color:var(--amber);font-weight:700;outline:none" value="1"/>
+    <input type="number" id="printRangeTo" placeholder="T" min="1" step="1" onclick="this.select()" onfocus="this.select()" onchange="LS.set('iat_pto',this.value)" style="width:40px;padding:3px;border:1.5px solid var(--b2);border-radius:5px;font-size:.75rem;font-family:monospace;text-align:center;background:var(--s1);color:var(--amber);font-weight:700;outline:none" value="100"/>
+    <span style="font-size:.62rem;color:var(--amber);font-weight:700;margin-left:3px;white-space:nowrap">🏷</span>
+    <input type="number" id="tenderPrintFrom" placeholder="F" min="1" step="1" onclick="this.select()" onfocus="this.select()" onkeydown="if(event.key==='Enter'||event.key==='Tab'){event.preventDefault();document.getElementById('tenderPrintTo').select();}" onchange="LS.set('iat_tpr_from',this.value)" style="width:40px;padding:3px;border:1.5px solid var(--b2);border-radius:5px;font-size:.75rem;font-family:monospace;text-align:center;background:var(--s1);color:var(--amber);font-weight:700;outline:none" value="1"/>
+    <input type="number" id="tenderPrintTo" placeholder="T" min="1" step="1" onclick="this.select()" onfocus="this.select()" onchange="LS.set('iat_tpr_to',this.value)" style="width:40px;padding:3px;border:1.5px solid var(--b2);border-radius:5px;font-size:.75rem;font-family:monospace;text-align:center;background:var(--s1);color:var(--amber);font-weight:700;outline:none" value="100"/>
+    <!-- أزرار حد المجالات -->
+    <div id="viewRangeBtns" style="display:none;align-items:center;gap:4px;margin-left:5px;padding-left:5px;border-left:1px solid var(--b2)">
+      <button onclick="saveAllThenPrint()" style="background:rgba(20,184,166,.3);border:1.5px solid var(--teal);border-radius:7px;padding:4px 8px;cursor:pointer;color:var(--teal);display:flex;flex-direction:column;align-items:center;gap:1px;min-width:52px">
+        <span style="font-size:.85rem">💾🖨</span>
+        <span style="font-size:.55rem;font-weight:700;white-space:nowrap">Save+Print</span>
+      </button>
+      <button onclick="saveAll()" style="background:rgba(20,184,166,.15);border:1.5px solid var(--teal);border-radius:7px;padding:4px 8px;cursor:pointer;color:var(--teal);display:flex;flex-direction:column;align-items:center;gap:1px;min-width:44px">
+        <span style="font-size:.85rem">💾</span>
+        <span style="font-size:.55rem;font-weight:700;white-space:nowrap">Save All</span>
+      </button>
+      <button onclick="printAllFresh()" style="background:rgba(59,130,246,.15);border:1.5px solid var(--blue2);border-radius:7px;padding:4px 8px;cursor:pointer;color:var(--blue2);display:flex;flex-direction:column;align-items:center;gap:1px;min-width:44px">
+        <span style="font-size:.85rem">🖨🏷</span>
+        <span style="font-size:.55rem;font-weight:700;white-space:nowrap">Fresh</span>
+      </button>
+    </div>
+  </div>
 </nav>
 
 <!-- ══ ENTRY PAGE ══ -->
@@ -361,24 +403,13 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
 
 <!-- ══ VIEW ORDERS PAGE ══ -->
 <div class="page" id="pg-view-orders">
-  <div class="orders-head">
-    <div>
-      <div style="font-size:.68rem;font-family:var(--mono);color:var(--muted);letter-spacing:.1em;text-transform:uppercase">View Orders</div>
-    </div>
-  </div>
   <div style="flex:1;overflow-y:auto;">
     <div class="olist" id="viewList">
       <div class="empty"><div class="ei">📋</div><p>No orders yet.</p></div>
     </div>
   </div>
-  <!-- صف 1: نطاق + حفظ + طباعة -->
+  <!-- صف 3: أزرار الطباعة -->
   <div class="exp-bar">
-    <div style="display:flex;gap:4px;align-items:center;flex-shrink:0">
-      <label style="font-size:.65rem;color:var(--blue2);white-space:nowrap;font-weight:700">📍</label>
-      <input type="number" id="printRangeFrom" placeholder="From" min="1" step="1" onclick="this.select()" onchange="LS.set('iat_pfrom',this.value)" style="width:46px;padding:4px;border:1.5px solid var(--b2);border-radius:6px;font-size:.75rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--amber);font-weight:700;outline:none" value="1"/>
-      <span style="color:var(--muted);font-size:.75rem">→</span>
-      <input type="number" id="printRangeTo" placeholder="To" min="1" step="1" onclick="this.select()" onchange="LS.set('iat_pto',this.value)" style="width:46px;padding:4px;border:1.5px solid var(--b2);border-radius:6px;font-size:.75rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--amber);font-weight:700;outline:none" value="100"/>
-    </div>
     <button class="btn btn-teal btn-sm" style="flex-shrink:0" onclick="manualSaveRange()" id="odBtn">☁ Save</button>
     <button class="btn btn-blue btn-sm" style="flex-shrink:0" onclick="directPrintOrders()">🖨 Orders</button>
     <button class="btn btn-amber btn-sm" style="flex-shrink:0" onclick="directPrintLabels()">🏷 Labels</button>
@@ -388,20 +419,20 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     <button class="btn btn-green btn-sm" style="flex-shrink:0" onclick="printFolderPDF('invoices')">🧾 INV</button>
     <button class="btn btn-purple btn-sm" style="flex-shrink:0" onclick="printFolderPDF('lpo')">📋 LPO</button>
     <button class="btn btn-ghost btn-sm" style="flex-shrink:0" onclick="exportXL()">⬇ XL</button>
-  </div>
-  <!-- صف 2: Reprint -->
-  <div style="background:var(--s1);border-top:1px solid var(--b1);padding:5px 10px;display:flex;gap:6px;align-items:center;flex-shrink:0;overflow-x:auto;scrollbar-width:none">
-    <label style="font-size:.62rem;color:var(--muted);white-space:nowrap">🔁</label>
-    <input type="number" id="reprintFrom" placeholder="From" min="1" step="1" onclick="this.select()" onchange="LS.set('iat_rpfrom',this.value)" style="width:44px;padding:4px;border:1.5px solid var(--b1);border-radius:5px;font-size:.72rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--teal);font-weight:700;outline:none" value="1"/>
-    <span style="color:var(--muted);font-size:.72rem">→</span>
-    <input type="number" id="reprintTo" placeholder="To" min="1" step="1" onclick="this.select()" onchange="LS.set('iat_rpto',this.value)" style="width:44px;padding:4px;border:1.5px solid var(--b1);border-radius:5px;font-size:.72rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--teal);font-weight:700;outline:none" value="1"/>
-    <button class="btn btn-ghost btn-sm" style="flex-shrink:0;color:var(--teal);font-size:.7rem" onclick="sendReprintRange()">↩ Send</button>
-  </div>
-  <!-- صف 3: حفظ وطباعة -->
-  <div style="background:var(--s1);border-top:1px solid var(--b1);padding:5px 10px;display:flex;gap:6px;align-items:center;flex-shrink:0">
-    <button class="btn btn-teal btn-sm" style="flex:1" onclick="saveAll()">💾 Save All</button>
-    <button class="btn btn-blue btn-sm" style="flex:1;background:rgba(59,130,246,.35)" onclick="printAllFresh()">🖨×2+🏷 Fresh</button>
-    <button class="btn btn-teal btn-sm" style="flex:1;background:rgba(20,184,166,.4);border-color:var(--teal)" onclick="saveAllThenPrint()">💾🖨 All</button>
+    <!-- Reprint بعد LPO -->
+    <div style="display:flex;align-items:center;gap:4px;margin-left:6px;padding-left:6px;border-left:1px solid var(--b2)">
+      <label style="font-size:.6rem;color:var(--muted);white-space:nowrap">🔁</label>
+      <input type="number" id="reprintFrom" min="1" step="1"
+        onclick="this.select()" onfocus="this.select()"
+        onkeydown="if(event.key==='Enter'||event.key==='Tab'){event.preventDefault();const t=document.getElementById('reprintTo');t.value=this.value;t.select();}"
+        style="width:44px;padding:3px;border:1.5px solid var(--b1);border-radius:5px;font-size:.72rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--teal);font-weight:700;outline:none" placeholder="F"/>
+      <span style="color:var(--muted);font-size:.7rem">→</span>
+      <input type="number" id="reprintTo" min="1" step="1"
+        onclick="this.select()" onfocus="this.select()"
+        style="width:44px;padding:3px;border:1.5px solid var(--b1);border-radius:5px;font-size:.72rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--teal);font-weight:700;outline:none" placeholder="T"/>
+      <button class="btn btn-ghost btn-sm" style="color:var(--teal);font-size:.68rem;padding:2px 6px" onclick="sendReprintRange()">↩</button>
+      <button class="btn btn-ghost btn-sm" style="color:var(--muted);font-size:.65rem;padding:2px 6px" onclick="syncReprintFromRange()">↑</button>
+    </div>
   </div>
 </div>
 
@@ -528,12 +559,6 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     </div>
   </div>
   <div class="exp-bar">
-    <div style="display:flex;gap:4px;align-items:center;flex-shrink:0">
-      <label style="font-size:.65rem;color:var(--amber);white-space:nowrap;font-weight:700">🏷</label>
-      <input type="number" id="tenderPrintFrom" placeholder="From" min="1" step="1" onclick="this.select()" onchange="LS.set('iat_tpr_from',this.value)" style="width:46px;padding:4px;border:1.5px solid var(--b2);border-radius:6px;font-size:.75rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--amber);font-weight:700;outline:none" value="1"/>
-      <span style="color:var(--muted);font-size:.75rem">→</span>
-      <input type="number" id="tenderPrintTo" placeholder="To" min="1" step="1" onclick="this.select()" onchange="LS.set('iat_tpr_to',this.value)" style="width:46px;padding:4px;border:1.5px solid var(--b2);border-radius:6px;font-size:.75rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--amber);font-weight:700;outline:none" value="100"/>
-    </div>
     <button class="btn btn-teal btn-sm" style="flex-shrink:0" onclick="tenderSaveToExcel()">☁ Save</button>
     <button class="btn btn-blue btn-sm" style="flex-shrink:0" onclick="tenderDirectPrintOrders()">🖨 Orders</button>
     <button class="btn btn-amber btn-sm" style="flex-shrink:0" onclick="tenderDirectPrintLabels()">🏷 Labels</button>
@@ -1227,6 +1252,11 @@ function showPage(n,t){
   document.querySelectorAll('.ntab').forEach(x=>x.classList.remove('on'));
   document.getElementById('pg-'+n).classList.add('on');
   if(t)t.classList.add('on');
+  // أظهر/أخفي شريط النطاقات
+  const rangeBar=document.getElementById('navRangeBar');
+  const viewBtns=document.getElementById('viewRangeBtns');
+  if(rangeBar) rangeBar.style.display=(n==='view-orders'||n==='tender-view')?'flex':'none';
+  if(viewBtns) viewBtns.style.display=n==='view-orders'?'flex':'none';
   if(n==='orders'){renderOrders();setTimeout(()=>{const el=document.querySelector('#pg-orders [style*="overflow-y"]');if(el)el.scrollTop=el.scrollHeight;},100);}
   if(n==='view-orders'){renderViewOrders();setTimeout(()=>{const el=document.querySelector('#pg-view-orders [style*="overflow-y"]');if(el)el.scrollTop=el.scrollHeight;},100);}
   if(n==='drivers')renderDriversPage();
@@ -2492,6 +2522,15 @@ async function printDrivers(){
   }finally{
     if(btn){btn.disabled=false;btn.textContent='🚗 Drivers';}
   }
+}
+
+function syncReprintFromRange(){
+  const f=document.getElementById('printRangeFrom')?.value||'1';
+  const t=document.getElementById('printRangeTo')?.value||'100';
+  const rf=document.getElementById('reprintFrom');
+  const rt=document.getElementById('reprintTo');
+  if(rf){rf.value=f;rf.select();}
+  if(rt) rt.value=t;
 }
 
 async function sendReprintRange(){
@@ -6261,6 +6300,191 @@ async function sendToInventory(){
 }
 
 
+// ══ Dispatch Page ══
+let _dispatched={};
+
+function initDispatch(){
+  _dispatched=LS.get('iat_dispatch',{});
+  renderDispatch();
+}
+
+function resetDispatch(){
+  confDlg('Reset all dispatch data?',()=>{
+    _dispatched={};
+    LS.set('iat_dispatch',{});
+    renderDispatch();
+    toast('✓ Reset','ok');
+  });
+}
+
+function dispatchKey(cust,num,prod){return `${cust}__${num}__${prod}`;}
+
+function setDispatched(cust,num,prod,val){
+  const k=dispatchKey(cust,num,prod);
+  const max=orders.filter(o=>o.customer===cust&&(o.num||0)===num&&o.product===prod).reduce((s,o)=>s+(parseFloat(o.qty)||0),0);
+  let v=parseFloat(val)||0;
+  if(v<0)v=0;
+  if(v>max)v=max;
+  _dispatched[k]=v;
+  LS.set('iat_dispatch',_dispatched);
+  renderDispatchResults();
+}
+
+function dispatchAll(cust,num){
+  const allDone=orders.filter(o=>o.customer===cust&&(o.num||0)===num).every(o=>_dispatched[dispatchKey(cust,num,o.product)]);
+  orders.filter(o=>o.customer===cust&&(o.num||0)===num).forEach(o=>{
+    if(allDone) delete _dispatched[dispatchKey(cust,num,o.product)];
+    else _dispatched[dispatchKey(cust,num,o.product)]=true;
+  });
+  LS.set('iat_dispatch',_dispatched);
+  renderDispatch();
+}
+
+function renderDispatch(){
+  renderDispatchOrderList();
+  renderDispatchResults();
+}
+
+function renderDispatchOrderList(){
+  const el=document.getElementById('dispatchOrderList');
+  if(!el) return;
+  if(!orders.length){el.innerHTML='<div class="empty"><div class="ei">📦</div><p>No orders yet.</p></div>';return;}
+
+  const groups=new Map();
+  [...orders].sort((a,b)=>(a.num||0)-(b.num||0)).forEach(o=>{
+    const k=`${o.customer}__${o.num||0}`;
+    if(!groups.has(k)) groups.set(k,{cust:o.customer,num:o.num||0,items:[]});
+    groups.get(k).items.push(o);
+  });
+
+  const total=groups.size;
+  const done=[...groups.values()].filter(g=>g.items.every(o=>_dispatched[dispatchKey(g.cust,g.num,o.product)])).length;
+
+  el.innerHTML=`<div style="font-family:var(--mono);font-size:.72rem;color:var(--muted);margin-bottom:8px;padding:4px 8px;background:var(--s1);border-radius:6px;display:flex;align-items:center;gap:8px">
+    <span>Orders:</span><span style="color:var(--teal);font-weight:700">${done}</span><span>/ ${total} done</span>
+  </div>`+[...groups.values()].map(g=>{
+    const allDone=g.items.every(o=>_dispatched[dispatchKey(g.cust,g.num,o.product)]);
+    const anyDone=g.items.some(o=>_dispatched[dispatchKey(g.cust,g.num,o.product)]);
+    const isPartialOrder=anyDone&&!allDone;
+    return`<div style="border:1.5px solid ${allDone?'var(--teal)':anyDone?'var(--amber)':'var(--b2)'};border-radius:8px;overflow:hidden;margin-bottom:6px">
+      <div style="padding:7px 10px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--b2);background:${allDone?'rgba(20,184,166,.08)':anyDone?'rgba(251,191,36,.05)':'transparent'}">
+        <span style="font-family:var(--mono);font-size:.7rem;color:var(--amber);font-weight:800;min-width:22px">${g.num}</span>
+        <span style="flex:1;font-weight:700;font-size:.78rem;color:${allDone?'var(--teal)':'var(--txt)'}">${g.cust}</span>
+        <span style="font-size:.65rem;color:${allDone?'var(--teal)':anyDone?'var(--amber)':'var(--muted)'}">${g.items.filter(o=>_dispatched[dispatchKey(g.cust,g.num,o.product)]).length}/${g.items.length}</span>
+        <button onclick="dispatchAll('${esc(g.cust)}',${g.num})" style="background:${allDone?'rgba(20,184,166,.15)':'rgba(251,191,36,.1)'};border:1px solid ${allDone?'var(--teal)':'var(--amber)'};border-radius:5px;padding:2px 8px;font-size:.65rem;color:${allDone?'var(--teal)':'var(--amber)'};cursor:pointer">${allDone?'↩ Undo':'✓ All'}</button>
+      </div>
+      ${g.items.map(o=>{
+        const k=dispatchKey(g.cust,g.num,o.product);
+        const dispVal=_dispatched[k];
+        const qty=parseFloat(o.qty)||0;
+        const isDone=dispVal===true||dispVal===1||dispVal===qty||(typeof dispVal==='number'&&dispVal>=qty);
+        const isPartial=!isDone&&typeof dispVal==='number'&&dispVal>0;
+        return`<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--faint);background:${isDone?'rgba(20,184,166,.05)':isPartial?'rgba(251,191,36,.04)':'transparent'}">
+          <div onclick="toggleDispatched('${esc(g.cust)}',${g.num},'${esc(o.product)}')"
+            style="width:22px;height:22px;border-radius:6px;border:2px solid ${isDone?'var(--teal)':isPartial?'var(--amber)':'var(--b2)'};background:${isDone?'var(--teal)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer">
+            ${isDone?'<span style="color:#000;font-size:.75rem;font-weight:900">✓</span>':isPartial?'<span style="color:var(--amber);font-size:.75rem;font-weight:900">~</span>':''}
+          </div>
+          <span onclick="toggleDispatched('${esc(g.cust)}',${g.num},'${esc(o.product)}')" style="flex:1;font-size:.75rem;cursor:pointer;${isDone?'text-decoration:line-through;color:var(--muted)':'color:var(--txt)'}">${o.product}</span>
+          <input type="number" min="0" max="${qty}" step="0.5"
+            value="${isPartial?dispVal:''}" placeholder="${qty}"
+            onclick="event.stopPropagation();this.select()"
+            onchange="event.stopPropagation();setDispatchQty('${esc(g.cust)}',${g.num},'${esc(o.product)}',this.value)"
+            style="width:48px;padding:2px 4px;border:1px solid ${isPartial?'var(--amber)':'var(--b2)'};border-radius:4px;font-size:.7rem;font-family:monospace;text-align:center;background:var(--s2);color:${isPartial?'var(--amber)':'var(--muted)'};outline:none"/>
+          <span style="font-family:var(--mono);font-weight:700;font-size:.74rem;color:${isDone?'var(--teal)':isPartial?'var(--amber)':'var(--amber)'}">${qty} kg</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+}
+
+function toggleDispatched(cust,num,prod){
+  const k=dispatchKey(cust,num,prod);
+  if(_dispatched[k]) delete _dispatched[k];
+  else _dispatched[k]=true;
+  LS.set('iat_dispatch',_dispatched);
+  renderDispatch();
+}
+
+function setDispatchQty(cust,num,prod,val){
+  const k=dispatchKey(cust,num,prod);
+  const v=parseFloat(val)||0;
+  if(v>0) _dispatched[k]=v; // كمية جزئية
+  else delete _dispatched[k];
+  LS.set('iat_dispatch',_dispatched);
+  renderDispatchResults();
+}
+
+function sendDispatchWA(){
+  const totals={};
+  const disp={};
+  orders.forEach(o=>{
+    const p=o.product;
+    const qty=parseFloat(o.qty)||0;
+    totals[p]=(totals[p]||0)+qty;
+    const k=dispatchKey(o.customer,o.num||0,o.product);
+    const d=_dispatched[k];
+    if(d===true) disp[p]=(disp[p]||0)+qty;
+    else if(d>0) disp[p]=(disp[p]||0)+d;
+  });
+
+  const prods=Object.keys(totals).sort();
+  const dispEntries=prods.filter(p=>disp[p]>0);
+  const remEntries=prods.filter(p=>(totals[p]||0)-(disp[p]||0)>0.001);
+
+  let msg='📦 *Dispatch Report*\n\n';
+  if(dispEntries.length){
+    msg+='✅ *Dispatched:*\n';
+    dispEntries.forEach(p=>msg+=`• ${p}: ${(disp[p]||0).toFixed(2)} kg\n`);
+    msg+='\n';
+  }
+  if(remEntries.length){
+    msg+='⏳ *Remaining:*\n';
+    remEntries.forEach(p=>msg+=`• ${p}: ${((totals[p]||0)-(disp[p]||0)).toFixed(2)} kg\n`);
+  }
+
+  window.open('https://wa.me/?text='+encodeURIComponent(msg.trim()),'_blank');
+}
+
+function renderDispatchResults(){
+  const el=document.getElementById('dispatchResults');
+  if(!el||!orders.length) return;
+
+  const totals={};
+  const disp={};
+  orders.forEach(o=>{
+    const p=o.product;
+    const qty=parseFloat(o.qty)||0;
+    totals[p]=(totals[p]||0)+qty;
+    const k=dispatchKey(o.customer,o.num||0,o.product);
+    const d=_dispatched[k];
+    if(d===true) disp[p]=(disp[p]||0)+qty;
+    else if(typeof d==='number'&&d>0) disp[p]=(disp[p]||0)+d;
+  });
+
+  const prods=Object.keys(totals).sort();
+  const dispEntries=prods.filter(p=>disp[p]>0);
+  const remEntries=prods.filter(p=>(totals[p]||0)-(disp[p]||0)>0.001);
+
+  el.innerHTML=`<div style="display:flex;gap:8px;flex-direction:column">
+    ${dispEntries.length?`
+    <div style="background:var(--s1);border:1.5px solid rgba(20,184,166,.3);border-radius:10px;overflow:hidden">
+      <div style="padding:7px 12px;background:rgba(20,184,166,.1);border-bottom:1px solid rgba(20,184,166,.2);font-weight:700;font-size:.78rem;color:var(--teal)">✓ Dispatched</div>
+      ${dispEntries.map((p,i)=>`
+        <div style="display:flex;justify-content:space-between;padding:5px 12px;font-size:.73rem;border-bottom:1px solid var(--faint);background:${i%2?'var(--s2)':'transparent'}">
+          <span>${p}</span><span style="font-family:var(--mono);font-weight:700;color:var(--teal)">${(disp[p]||0).toFixed(2)} kg</span>
+        </div>`).join('')}
+    </div>`:''}
+    ${remEntries.length?`
+    <div style="background:var(--s1);border:1.5px solid rgba(239,68,68,.3);border-radius:10px;overflow:hidden">
+      <div style="padding:7px 12px;background:rgba(239,68,68,.08);border-bottom:1px solid rgba(239,68,68,.2);font-weight:700;font-size:.78rem;color:var(--red)">⏳ Remaining</div>
+      ${remEntries.map((p,i)=>`
+        <div style="display:flex;justify-content:space-between;padding:5px 12px;font-size:.73rem;border-bottom:1px solid var(--faint);background:${i%2?'var(--s2)':'transparent'}">
+          <span>${p}</span><span style="font-family:var(--mono);font-weight:700;color:var(--red)">${((totals[p]||0)-(disp[p]||0)).toFixed(2)} kg</span>
+        </div>`).join('')}
+    </div>`:''}
+  </div>`;
+}
+
 let _waOrder = new Map();
 
 function initWASend(){
@@ -6384,7 +6608,24 @@ function sendDriversWhatsAppFromPage(){
   window.open(url,'_blank');
 }
 </script>
-<!-- ══ WA SEND PAGE ══ -->
+<!-- ══ DISPATCH PAGE ══ -->
+<div class="page" id="pg-dispatch">
+  <div class="orders-head">
+    <div><div style="font-size:.68rem;font-family:var(--mono);color:var(--muted);letter-spacing:.1em;text-transform:uppercase">📦 Dispatch</div></div>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-green btn-sm" onclick="sendDispatchWA()" style="font-size:.7rem;padding:4px 8px">📤 WA</button>
+      <button class="btn btn-ghost btn-sm" onclick="resetDispatch()" style="font-size:.7rem;padding:4px 8px">🔄 Reset</button>
+    </div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:8px">
+    <!-- جداول الكميات أولاً -->
+    <div id="dispatchResults"></div>
+    <!-- قائمة الأوردرات -->
+    <div id="dispatchOrderList"></div>
+  </div>
+</div>
+
+
 <div class="page" id="pg-wa-send">
   <div class="orders-head">
     <div><div style="font-size:.68rem;font-family:var(--mono);color:var(--muted);letter-spacing:.1em;text-transform:uppercase">📤 WA Send</div></div>
