@@ -28,7 +28,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);display:flex;
 nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display:flex;align-items:stretch;height:var(--nav-h);flex-shrink:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;}
 .logo{display:flex;align-items:center;font-weight:800;font-size:.95rem;color:var(--blue2);margin-right:8px;letter-spacing:-.02em;}
 .logo b{color:var(--teal);}
-.ntab{display:flex;align-items:center;gap:4px;padding:0 12px;font-size:.78rem;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2.5px solid transparent;transition:all .17s;white-space:nowrap;flex-shrink:0;min-height:36px;}
+.ntab{display:flex;align-items:center;gap:4px;padding:0 12px;font-size:.78rem;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2.5px solid transparent;transition:all .17s;white-space:nowrap;flex-shrink:0;min-height:40px;}
 .ntab:hover{color:var(--txt);}
 .ntab.on{color:var(--blue2);border-bottom-color:var(--blue);}
 .nbadge{background:var(--blue);color:#fff;border-radius:10px;padding:1px 6px;font-size:.62rem;font-family:var(--mono);}
@@ -419,6 +419,7 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     <button class="btn btn-green btn-sm" style="flex-shrink:0" onclick="printFolderPDF('invoices')">🧾 INV</button>
     <button class="btn btn-purple btn-sm" style="flex-shrink:0" onclick="printFolderPDF('lpo')">📋 LPO</button>
     <button class="btn btn-ghost btn-sm" style="flex-shrink:0" onclick="exportXL()">⬇ XL</button>
+    <button class="btn btn-red btn-sm" style="flex-shrink:0" onclick="killExcel()" title="Force close Excel">❌ Excel</button>
     <!-- Reprint بعد LPO -->
     <div style="display:flex;align-items:center;gap:4px;margin-left:6px;padding-left:6px;border-left:1px solid var(--b2)">
       <label style="font-size:.6rem;color:var(--muted);white-space:nowrap">🔁</label>
@@ -2524,6 +2525,35 @@ async function printDrivers(){
   }
 }
 
+// ── Device Mode ──
+let _desktopMode=LS.get('iat_desktop',false);
+
+function applyDeviceMode(){
+  const isDesktop=_desktopMode;
+  document.querySelectorAll('.ntab').forEach(t=>{
+    t.style.padding=isDesktop?'0 16px':'';
+    t.style.fontSize=isDesktop?'.85rem':'';
+    t.style.minHeight=isDesktop?'42px':'';
+  });
+  document.querySelectorAll('.btn').forEach(b=>{
+    b.style.fontSize=isDesktop?'.82rem':'';
+    b.style.padding=isDesktop?(b.classList.contains('btn-sm')?'6px 12px':'8px 16px'):'';
+  });
+  document.querySelectorAll('input[type="number"],input[type="text"]').forEach(i=>{
+    i.style.fontSize=isDesktop?'.82rem':'';
+    i.style.padding=isDesktop?'5px 6px':'';
+  });
+  document.body.style.fontSize=isDesktop?'15px':'';
+  const btn=document.getElementById('modeBtn');
+  if(btn){btn.textContent=isDesktop?'📱':'💻';btn.title=isDesktop?'Mobile mode':'Desktop mode';}
+}
+
+function toggleDeviceMode(){
+  _desktopMode=!_desktopMode;
+  LS.set('iat_desktop',_desktopMode);
+  applyDeviceMode();
+}
+
 function syncReprintFromRange(){
   const f=document.getElementById('printRangeFrom')?.value||'1';
   const t=document.getElementById('printRangeTo')?.value||'100';
@@ -2766,6 +2796,15 @@ function resetAll(){
 }
 
 // ── PDF Folder Print ──
+async function killExcel(){
+  try{
+    const count=await addPrintJob({action:'kill_excel'});
+    toast(`✓ Kill Excel queued (#${count})`,'ok');
+  }catch(e){
+    if(e.message!=='user_cancelled')toast('Error: '+e.message,'err');
+  }
+}
+
 async function printFolderPDF(folder){
   const label = folder==='invoices' ? 'Invoices' : 'LPO';
   const action = folder==='invoices' ? 'print_invoices' : 'print_lpo';
@@ -5685,6 +5724,11 @@ function gPickerAddNew() {
 // Close on backdrop tap
 document.addEventListener('DOMContentLoaded', () => {
   loadFamilyMap();
+  // تحميل آخر قيم المجالات
+  const pf=LS.get('iat_pfrom',null); if(pf){const el=document.getElementById('printRangeFrom');if(el)el.value=pf;}
+  const pt=LS.get('iat_pto',null); if(pt){const el=document.getElementById('printRangeTo');if(el)el.value=pt;}
+  const tf=LS.get('iat_tpr_from',null); if(tf){const el=document.getElementById('tenderPrintFrom');if(el)el.value=tf;}
+  const tt=LS.get('iat_tpr_to',null); if(tt){const el=document.getElementById('tenderPrintTo');if(el)el.value=tt;}
   const ov = document.getElementById('gPickerOv');
   if (ov) {
     ov.addEventListener('click', e => { if (e.target === ov) gPickerClose(); });
