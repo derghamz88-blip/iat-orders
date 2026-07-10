@@ -270,29 +270,48 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
       <div class="ntab" style="flex:1;font-size:.68rem;padding:6px 8px;justify-content:center;display:flex;align-items:center" onclick="showPage('settings',this)">⚙️ Settings</div>
     </div>
   </div>
-  <!-- صف النطاقات - مخفي، بس يظهر بصفحة View -->
-  <div id="navRangeBar" style="display:none;align-items:center;gap:3px;padding:4px 8px;background:var(--s2);border-bottom:1px solid var(--b1);flex-shrink:0;overflow-x:auto;scrollbar-width:none">
-    <span style="font-size:.62rem;color:var(--blue2);font-weight:700;white-space:nowrap">📍</span>
-    <input type="number" id="printRangeFrom" placeholder="F" min="1" step="1" onclick="this.select()" onfocus="this.select()" onkeydown="if(event.key==='Enter'||event.key==='Tab'){event.preventDefault();document.getElementById('printRangeTo').select();}" onchange="LS.set('iat_pfrom',this.value)" style="width:40px;padding:3px;border:1.5px solid var(--b2);border-radius:5px;font-size:.75rem;font-family:monospace;text-align:center;background:var(--s1);color:var(--amber);font-weight:700;outline:none" value="1"/>
-    <input type="number" id="printRangeTo" placeholder="T" min="1" step="1" onclick="this.select()" onfocus="this.select()" onchange="LS.set('iat_pto',this.value)" style="width:40px;padding:3px;border:1.5px solid var(--b2);border-radius:5px;font-size:.75rem;font-family:monospace;text-align:center;background:var(--s1);color:var(--amber);font-weight:700;outline:none" value="100"/>
-    <span style="font-size:.62rem;color:var(--amber);font-weight:700;margin-left:3px;white-space:nowrap">🏷</span>
-    <input type="number" id="tenderPrintFrom" placeholder="F" min="1" step="1" onclick="this.select()" onfocus="this.select()" onkeydown="if(event.key==='Enter'||event.key==='Tab'){event.preventDefault();document.getElementById('tenderPrintTo').select();}" onchange="LS.set('iat_tpr_from',this.value)" style="width:40px;padding:3px;border:1.5px solid var(--b2);border-radius:5px;font-size:.75rem;font-family:monospace;text-align:center;background:var(--s1);color:var(--amber);font-weight:700;outline:none" value="1"/>
-    <input type="number" id="tenderPrintTo" placeholder="T" min="1" step="1" onclick="this.select()" onfocus="this.select()" onchange="LS.set('iat_tpr_to',this.value)" style="width:40px;padding:3px;border:1.5px solid var(--b2);border-radius:5px;font-size:.75rem;font-family:monospace;text-align:center;background:var(--s1);color:var(--amber);font-weight:700;outline:none" value="100"/>
-    <!-- أزرار حد المجالات -->
-    <div id="viewRangeBtns" style="display:none;align-items:center;gap:4px;margin-left:5px;padding-left:5px;border-left:1px solid var(--b2)">
-      <button onclick="saveAllThenPrint()" style="background:rgba(20,184,166,.3);border:1.5px solid var(--teal);border-radius:7px;padding:4px 8px;cursor:pointer;color:var(--teal);display:flex;flex-direction:column;align-items:center;gap:1px;min-width:52px">
-        <span style="font-size:.85rem">💾🖨</span>
-        <span style="font-size:.55rem;font-weight:700;white-space:nowrap">Save+Print</span>
-      </button>
-      <button onclick="saveAll()" style="background:rgba(20,184,166,.15);border:1.5px solid var(--teal);border-radius:7px;padding:4px 8px;cursor:pointer;color:var(--teal);display:flex;flex-direction:column;align-items:center;gap:1px;min-width:44px">
+  <!-- شريط المجالات والأزرار - يظهر بصفحة View -->
+  <div id="navRangeBar" style="display:none;flex-direction:column;background:var(--s2);border-bottom:1px solid var(--b1);flex-shrink:0">
+    <!-- صف 1: أزرار كبيرة -->
+    <div id="viewRangeBtns" style="display:none;align-items:center;gap:4px;padding:4px 8px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--b1)">
+      <button onclick="saveAll()" style="background:rgba(20,184,166,.15);border:1.5px solid var(--teal);border-radius:7px;padding:4px 8px;cursor:pointer;color:var(--teal);display:flex;flex-direction:column;align-items:center;gap:1px;flex-shrink:0;min-width:44px">
         <span style="font-size:.85rem">💾</span>
-        <span style="font-size:.55rem;font-weight:700;white-space:nowrap">Save All</span>
+        <span style="font-size:.52rem;font-weight:700;white-space:nowrap">Save All</span>
       </button>
-      <button onclick="printAllFresh()" style="background:rgba(59,130,246,.15);border:1.5px solid var(--blue2);border-radius:7px;padding:4px 8px;cursor:pointer;color:var(--blue2);display:flex;flex-direction:column;align-items:center;gap:1px;min-width:44px">
+      <button onclick="savePrintTender()" style="background:rgba(251,191,36,.2);border:1.5px solid var(--amber);border-radius:7px;padding:4px 8px;cursor:pointer;color:var(--amber);display:flex;flex-direction:column;align-items:center;gap:1px;flex-shrink:0;min-width:52px">
+        <span style="font-size:.85rem">💾🏷</span>
+        <span style="font-size:.52rem;font-weight:700;white-space:nowrap">Tender</span>
+      </button>
+      <button onclick="printAllFresh()" style="background:rgba(59,130,246,.15);border:1.5px solid var(--blue2);border-radius:7px;padding:4px 8px;cursor:pointer;color:var(--blue2);display:flex;flex-direction:column;align-items:center;gap:1px;flex-shrink:0;min-width:44px">
         <span style="font-size:.85rem">🖨🏷</span>
-        <span style="font-size:.55rem;font-weight:700;white-space:nowrap">Fresh</span>
+        <span style="font-size:.52rem;font-weight:700;white-space:nowrap">Fresh</span>
+      </button>
+      <button onclick="killExcel()" style="background:rgba(239,68,68,.15);border:1.5px solid var(--red);border-radius:7px;padding:4px 8px;cursor:pointer;color:var(--red);display:flex;flex-direction:column;align-items:center;gap:1px;flex-shrink:0;min-width:44px">
+        <span style="font-size:.85rem">❌</span>
+        <span style="font-size:.52rem;font-weight:700;white-space:nowrap">Excel</span>
+      </button>
+      <!-- زر كبير Save+Print All -->
+      <button onclick="saveAllThenPrint()" style="background:rgba(20,184,166,.35);border:2px solid var(--teal);border-radius:7px;padding:6px 14px;cursor:pointer;color:var(--teal);display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;flex:1;max-width:140px">
+        <span style="font-size:1.1rem">💾🖨</span>
+        <span style="font-size:.62rem;font-weight:800;white-space:nowrap">Save+Print All</span>
       </button>
     </div>
+    <!-- صف 2: المجالات + Send + زر Tender -->
+    <div style="display:flex;align-items:center;gap:4px;padding:4px 8px;overflow-x:auto;scrollbar-width:none">
+      <span style="font-size:.62rem;color:var(--blue2);font-weight:700;white-space:nowrap">📍</span>
+      <input type="number" id="printRangeFrom" placeholder="F" min="1" step="1" onclick="this.select()" onfocus="this.select()" onkeydown="if(event.key==='Enter'||event.key==='Tab'){event.preventDefault();document.getElementById('printRangeTo').select();}" onchange="LS.set('iat_pfrom',this.value)" style="width:40px;padding:3px;border:1.5px solid var(--b2);border-radius:5px;font-size:.75rem;font-family:monospace;text-align:center;background:var(--s1);color:var(--amber);font-weight:700;outline:none" value="1"/>
+      <input type="number" id="printRangeTo" placeholder="T" min="1" step="1" onclick="this.select()" onfocus="this.select()" onchange="LS.set('iat_pto',this.value)" style="width:40px;padding:3px;border:1.5px solid var(--b2);border-radius:5px;font-size:.75rem;font-family:monospace;text-align:center;background:var(--s1);color:var(--amber);font-weight:700;outline:none" value="100"/>
+      <button onclick="sendReprintRange()" style="background:rgba(20,184,166,.15);border:1px solid var(--teal);border-radius:5px;padding:3px 8px;font-size:.68rem;color:var(--teal);cursor:pointer;white-space:nowrap;flex-shrink:0">↩ Send</button>
+      <span style="font-size:.62rem;color:var(--amber);font-weight:700;margin-left:4px;white-space:nowrap">🏷</span>
+      <input type="number" id="tenderPrintFrom" placeholder="F" min="1" step="1" onclick="this.select()" onfocus="this.select()" onkeydown="if(event.key==='Enter'||event.key==='Tab'){event.preventDefault();document.getElementById('tenderPrintTo').select();}" onchange="LS.set('iat_tpr_from',this.value)" style="width:40px;padding:3px;border:1.5px solid var(--b2);border-radius:5px;font-size:.75rem;font-family:monospace;text-align:center;background:var(--s1);color:var(--amber);font-weight:700;outline:none" value="1"/>
+      <input type="number" id="tenderPrintTo" placeholder="T" min="1" step="1" onclick="this.select()" onfocus="this.select()" onchange="LS.set('iat_tpr_to',this.value)" style="width:40px;padding:3px;border:1.5px solid var(--b2);border-radius:5px;font-size:.75rem;font-family:monospace;text-align:center;background:var(--s1);color:var(--amber);font-weight:700;outline:none" value="100"/>
+      <!-- زر Tender حد المجال - يظهر بس بـ T.View -->
+      <button id="tenderSavePrintBtn" style="display:none;background:rgba(251,191,36,.25);border:1.5px solid var(--amber);border-radius:7px;padding:4px 10px;cursor:pointer;color:var(--amber);flex-direction:column;align-items:center;gap:1px;flex-shrink:0;margin-left:4px" onclick="savePrintTender()">
+        <span style="font-size:.85rem">💾🏷</span>
+        <span style="font-size:.52rem;font-weight:700;white-space:nowrap">Save+Print Tender</span>
+      </button>
+    </div>
+  </div>
   </div>
 </nav>
 
@@ -414,26 +433,9 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     <button class="btn btn-blue btn-sm" style="flex-shrink:0" onclick="directPrintOrders()">🖨 Orders</button>
     <button class="btn btn-amber btn-sm" style="flex-shrink:0" onclick="directPrintLabels()">🏷 Labels</button>
     <button class="btn btn-purple btn-sm" style="flex-shrink:0" onclick="printDrivers()">🚗 Drivers</button>
-    <button class="btn btn-green btn-sm" style="flex-shrink:0" onclick="sendOrdersDirect()">📤 Send</button>
     <button class="btn btn-red btn-sm" id="clearLoadingBtn" style="flex-shrink:0" onclick="clearLoadingSheet()">🧹 Clear</button>
     <button class="btn btn-green btn-sm" style="flex-shrink:0" onclick="printFolderPDF('invoices')">🧾 INV</button>
     <button class="btn btn-purple btn-sm" style="flex-shrink:0" onclick="printFolderPDF('lpo')">📋 LPO</button>
-    <button class="btn btn-ghost btn-sm" style="flex-shrink:0" onclick="exportXL()">⬇ XL</button>
-    <button class="btn btn-red btn-sm" style="flex-shrink:0" onclick="killExcel()" title="Force close Excel">❌ Excel</button>
-    <!-- Reprint بعد LPO -->
-    <div style="display:flex;align-items:center;gap:4px;margin-left:6px;padding-left:6px;border-left:1px solid var(--b2)">
-      <label style="font-size:.6rem;color:var(--muted);white-space:nowrap">🔁</label>
-      <input type="number" id="reprintFrom" min="1" step="1"
-        onclick="this.select()" onfocus="this.select()"
-        onkeydown="if(event.key==='Enter'||event.key==='Tab'){event.preventDefault();const t=document.getElementById('reprintTo');t.value=this.value;t.select();}"
-        style="width:44px;padding:3px;border:1.5px solid var(--b1);border-radius:5px;font-size:.72rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--teal);font-weight:700;outline:none" placeholder="F"/>
-      <span style="color:var(--muted);font-size:.7rem">→</span>
-      <input type="number" id="reprintTo" min="1" step="1"
-        onclick="this.select()" onfocus="this.select()"
-        style="width:44px;padding:3px;border:1.5px solid var(--b1);border-radius:5px;font-size:.72rem;font-family:monospace;text-align:center;background:var(--s2);color:var(--teal);font-weight:700;outline:none" placeholder="T"/>
-      <button class="btn btn-ghost btn-sm" style="color:var(--teal);font-size:.68rem;padding:2px 6px" onclick="sendReprintRange()">↩</button>
-      <button class="btn btn-ghost btn-sm" style="color:var(--muted);font-size:.65rem;padding:2px 6px" onclick="syncReprintFromRange()">↑</button>
-    </div>
   </div>
 </div>
 
@@ -1030,7 +1032,14 @@ async function saveAppToOneDrive(){
       freq,
       priceGroups,
       custGroups,
-      invoices
+      invoices,
+      dispatch: LS.get('iat_dispatch',{}),
+      ranges:{
+        pfrom: LS.get('iat_pfrom','1'),
+        pto:   LS.get('iat_pto','100'),
+        tpfrom:LS.get('iat_tpr_from','1'),
+        tpto:  LS.get('iat_tpr_to','100')
+      }
     };
 
     const content = JSON.stringify(backup, null, 2);
@@ -1088,6 +1097,14 @@ async function loadAppFromOneDrive(){
       if(backup.priceGroups) { priceGroups=backup.priceGroups; LS.set('iat_pg',priceGroups); }
       if(backup.custGroups)  { custGroups=backup.custGroups; LS.set('iat_cg',custGroups); }
       if(backup.invoices)    { invoices=backup.invoices;    LS.set('iat_inv',invoices); }
+      if(backup.dispatch)    { _dispatched=backup.dispatch; LS.set('iat_dispatch',_dispatched); }
+      if(backup.ranges){
+        const r=backup.ranges;
+        if(r.pfrom) LS.set('iat_pfrom',r.pfrom);
+        if(r.pto)   LS.set('iat_pto',r.pto);
+        if(r.tpfrom)LS.set('iat_tpr_from',r.tpfrom);
+        if(r.tpto)  LS.set('iat_tpr_to',r.tpto);
+      }
 
       const savedDate=backup.saved?new Date(backup.saved).toLocaleString('en-GB'):'unknown';
       status.style.color='var(--teal)';
@@ -1256,8 +1273,10 @@ function showPage(n,t){
   // أظهر/أخفي شريط النطاقات
   const rangeBar=document.getElementById('navRangeBar');
   const viewBtns=document.getElementById('viewRangeBtns');
+  const tenderBtn=document.getElementById('tenderSavePrintBtn');
   if(rangeBar) rangeBar.style.display=(n==='view-orders'||n==='tender-view')?'flex':'none';
   if(viewBtns) viewBtns.style.display=n==='view-orders'?'flex':'none';
+  if(tenderBtn) tenderBtn.style.display=n==='tender-view'?'flex':'none';
   if(n==='orders'){renderOrders();setTimeout(()=>{const el=document.querySelector('#pg-orders [style*="overflow-y"]');if(el)el.scrollTop=el.scrollHeight;},100);}
   if(n==='view-orders'){renderViewOrders();setTimeout(()=>{const el=document.querySelector('#pg-view-orders [style*="overflow-y"]');if(el)el.scrollTop=el.scrollHeight;},100);}
   if(n==='drivers')renderDriversPage();
@@ -2554,6 +2573,49 @@ function toggleDeviceMode(){
   applyDeviceMode();
 }
 
+async function sendRangeToExcel(){
+  const from=parseInt(document.getElementById('rangeFromIndep').value)||0;
+  const to=parseInt(document.getElementById('rangeToIndep').value)||0;
+  if(!from||!to||from>to){toast('Set valid range','err');return;}
+  try{
+    const token=await getODToken();
+    const fileRes=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,{headers:{'Authorization':'Bearer '+token}});
+    if(!fileRes.ok) throw new Error('File not found');
+    const fileId=(await fileRes.json()).id;
+    const baseUrl=`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/workbook/worksheets/`;
+    await fetch(baseUrl+"Loading/range(address='BS1:BT1')",{
+      method:'PATCH',
+      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:JSON.stringify({values:[[from,to]]})
+    });
+    toast(`✓ Range ${from}→${to} set in Excel`,'ok');
+  }catch(e){
+    toast('Error: '+e.message,'err');
+  }
+}
+
+async function savePrintTender(){
+  const tf=parseInt(document.getElementById('tenderPrintFrom')?.value)||parseInt(LS.get('iat_tpr_from','1'))||1;
+  const tt=parseInt(document.getElementById('tenderPrintTo')?.value)||parseInt(LS.get('iat_tpr_to','100'))||100;
+  const signalTs=Date.now();
+  window._lastSaveTs=signalTs;
+  try{
+    const token=await getODToken();
+    const jobs=[
+      {action:'print_tender_orders',from:tf,to:tt,_includeSaveTs:true},
+      {action:'print_tender_orders',from:tf,to:tt,_includeSaveTs:true},
+      {action:'print_tender_labels',from:tf,to:tt,_includeSaveTs:true}
+    ];
+    await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',{
+      method:'PUT',
+      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:JSON.stringify({jobs,ts:signalTs,save_ts:signalTs})
+    });
+  }catch(e){toast('Error signal: '+e.message,'err');return;}
+  if(tenderOrders.length) await tenderSaveToExcel(tf,tt);
+  toast(`✓ Tender: Signal sent + Saved → 2×Orders + Labels`,'ok');
+}
+
 function syncReprintFromRange(){
   const f=document.getElementById('printRangeFrom')?.value||'1';
   const t=document.getElementById('printRangeTo')?.value||'100';
@@ -2564,24 +2626,14 @@ function syncReprintFromRange(){
 }
 
 async function sendReprintRange(){
-  const from=parseInt(document.getElementById('reprintFrom').value)||1;
-  const to=parseInt(document.getElementById('reprintTo').value)||1;
-  if(from>to){toast('Range invalid','err');return;}
-  const btn=document.getElementById('reprintFrom').nextElementSibling?.nextElementSibling?.nextElementSibling;
+  const from=parseInt(document.getElementById('printRangeFrom').value)||0;
+  const to=parseInt(document.getElementById('printRangeTo').value)||0;
+  const tf=parseInt(document.getElementById('tenderPrintFrom').value)||0;
+  const tt=parseInt(document.getElementById('tenderPrintTo').value)||0;
+  if((!from||!to)&&(!tf||!tt)){toast('Set valid range','err');return;}
   try{
-    // كتابة BS1/BT1 فقط بدون كتابة الأوردرات
-    const token=await getODToken();
-    const fileRes=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,
-      {headers:{'Authorization':'Bearer '+token}});
-    if(!fileRes.ok)throw new Error('File not found');
-    const fileId=(await fileRes.json()).id;
-    const baseUrl=`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/workbook/worksheets/`;
-    await fetch(baseUrl+"Loading/range(address='BS1:BT1')",{
-      method:'PATCH',
-      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
-      body:JSON.stringify({values:[[from,to]]})
-    });
-    toast(`✓ Reprint range ${from}→${to} sent`,'ok');
+    const count=await addPrintJob({action:'set_range',from,to,tf,tt});
+    toast(`✓ Ranges sent (#${count})`,'ok');
   }catch(e){
     if(e.message!=='user_cancelled')toast('Error: '+e.message,'err');
   }
@@ -6430,11 +6482,16 @@ function renderDispatchOrderList(){
           </div>
           <span onclick="toggleDispatched('${esc(g.cust)}',${g.num},'${esc(o.product)}')" style="flex:1;font-size:.75rem;cursor:pointer;${isDone?'text-decoration:line-through;color:var(--muted)':'color:var(--txt)'}">${o.product}</span>
           <input type="number" min="0" max="${qty}" step="0.5"
+            data-dk="${k}" data-qty="${qty}" data-cust="${esc(g.cust)}" data-num="${g.num}" data-prod="${esc(o.product)}"
             value="${isPartial?dispVal:''}" placeholder="${qty}"
             onclick="event.stopPropagation();this.select()"
-            onchange="event.stopPropagation();setDispatchQty('${esc(g.cust)}',${g.num},'${esc(o.product)}',this.value)"
-            style="width:48px;padding:2px 4px;border:1px solid ${isPartial?'var(--amber)':'var(--b2)'};border-radius:4px;font-size:.7rem;font-family:monospace;text-align:center;background:var(--s2);color:${isPartial?'var(--amber)':'var(--muted)'};outline:none"/>
-          <span style="font-family:var(--mono);font-weight:700;font-size:.74rem;color:${isDone?'var(--teal)':isPartial?'var(--amber)':'var(--amber)'}">${qty} kg</span>
+            oninput="event.stopPropagation();dispatchInputLive(this)"
+            onkeyup="event.stopPropagation();dispatchInputLive(this)"
+            onkeydown="event.stopPropagation();if(event.key==='Enter'){event.preventDefault();setDispatchQty(this.dataset.cust,+this.dataset.num,this.dataset.prod,this.value);const inputs=[...document.querySelectorAll('#dispatchOrderList input[type=number]')];const idx=inputs.indexOf(this);if(inputs[idx+1]){inputs[idx+1].focus();inputs[idx+1].select();}}"
+            onblur="event.stopPropagation();setDispatchQty(this.dataset.cust,+this.dataset.num,this.dataset.prod,this.value)"
+            style="width:48px;padding:2px 4px;border:1px solid ${isDone?'var(--teal)':isPartial?'var(--amber)':'var(--b2)'};border-radius:4px;font-size:.7rem;font-family:monospace;text-align:center;background:var(--s2);color:${isDone?'var(--teal)':isPartial?'var(--amber)':'var(--muted)'};outline:none"/>
+          <span style="font-family:var(--mono);font-weight:700;font-size:.74rem;color:${isDone?'var(--teal)':isPartial?'var(--amber)':'var(--amber)'}">${qty} kg${isPartial?` <span style="color:var(--amber);font-size:.65rem">⚠</span>`:''}
+          </span>
         </div>`;
       }).join('')}
     </div>`;
@@ -6449,13 +6506,47 @@ function toggleDispatched(cust,num,prod){
   renderDispatch();
 }
 
+function dispatchInputLive(el){
+  const v=parseFloat(el.value)||0;
+  const qty=parseFloat(el.dataset.qty)||0;
+  const isDone=v>0&&v>=qty;
+  const isPartial=v>0&&v<qty;
+  // لون الخانة
+  el.style.borderColor=isDone?'var(--teal)':isPartial?'var(--amber)':'var(--b2)';
+  el.style.color=isDone?'var(--teal)':isPartial?'var(--amber)':'var(--muted)';
+  // الـ checkbox
+  const row=el.parentElement;
+  if(row){
+    const box=row.querySelector('div[style*="border-radius:6px"]');
+    if(box){
+      box.style.borderColor=isDone?'var(--teal)':isPartial?'var(--amber)':'var(--b2)';
+      box.style.background=isDone?'var(--teal)':'transparent';
+      box.innerHTML=isDone?'<span style="color:#000;font-size:.75rem;font-weight:900">✓</span>':isPartial?'<span style="color:var(--amber);font-size:.75rem;font-weight:900">~</span>':'';
+    }
+  }
+}
+
 function setDispatchQty(cust,num,prod,val){
   const k=dispatchKey(cust,num,prod);
   const v=parseFloat(val)||0;
-  if(v>0) _dispatched[k]=v; // كمية جزئية
-  else delete _dispatched[k];
+  if(v<=0){
+    delete _dispatched[k];
+  }else{
+    const qty=orders.filter(o=>o.customer===cust&&(o.num||0)===num&&o.product===prod)
+                    .reduce((s,o)=>s+(parseFloat(o.qty)||0),0);
+    _dispatched[k]=(v>=qty)?true:v;
+  }
   LS.set('iat_dispatch',_dispatched);
+  // لا نعيد رسم القائمة - بس نحدث الـ results والألوان
   renderDispatchResults();
+  // حدث لون الخانة مباشرة بالـ DOM
+  const inputEl=document.querySelector(`input[data-dk="${k}"]`);
+  if(inputEl){
+    const isDone=_dispatched[k]===true;
+    const isPartial=typeof _dispatched[k]==='number'&&_dispatched[k]>0;
+    inputEl.style.borderColor=isDone?'var(--teal)':isPartial?'var(--amber)':'var(--b2)';
+    inputEl.style.color=isDone?'var(--teal)':isPartial?'var(--amber)':'var(--muted)';
+  }
 }
 
 function sendDispatchWA(){
