@@ -2660,11 +2660,12 @@ async function directPrintLabels(){
 
 // ── Save All then Print All ──
 async function saveAllThenPrint(){
-  const from=parseInt(document.getElementById('printRangeFrom')?.value)||1;
-  const to=parseInt(document.getElementById('printRangeTo')?.value)||999;
-  const tf=parseInt(document.getElementById('tenderPrintFrom')?.value)||1;
-  const tt=parseInt(document.getElementById('tenderPrintTo')?.value)||999;
+  const from=parseInt(document.getElementById('printRangeFrom')?.value)||parseInt(LS.get('iat_pfrom','1'))||1;
+  const to=parseInt(document.getElementById('printRangeTo')?.value)||parseInt(LS.get('iat_pto','100'))||100;
+  const tf=parseInt(document.getElementById('tenderPrintFrom')?.value)||parseInt(LS.get('iat_tpr_from','1'))||1;
+  const tt=parseInt(document.getElementById('tenderPrintTo')?.value)||parseInt(LS.get('iat_tpr_to','100'))||100;
   const date=document.getElementById('orderDate')?.value||todayStr();
+  console.log(`saveAllThenPrint: fresh ${from}-${to} | tender ${tf}-${tt}`);
 
   // 1. سجل timestamp الـ signal قبل الحفظ
   const signalTs=Date.now();
