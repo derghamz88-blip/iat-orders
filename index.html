@@ -2866,8 +2866,13 @@ async function printFolderPDF(folder){
 // ── Tender Save + Print ──
 async function tenderSaveToExcel(fromOverride, toOverride){
   if(!tenderOrders.length){toast('No tender orders','err');return;}
-  const from=fromOverride||parseInt(document.getElementById('tenderPrintFrom')?.value)||parseInt(LS.get('iat_tpr_from','1'))||1;
-  const to=toOverride||parseInt(document.getElementById('tenderPrintTo')?.value)||parseInt(LS.get('iat_tpr_to','100'))||100;
+  // حدّث LS من الـ input قبل القراءة
+  const fromEl=document.getElementById('tenderPrintFrom');
+  const toEl=document.getElementById('tenderPrintTo');
+  if(fromEl?.value) LS.set('iat_tpr_from',fromEl.value);
+  if(toEl?.value) LS.set('iat_tpr_to',toEl.value);
+  const from=fromOverride||parseInt(fromEl?.value)||parseInt(LS.get('iat_tpr_from','1'))||1;
+  const to=toOverride||parseInt(toEl?.value)||parseInt(LS.get('iat_tpr_to','100'))||100;
   const btn=event?.target;
   if(btn){btn.disabled=true;btn.textContent='⏳...';}
   try{
