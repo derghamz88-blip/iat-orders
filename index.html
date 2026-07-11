@@ -2453,7 +2453,7 @@ async function addPrintJob(job){
     job.orders=sorted;
     job.date=document.getElementById('orderDate')?.value||todayStr();
   }
-  _localJobs.push(job);
+  _localJobs.push({...job, _id: Date.now()+Math.random()});
   toast(`✓ Job #${_localJobs.length} queued`,'ok');
   // انتظر 400ms بعد آخر نقرة ثم اكتب كلهم مرة وحدة
   clearTimeout(_flushTimeout);
@@ -2468,12 +2468,7 @@ async function _flushJobs(){
     _localJobs=[];
     try{
       const token=await getODToken();
-      let existingJobs=[];
-      try{
-        const r=await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',{headers:{'Authorization':'Bearer '+token}});
-        if(r.ok){const d=await r.json();existingJobs=Array.isArray(d.jobs)?d.jobs:[];}
-      }catch(e){}
-      const allJobs=[...existingJobs,...jobsToSend];
+      const allJobs=[...jobsToSend]; // بس الجديدة - لا نقرأ القديمة
       // save_ts بس لما يكون من Save+Print، مو من طباعة عادية
       const signalSaveTs = jobsToSend.some(j=>j._includeSaveTs) ? (window._lastSaveTs||0) : 0;
       const res=await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',{
