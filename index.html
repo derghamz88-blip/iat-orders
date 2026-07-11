@@ -2598,7 +2598,6 @@ async function savePrintTender(){
     const token=await getODToken();
     const jobs=[
       {action:'print_tender_orders',from:tf,to:tt,_includeSaveTs:true},
-      {action:'print_tender_orders',from:tf,to:tt,_includeSaveTs:true},
       {action:'print_tender_labels',from:tf,to:tt,_includeSaveTs:true}
     ];
     await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',{
@@ -2667,16 +2666,17 @@ async function saveAllThenPrint(){
   const date=document.getElementById('orderDate')?.value||todayStr();
   console.log(`saveAllThenPrint: fresh ${from}-${to} | tender ${tf}-${tt}`);
 
-  // 1. سجل timestamp الـ signal قبل الحفظ
+  // 1. احفظ الأوردرات أولاً
+  if(orders.length) await saveOrdersToLoading(from,to,date);
+  if(tenderOrders.length) await tenderSaveToExcel(tf,tt);
+
+  // 2. بعد الحفظ - سجل timestamp وأرسل signal
   const signalTs=Date.now();
   window._lastSaveTs=signalTs;
 
-  // 2. أرسل signal أول مع كل الـ jobs
   const jobs=[
     {action:'',from,to,_includeSaveTs:true},
-    {action:'',from,to,_includeSaveTs:true},
     {action:'print_labels',from,to,_includeSaveTs:true},
-    {action:'print_tender_orders',from:tf,to:tt,_includeSaveTs:true},
     {action:'print_tender_orders',from:tf,to:tt,_includeSaveTs:true},
     {action:'print_tender_labels',from:tf,to:tt,_includeSaveTs:true}
   ];
@@ -2688,17 +2688,10 @@ async function saveAllThenPrint(){
       headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
       body:JSON.stringify({jobs,ts:signalTs,save_ts:signalTs})
     });
-    toast('✓ Signal sent - saving...','ok');
+    toast('✓ Saved + Signal sent!','ok');
   }catch(e){
     toast('Error sending signal: '+e.message,'err');
-    return;
   }
-
-  // 3. بعدها احفظ الأوردرات للإكسيل
-  if(orders.length) await saveOrdersToLoading(from,to,date);
-  if(tenderOrders.length) await tenderSaveToExcel(tf,tt);
-
-  toast('✓ Saved! Python waiting for sync then will print...','ok');
 }
 
 // ── Save All (فريش + تندر) ──
@@ -2726,7 +2719,6 @@ async function printAllFresh(){
     const token=await getODToken();
     const jobs=[
       {action:'',from,to,_includeSaveTs:true},
-      {action:'',from,to,_includeSaveTs:true},
       {action:'print_labels',from,to,_includeSaveTs:true}
     ];
     await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',{
@@ -2753,7 +2745,6 @@ async function printAllTender(){
   try{
     const token=await getODToken();
     const jobs=[
-      {action:'print_tender_orders',from:tf,to:tt,_includeSaveTs:true},
       {action:'print_tender_orders',from:tf,to:tt,_includeSaveTs:true},
       {action:'print_tender_labels',from:tf,to:tt,_includeSaveTs:true}
     ];
