@@ -238,7 +238,7 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
 <nav style="flex-direction:column;height:auto;padding:0">
   <!-- صف 1: Fresh/Tender/Drivers -->
   <div style="display:flex;align-items:stretch;overflow-x:auto;scrollbar-width:none;flex-shrink:0;border-bottom:1px solid var(--b1)">
-    <span id="onlineIndicator" title="Online" style="font-size:.7rem;cursor:default;display:flex;align-items:center;padding:0 5px;flex-shrink:0">🟢</span>
+    <span id="onlineIndicator" title="Online - tap to save now" onclick="autoSyncSave(true)" style="font-size:.7rem;cursor:pointer;display:flex;align-items:center;padding:0 5px;flex-shrink:0">🟢</span>
     <!-- Entry pair -->
     <div style="display:flex;flex-direction:column;flex-shrink:0;min-width:60px">
       <div class="ntab on" style="flex:1;font-size:.72rem;padding:7px 8px;border-bottom:1px solid var(--b1);justify-content:center;display:flex;align-items:center" onclick="showPage('entry',this)">✏️ Entry</div>
@@ -1043,11 +1043,32 @@ function buildBackupObj(){
   };
 }
 
-async function autoSyncSave(){
+function _syncIndicator(state){
+  const ind=document.getElementById('onlineIndicator');
+  if(!ind) return;
+  if(state==='dirty'){ind.textContent='🟠';ind.title='Unsaved changes';}
+  else if(state==='saving'){ind.textContent='☁️';ind.title='Saving...';}
+  else if(state==='saved'){ind.textContent='✅';ind.title='Saved';setTimeout(()=>{ind.textContent='🟢';ind.title='Online';},2000);}
+  else if(state==='error'){ind.textContent='🔴';ind.title='Save failed - tap to retry';}
+  else {ind.textContent='🟢';ind.title='Online';}
+}
+
+async function autoSyncSave(showErrors){
   if(_autoSyncBusy) return;
   _autoSyncBusy=true;
+  _syncIndicator('saving');
   try{
-    const token=await getODTokenSilent();
+    let token;
+    try{
+      token=await getODTokenSilent();
+    }catch(te){
+      // silent فشل - جرب العادي بس إذا الصفحة ظاهرة (popup ممكن)
+      if(document.visibilityState==='visible'){
+        token=await getODToken();
+      }else{
+        throw te;
+      }
+    }
     const backup=buildBackupObj();
     const res=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${OD_BACKUP_PATH}:/content`,{
       method:'PUT',
@@ -1056,15 +1077,15 @@ async function autoSyncSave(){
       keepalive:true
     });
     if(!res.ok) throw new Error('upload failed '+res.status);
-    // نحدث الـ ts ونمسح الـ dirty بس بعد نجاح الرفع
     LS.set('iat_last_save_ts',backup.savedTs);
     localStorage.removeItem('iat_dirty');
     _autoSyncDirty=false;
-    const ind=document.getElementById('onlineIndicator');
-    if(ind){ind.textContent='☁️';setTimeout(()=>{ind.textContent='🟢';},1500);}
+    _syncIndicator('saved');
     console.log('☁ Auto-synced',new Date().toLocaleTimeString());
   }catch(e){
+    _syncIndicator('error');
     console.warn('Auto-sync failed:',e.message);
+    if(showErrors) toast('☁ Save failed: '+e.message,'err');
   }finally{
     _autoSyncBusy=false;
   }
@@ -1074,6 +1095,7 @@ async function autoSyncSave(){
 function markDirty(){
   _autoSyncDirty=true;
   try{localStorage.setItem('iat_dirty','1');}catch{}
+  _syncIndicator('dirty');
   if(_autoSyncTimer) clearTimeout(_autoSyncTimer);
   _autoSyncTimer=setTimeout(()=>{autoSyncSave();},30000);
 }
@@ -5902,6 +5924,8 @@ function gPickerAddNew() {
 // Close on backdrop tap
 document.addEventListener('DOMContentLoaded', () => {
   loadFamilyMap();
+  // إذا في تعديلات غير مرفوعة من جلسة سابقة - بيّن الحالة
+  if(localStorage.getItem('iat_dirty')==='1'){_autoSyncDirty=true;_syncIndicator('dirty');}
   // تحميل آخر نسخة من OneDrive تلقائياً (بصمت - بدون popup)
   setTimeout(()=>{autoSyncLoad();},1500);
   // تحميل آخر قيم المجالات
