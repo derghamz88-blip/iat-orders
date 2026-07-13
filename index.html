@@ -238,7 +238,7 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
 <nav style="flex-direction:column;height:auto;padding:0">
   <!-- صف 1: Fresh/Tender/Drivers -->
   <div style="display:flex;align-items:stretch;overflow-x:auto;scrollbar-width:none;flex-shrink:0;border-bottom:1px solid var(--b1)">
-    <span id="onlineIndicator" title="Online - tap to save now" onclick="autoSyncSave(true)" style="font-size:.7rem;cursor:pointer;display:flex;align-items:center;padding:0 5px;flex-shrink:0">🟢</span>
+    <span id="onlineIndicator" title="Online" style="font-size:.7rem;cursor:default;display:flex;align-items:center;padding:0 5px;flex-shrink:0">🟢</span>
     <!-- Entry pair -->
     <div style="display:flex;flex-direction:column;flex-shrink:0;min-width:60px">
       <div class="ntab on" style="flex:1;font-size:.72rem;padding:7px 8px;border-bottom:1px solid var(--b1);justify-content:center;display:flex;align-items:center" onclick="showPage('entry',this)">✏️ Entry</div>
@@ -992,8 +992,7 @@ const DC=["Aswaaq – (JVC)","Aswaaq – Al Mizhar","Aswaaq – Al Quoz","Aswaaq
 const DP=["Chicken","Liver","Liver 500","Breast","Breast 500","Whole Legs","Whole Legs 500","Thigh","Thigh 500","Drum","Drum 500","Wings","Wings 500","BREAST WITH BONE","Chicken BLW Wings","Thigh BL-SL","Thigh BL-SO","Thigh SL","Whole legs BL-SL","Whole legs BL-SO","Whole legs SL","Thigh BL-SL 500","Thigh BL-SO 500","Thigh SL 500","Whole legs BL-SL 500","Whole legs BL-SO 500","Whole legs SL 500","Heart","Heart 500","Gizzard","Gizzard 500","Whole Chicken Frozen","Whole Legs 500 FF","Breast Frozen","Thigh 500 FF","Tail","Drum 500 FF","Minced","Wings 500 FF","Bone","Kashra","Neck","Skin","Mix Chicken","DRUM SL 500"];
 const SIZES=["800","900","1000","1100","1200","1300","1400","1500"];
 const isCHK=p=>['Chicken','Chicken BLW Wings','Whole Chicken Frozen'].includes(p);
-const _SYNC_KEYS=new Set(['iat_orders','iat_to','iat_c','iat_p','iat_d','iat_tp','iat_f','iat_pg','iat_cg','iat_inv','iat_dispatch','iat_pfrom','iat_pto','iat_tpr_from','iat_tpr_to']);
-const LS={get:(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}},set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));if(_SYNC_KEYS.has(k)&&typeof markDirty==='function')markDirty();}catch{}}};
+const LS={get:(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}},set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}}};
 
 let customers=LS.get('iat_c',DC);
 let products=LS.get('iat_p',DP);
@@ -1013,190 +1012,6 @@ let cOpen=false,pOpen=false;
 // ✅ دوال الحفظ المركزية
 const OD_BACKUP_PATH = 'iat_backup.json';
 
-// ══ AUTO-SYNC SYSTEM ══
-let _autoSyncTimer=null;
-let _autoSyncDirty=false;
-let _autoSyncBusy=false;
-let _syncLoadDone=false; // ما نرفع تلقائياً قبل ما نحاول التحميل أولاً
-
-function buildBackupObj(){
-  return {
-    saved: new Date().toISOString(),
-    savedTs: Date.now(),
-    version: 1,
-    orders,
-    tenderOrders,
-    customers,
-    products,
-    drivers,
-    tenderProds,
-    freq,
-    priceGroups,
-    custGroups,
-    invoices,
-    dispatch: LS.get('iat_dispatch',{}),
-    ranges:{
-      pfrom: LS.get('iat_pfrom','1'),
-      pto:   LS.get('iat_pto','100'),
-      tpfrom:LS.get('iat_tpr_from','1'),
-      tpto:  LS.get('iat_tpr_to','100')
-    }
-  };
-}
-
-function _syncIndicator(state){
-  const ind=document.getElementById('onlineIndicator');
-  if(!ind) return;
-  if(state==='dirty'){ind.textContent='🟠';ind.title='Unsaved changes';}
-  else if(state==='saving'){ind.textContent='☁️';ind.title='Saving...';}
-  else if(state==='saved'){ind.textContent='✅';ind.title='Saved';setTimeout(()=>{ind.textContent='🟢';ind.title='Online';},2000);}
-  else if(state==='error'){ind.textContent='🔴';ind.title='Save failed - tap to retry';}
-  else {ind.textContent='🟢';ind.title='Online';}
-}
-
-async function autoSyncSave(showErrors){
-  if(_autoSyncBusy) return;
-  _autoSyncBusy=true;
-  _syncIndicator('saving');
-  try{
-    let token;
-    try{
-      token=await getODTokenSilent();
-    }catch(te){
-      // silent فشل - جرب العادي بس إذا الصفحة ظاهرة (popup ممكن)
-      if(document.visibilityState==='visible'){
-        token=await getODToken();
-      }else{
-        throw te;
-      }
-    }
-    const backup=buildBackupObj();
-    // حماية: لا ترفع نسخة فارغة تلقائياً فوق نسخة فيها بيانات
-    const localEmpty=(!orders.length&&!tenderOrders.length);
-    if(localEmpty&&!showErrors){
-      try{
-        const chk=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${OD_BACKUP_PATH}:/content`,{headers:{'Authorization':'Bearer '+token}});
-        if(chk.ok){
-          const cloud=await chk.json();
-          if((cloud.orders?.length||0)>0||(cloud.tenderOrders?.length||0)>0){
-            console.warn('☁ BLOCKED: refusing to overwrite cloud data with empty local');
-            _syncIndicator('error');
-            return;
-          }
-        }
-      }catch{}
-    }
-    const res=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${OD_BACKUP_PATH}:/content`,{
-      method:'PUT',
-      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
-      body: JSON.stringify(backup),
-      keepalive:true
-    });
-    if(!res.ok) throw new Error('upload failed '+res.status);
-    LS.set('iat_last_save_ts',backup.savedTs);
-    localStorage.removeItem('iat_dirty');
-    _autoSyncDirty=false;
-    _syncIndicator('saved');
-    console.log('☁ Auto-synced',new Date().toLocaleTimeString());
-  }catch(e){
-    _syncIndicator('error');
-    console.warn('Auto-sync failed:',e.message);
-    if(showErrors) toast('☁ Save failed: '+e.message,'err');
-  }finally{
-    _autoSyncBusy=false;
-  }
-}
-
-// استدعِ هذه بعد كل تعديل - تحفظ بعد 30 ثانية من آخر تعديل
-function markDirty(){
-  _autoSyncDirty=true;
-  try{localStorage.setItem('iat_dirty','1');}catch{}
-  _syncIndicator('dirty');
-  if(_autoSyncTimer) clearTimeout(_autoSyncTimer);
-  _autoSyncTimer=setTimeout(()=>{
-    // لا رفع تلقائي قبل ما نحاول التحميل أول (منع جهاز فاضي يغطي على البيانات)
-    if(!_syncLoadDone){markDirty();return;}
-    autoSyncSave();
-  },30000);
-}
-
-// حفظ فوري عند إخفاء التطبيق
-document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='hidden'&&_autoSyncDirty){
-    if(_autoSyncTimer) clearTimeout(_autoSyncTimer);
-    autoSyncSave();
-  }
-});
-window.addEventListener('pagehide',()=>{
-  if(_autoSyncDirty){
-    if(_autoSyncTimer) clearTimeout(_autoSyncTimer);
-    autoSyncSave();
-  }
-});
-
-// تحميل تلقائي عند الفتح - بس إذا الـ cloud أحدث
-async function autoSyncLoad(){
-  try{
-    // إذا في تعديلات محلية غير مرفوعة - ارفعها بدل ما تحمل وتمسحها!
-    if(localStorage.getItem('iat_dirty')==='1'){
-      console.log('☁ Local has unsaved changes - uploading instead of loading');
-      await autoSyncSave();
-      return;
-    }
-    const token=await getODTokenSilent();
-    const res=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${OD_BACKUP_PATH}:/content`,{
-      headers:{'Authorization':'Bearer '+token}
-    });
-    if(!res.ok) return;
-    const backup=await res.json();
-    const cloudTs=backup.savedTs||0;
-    const localTs=parseInt(LS.get('iat_last_save_ts','0'))||0;
-    if(cloudTs<=localTs){
-      console.log('☁ Local is up-to-date');
-      return;
-    }
-    // حماية: لا تمسح بيانات محلية بنسخة cloud فارغة - ارفع المحلي بدلها
-    const cloudEmpty=(!(backup.orders?.length)&&!(backup.tenderOrders?.length));
-    const localHasData=(orders.length>0||tenderOrders.length>0);
-    if(cloudEmpty&&localHasData){
-      console.warn('☁ Cloud is empty but local has data - uploading local instead');
-      await autoSyncSave();
-      return;
-    }
-    // الـ cloud أحدث - حمّل
-    if(backup.orders)      { orders=backup.orders;           saveOrders(); }
-    if(backup.tenderOrders){ tenderOrders=backup.tenderOrders; saveTenderOrders(); }
-    if(backup.customers)   { customers=backup.customers;     LS.set('iat_c',customers); }
-    if(backup.products)    { products=backup.products;       LS.set('iat_p',products); }
-    if(backup.drivers)     { drivers=backup.drivers;         LS.set('iat_d',drivers); }
-    if(backup.tenderProds) { tenderProds=backup.tenderProds; LS.set('iat_tp',tenderProds); }
-    if(backup.freq)        { freq=backup.freq;               LS.set('iat_f',freq); }
-    if(backup.priceGroups) { priceGroups=backup.priceGroups; LS.set('iat_pg',priceGroups); }
-    if(backup.custGroups)  { custGroups=backup.custGroups;   LS.set('iat_cg',custGroups); }
-    if(backup.invoices)    { invoices=backup.invoices;       LS.set('iat_inv',invoices); }
-    if(backup.dispatch)    { LS.set('iat_dispatch',backup.dispatch); }
-    if(backup.ranges){
-      const r=backup.ranges;
-      if(r.pfrom) LS.set('iat_pfrom',r.pfrom);
-      if(r.pto)   LS.set('iat_pto',r.pto);
-      if(r.tpfrom)LS.set('iat_tpr_from',r.tpfrom);
-      if(r.tpto)  LS.set('iat_tpr_to',r.tpto);
-    }
-    LS.set('iat_last_save_ts',cloudTs);
-    // التحميل مش تعديل - ألغِ الـ dirty flag
-    _autoSyncDirty=false;
-    if(_autoSyncTimer) clearTimeout(_autoSyncTimer);
-    renderOrders(); renderView(); updateBadge();
-    if(typeof renderTenderOrders==='function') renderTenderOrders();
-    toast('☁ Loaded latest from OneDrive','ok');
-    console.log('☁ Auto-loaded from cloud',new Date(cloudTs).toLocaleTimeString());
-  }catch(e){
-    console.warn('Auto-load failed:',e.message);
-  }finally{
-    _syncLoadDone=true;
-  }
-}
-
 async function saveAppToOneDrive(){
   const btn=document.getElementById('cloudSaveBtn');
   const status=document.getElementById('cloudStatus');
@@ -1205,9 +1020,30 @@ async function saveAppToOneDrive(){
   try{
     const token=await getODToken();
 
-    const backup=buildBackupObj();
+    const backup={
+      saved: new Date().toISOString(),
+      version: 1,
+      orders,
+      tenderOrders,
+      customers,
+      products,
+      drivers,
+      tenderProds,
+      freq,
+      priceGroups,
+      custGroups,
+      invoices,
+      dispatch: LS.get('iat_dispatch',{}),
+      ranges:{
+        pfrom: LS.get('iat_pfrom','1'),
+        pto:   LS.get('iat_pto','100'),
+        tpfrom:LS.get('iat_tpr_from','1'),
+        tpto:  LS.get('iat_tpr_to','100')
+      }
+    };
 
     const content = JSON.stringify(backup, null, 2);
+    const blob = new Blob([content], {type:'application/json'});
 
     const res = await fetch(
       `https://graph.microsoft.com/v1.0/me/drive/root:/${OD_BACKUP_PATH}:/content`,
@@ -1220,10 +1056,6 @@ async function saveAppToOneDrive(){
     if(!res.ok) throw new Error(await res.text());
 
     const saved = new Date().toLocaleTimeString('en-GB');
-    // حدث الـ ts وامسح الـ dirty - نفس نظام الـ auto-sync
-    LS.set('iat_last_save_ts',backup.savedTs);
-    localStorage.removeItem('iat_dirty');
-    _autoSyncDirty=false;
     status.style.color='var(--teal)';
     status.textContent=`✓ Saved at ${saved}`;
     toast('✓ Backup saved to OneDrive','ok');
@@ -1277,10 +1109,6 @@ async function loadAppFromOneDrive(){
       const savedDate=backup.saved?new Date(backup.saved).toLocaleString('en-GB'):'unknown';
       status.style.color='var(--teal)';
       status.textContent=`✓ Loaded (saved: ${savedDate})`;
-      // اعتبر المحلي متطابق مع الـ cloud الآن
-      if(backup.savedTs) LS.set('iat_last_save_ts',backup.savedTs);
-      localStorage.removeItem('iat_dirty');
-      _autoSyncDirty=false;
       toast('✓ Data loaded from OneDrive','ok');
 
       // تحديث الواجهة
@@ -1339,12 +1167,10 @@ function updateUndoButtons(){
 function saveOrders(){
   pushUndo();
   LS.set('iat_orders',orders);
-  if(typeof markDirty==='function')markDirty();
   if(document.getElementById('pg-combined-qty')?.classList.contains('on'))renderCombinedQtyPage();
 }
 function saveTenderOrders(){
   LS.set('iat_to',tenderOrders);
-  if(typeof markDirty==='function')markDirty();
   if(document.getElementById('pg-combined-qty')?.classList.contains('on'))renderCombinedQtyPage();
 }
 
@@ -2327,16 +2153,6 @@ async function getODToken(){
   return res.accessToken;
 }
 
-// نسخة صامتة - ما تفتح popup (للـ auto-sync)
-async function getODTokenSilent(){
-  await initMsal();
-  const scopes=['Files.ReadWrite'];
-  const acc=msalApp.getAllAccounts();
-  if(!acc.length) throw new Error('no-account');
-  const res=await msalApp.acquireTokenSilent({scopes,account:acc[0]});
-  return res.accessToken;
-}
-
 // Column mapping: col letter -> Excel col number (A=1)
 function colNum(l){let r=0;for(const c of l.toUpperCase())r=r*26+(c.charCodeAt(0)-64);return r;}
 
@@ -2850,15 +2666,13 @@ async function saveAllThenPrint(){
   const date=document.getElementById('orderDate')?.value||todayStr();
   console.log(`saveAllThenPrint: fresh ${from}-${to} | tender ${tf}-${tt}`);
 
-  // 1. سجل timestamp أولاً - قبل الحفظ (حتى يكون mtime الملف بعده)
-  const signalTs=Date.now();
-  window._lastSaveTs=signalTs;
-
-  // 2. احفظ الأوردرات
+  // 1. احفظ الأوردرات أولاً
   if(orders.length) await saveOrdersToLoading(from,to,date);
   if(tenderOrders.length) await tenderSaveToExcel(tf,tt);
 
-  // 3. أرسل signal بعد اكتمال الحفظ
+  // 2. بعد الحفظ - سجل timestamp وأرسل signal
+  const signalTs=Date.now();
+  window._lastSaveTs=signalTs;
 
   const jobs=[
     {action:'',from,to,_includeSaveTs:true},
@@ -5954,10 +5768,6 @@ function gPickerAddNew() {
 // Close on backdrop tap
 document.addEventListener('DOMContentLoaded', () => {
   loadFamilyMap();
-  // إذا في تعديلات غير مرفوعة من جلسة سابقة - بيّن الحالة
-  if(localStorage.getItem('iat_dirty')==='1'){_autoSyncDirty=true;_syncIndicator('dirty');}
-  // تحميل آخر نسخة من OneDrive تلقائياً (بصمت - بدون popup)
-  setTimeout(()=>{autoSyncLoad();},1500);
   // تحميل آخر قيم المجالات
   const pf=LS.get('iat_pfrom',null); if(pf){const el=document.getElementById('printRangeFrom');if(el)el.value=pf;}
   const pt=LS.get('iat_pto',null); if(pt){const el=document.getElementById('printRangeTo');if(el)el.value=pt;}
