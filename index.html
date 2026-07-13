@@ -1017,6 +1017,7 @@ const OD_BACKUP_PATH = 'iat_backup.json';
 let _autoSyncTimer=null;
 let _autoSyncDirty=false;
 let _autoSyncBusy=false;
+let _syncLoadDone=false; // ما نرفع تلقائياً قبل ما نحاول التحميل أولاً
 
 function buildBackupObj(){
   return {
@@ -1070,6 +1071,21 @@ async function autoSyncSave(showErrors){
       }
     }
     const backup=buildBackupObj();
+    // حماية: لا ترفع نسخة فارغة تلقائياً فوق نسخة فيها بيانات
+    const localEmpty=(!orders.length&&!tenderOrders.length);
+    if(localEmpty&&!showErrors){
+      try{
+        const chk=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${OD_BACKUP_PATH}:/content`,{headers:{'Authorization':'Bearer '+token}});
+        if(chk.ok){
+          const cloud=await chk.json();
+          if((cloud.orders?.length||0)>0||(cloud.tenderOrders?.length||0)>0){
+            console.warn('☁ BLOCKED: refusing to overwrite cloud data with empty local');
+            _syncIndicator('error');
+            return;
+          }
+        }
+      }catch{}
+    }
     const res=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${OD_BACKUP_PATH}:/content`,{
       method:'PUT',
       headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
@@ -1097,7 +1113,11 @@ function markDirty(){
   try{localStorage.setItem('iat_dirty','1');}catch{}
   _syncIndicator('dirty');
   if(_autoSyncTimer) clearTimeout(_autoSyncTimer);
-  _autoSyncTimer=setTimeout(()=>{autoSyncSave();},30000);
+  _autoSyncTimer=setTimeout(()=>{
+    // لا رفع تلقائي قبل ما نحاول التحميل أول (منع جهاز فاضي يغطي على البيانات)
+    if(!_syncLoadDone){markDirty();return;}
+    autoSyncSave();
+  },30000);
 }
 
 // حفظ فوري عند إخفاء التطبيق
@@ -1135,6 +1155,14 @@ async function autoSyncLoad(){
       console.log('☁ Local is up-to-date');
       return;
     }
+    // حماية: لا تمسح بيانات محلية بنسخة cloud فارغة - ارفع المحلي بدلها
+    const cloudEmpty=(!(backup.orders?.length)&&!(backup.tenderOrders?.length));
+    const localHasData=(orders.length>0||tenderOrders.length>0);
+    if(cloudEmpty&&localHasData){
+      console.warn('☁ Cloud is empty but local has data - uploading local instead');
+      await autoSyncSave();
+      return;
+    }
     // الـ cloud أحدث - حمّل
     if(backup.orders)      { orders=backup.orders;           saveOrders(); }
     if(backup.tenderOrders){ tenderOrders=backup.tenderOrders; saveTenderOrders(); }
@@ -1164,6 +1192,8 @@ async function autoSyncLoad(){
     console.log('☁ Auto-loaded from cloud',new Date(cloudTs).toLocaleTimeString());
   }catch(e){
     console.warn('Auto-load failed:',e.message);
+  }finally{
+    _syncLoadDone=true;
   }
 }
 
