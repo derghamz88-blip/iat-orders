@@ -176,6 +176,7 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
 .drv-drop-hint{font-size:.6rem;color:var(--muted);text-align:center;padding:10px 4px;opacity:.5}
 .drv-card{background:var(--s1);border:1.5px solid var(--b2);border-radius:6px;padding:7px 8px;cursor:grab;user-select:none;transition:all .15s}
 .drv-card:active{cursor:grabbing;opacity:.7;transform:scale(.97)}
+.drv-card.card-drop{border-color:var(--teal);border-width:2px;background:rgba(20,184,166,.12)}
 .drv-card .card-num{font-family:var(--mono);font-size:.62rem;color:var(--amber);font-weight:800;margin-bottom:2px}
 .drv-card .card-cust{font-size:.76rem;color:var(--txt);font-weight:600;line-height:1.25;word-break:break-word}
 .cc-mb{background:var(--s3);border:1px solid var(--b2);border-radius:4px;width:22px;height:18px;color:var(--muted);cursor:pointer;font-size:.6rem;display:flex;align-items:center;justify-content:center;transition:all .15s;}
@@ -3367,6 +3368,15 @@ function renderDrvBoard(){
   [...orders].sort((a,b)=>(a.num||0)-(b.num||0)).forEach(o=>{
     if(!custMap.has(o.customer))custMap.set(o.customer,{num:o.num||'',driver:o.driver||''});
   });
+  // رتّب الأوردرات جوّا كل سائق حسب الترتيب الموحّد المحفوظ
+  const savedWA=LS.get('iat_waorder',null);
+  const waMap = savedWA&&Array.isArray(savedWA) ? new Map(savedWA) : new Map();
+  function orderKey(drv,cust){
+    const list=waMap.get(drv);
+    if(!list)return 999;
+    const i=list.findIndex(it=>it.customer===cust);
+    return i<0?999:i;
+  }
 
   // أعمدة بعرض ثابت مريح + تمرير أفقي (بدل ما تنكبس بالشاشة)
   const COL_W=140;
@@ -3374,14 +3384,25 @@ function renderDrvBoard(){
     ${cols.map(drv=>{
       const cards=[...custMap.entries()]
         .filter(([c,info])=>info.driver===drv)
+        .sort((a,b)=>orderKey(drv,a[0])-orderKey(drv,b[0]))
         .map(([cust,info])=>`
           <div class="drv-card" draggable="true"
             ondragstart="drvDragStart(event,'${esc(cust)}')"
+            ondragover="event.preventDefault();event.stopPropagation();this.classList.add('card-drop')"
+            ondragleave="this.classList.remove('card-drop')"
+            ondrop="event.stopPropagation();drvDropOnCard(event,'${esc(drv)}','${esc(cust)}')"
             ontouchstart="drvTouchStart(event,'${esc(cust)}')"
             ontouchmove="drvTouchMove(event)"
             ontouchend="drvTouchEnd(event)">
-            <div class="card-num">#${info.num}</div>
-            <div class="card-cust">${cust}</div>
+            <div style="display:flex;align-items:flex-start;gap:4px">
+              <div style="flex:1;min-width:0">
+                <div class="card-num">#${info.num}</div>
+                <div class="card-cust">${cust}</div>
+              </div>
+              <button onclick="event.stopPropagation();openOrderMenu('${esc(cust)}','${esc(drv)}')"
+                ontouchstart="event.stopPropagation()"
+                style="background:var(--s3);border:1px solid var(--b2);border-radius:5px;color:var(--blue2);font-size:.85rem;font-weight:800;cursor:pointer;padding:2px 7px;flex-shrink:0;line-height:1">⋯</button>
+            </div>
           </div>`).join('');
       const isUnassigned = drv==='';
       return `<div class="drv-col" style="width:${COL_W}px;flex-shrink:0"
@@ -3403,10 +3424,47 @@ function drvDrop(e,drv){
   e.preventDefault();
   e.currentTarget.querySelector('.drv-col-body').classList.remove('drag-over');
   if(!_dragCust)return;
+  // فلتان على جسم العمود (مو على كرت) = نقل لآخر قائمة هالسائق
+  const changed = orders.some(o=>o.customer===_dragCust && (o.driver||'')!==drv);
   orders.forEach(o=>{if(o.customer===_dragCust)o.driver=drv;});
   saveOrders();
+  syncWAFromOrders();
+  // ضع المسحوب بآخر ترتيب السائق
+  const list=_waOrder.get(drv);
+  if(list){
+    const i=list.findIndex(it=>it.customer===_dragCust);
+    if(i>=0){const [m]=list.splice(i,1);list.push(m);saveWAOrder();}
+  }
   renderDrvBoard();
-  toast('✓ Driver updated','ok');
+  if(changed)toast('✓ Driver updated','ok');
+  _dragCust=null;
+}
+
+// فلتان على كرت = ترتيب داخل نفس العمود (أو نقل لهالسائق بمكان محدد)
+function drvDropOnCard(e,drv,targetCust){
+  e.preventDefault();
+  document.querySelectorAll('.card-drop').forEach(c=>c.classList.remove('card-drop'));
+  if(!_dragCust||_dragCust===targetCust){_dragCust=null;return;}
+
+  // غيّر سائق المسحوب لهالعمود
+  orders.forEach(o=>{if(o.customer===_dragCust)o.driver=drv;});
+  saveOrders();
+  syncWAFromOrders();
+
+  // رتّبه مكان الكرت الهدف
+  const list=_waOrder.get(drv);
+  if(list){
+    const from=list.findIndex(it=>it.customer===_dragCust);
+    let to=list.findIndex(it=>it.customer===targetCust);
+    if(from>=0&&to>=0){
+      const [m]=list.splice(from,1);
+      to=list.findIndex(it=>it.customer===targetCust); // أعد الحساب بعد الحذف
+      list.splice(to,0,m);
+      saveWAOrder();
+    }
+  }
+  renderDrvBoard();
+  toast('✓ تم الترتيب','ok');
   _dragCust=null;
 }
 
@@ -3430,16 +3488,171 @@ function drvTouchEnd(e){
   document.querySelectorAll('.drv-col-body').forEach(c=>c.classList.remove('drag-over'));
   const t=e.changedTouches[0];
   const el=document.elementFromPoint(t.clientX,t.clientY);
+  if(!_touchCust){_touchCust=null;_touchEl=null;return;}
+
+  // هل انفلت فوق كرت معيّن؟ → ترتيب
+  const targetCard=el?.closest('.drv-card');
   const colBody=el?.closest('.drv-col-body');
-  if(colBody&&_touchCust){
+  const targetCust=targetCard?.querySelector('.card-cust')?.textContent?.trim();
+
+  if(colBody){
     const finalDrv=colBody.dataset.drv||'';
     orders.forEach(o=>{if(o.customer===_touchCust)o.driver=finalDrv;});
     saveOrders();
-    toast('✓ Driver updated','ok');
+    syncWAFromOrders();
+    const list=_waOrder.get(finalDrv);
+    if(list){
+      const from=list.findIndex(it=>it.customer===_touchCust);
+      if(targetCust && targetCust!==_touchCust){
+        // رتّب مكان الكرت الهدف
+        let to=list.findIndex(it=>it.customer===targetCust);
+        if(from>=0&&to>=0){const[m]=list.splice(from,1);to=list.findIndex(it=>it.customer===targetCust);list.splice(to,0,m);saveWAOrder();}
+      }else if(from>=0){
+        // آخر القائمة
+        const[m]=list.splice(from,1);list.push(m);saveWAOrder();
+      }
+    }
+    toast('✓ تم','ok');
     renderDrvBoard();
   }
   _touchCust=null;_touchEl=null;
 }
+
+// ── Order menu: اختيار السائق + الترتيب (يفتح لما تضغط ⋯) ──
+function openOrderMenu(cust, curDrv){
+  // اجمع الأوردرات الحالية لكل سائق (نفس ترتيب _waOrder الموحّد)
+  syncWAFromOrders();
+  const allDrvs = ['', ...drivers];
+  const curList = _waOrder.get(curDrv) || [];
+  const curPos = curList.findIndex(it=>it.customer===cust);
+
+  let html = `<div style="padding:14px 16px;border-bottom:1px solid var(--b1)">
+    <div style="font-size:.7rem;color:var(--muted);font-family:var(--mono)">ORDER</div>
+    <div style="font-size:1rem;font-weight:800;color:var(--txt);margin-top:2px">👤 ${cust}</div>
+  </div>`;
+
+  // 1) اختيار السائق
+  html += `<div style="padding:12px 16px;border-bottom:1px solid var(--b1)">
+    <div style="font-size:.72rem;color:var(--muted);margin-bottom:8px;font-weight:700">🚗 اختر السائق</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">`;
+  allDrvs.forEach(d=>{
+    const on = d===curDrv;
+    const label = d||'❓ بدون';
+    html += `<button onclick="assignOrderDriver('${esc(cust)}','${esc(d)}')"
+      style="padding:8px 12px;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;border:1.5px solid ${on?'var(--teal)':'var(--b2)'};background:${on?'rgba(20,184,166,.15)':'var(--s2)'};color:${on?'var(--teal)':'var(--txt)'}">${label}${on?' ✓':''}</button>`;
+  });
+  html += `</div></div>`;
+
+  // 2) الترتيب داخل السائق الحالي
+  if(curList.length > 1){
+    html += `<div style="padding:12px 16px">
+      <div style="font-size:.72rem;color:var(--muted);margin-bottom:8px;font-weight:700">↕ الترتيب عند ${curDrv||'بدون سائق'} (اسحب أو استخدم الأسهم)</div>
+      <div id="omPosList" style="display:flex;flex-direction:column;gap:4px">`;
+    curList.forEach((it,i)=>{
+      const isMe = it.customer===cust;
+      html += `<div class="om-row" data-cust="${esc(it.customer)}" draggable="true"
+        ondragstart="omDragStart(event,${i})" ondragover="omDragOver(event,${i})" ondrop="omDrop(event,${i})" ondragend="omDragEnd(event)"
+        style="display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:7px;border:1.5px solid ${isMe?'var(--teal)':'var(--b2)'};background:${isMe?'rgba(20,184,166,.1)':'var(--s2)'}">
+        <span style="color:var(--muted);cursor:grab;font-size:1rem">⠿</span>
+        <span style="font-family:var(--mono);font-size:.7rem;color:var(--amber);font-weight:800;min-width:26px">${it.num}</span>
+        <span style="flex:1;font-size:.8rem;font-weight:${isMe?'800':'600'};color:${isMe?'var(--teal)':'var(--txt)'}">${it.customer}</span>
+        <div style="display:flex;gap:3px">
+          <button onclick="moveOrderPos('${esc(curDrv)}',${i},-1)" ${i===0?'disabled':''} style="width:30px;height:30px;border-radius:6px;border:1px solid var(--b2);background:var(--s3);color:var(--muted);cursor:pointer;font-size:.8rem">▲</button>
+          <button onclick="moveOrderPos('${esc(curDrv)}',${i},1)" ${i===curList.length-1?'disabled':''} style="width:30px;height:30px;border-radius:6px;border:1px solid var(--b2);background:var(--s3);color:var(--muted);cursor:pointer;font-size:.8rem">▼</button>
+        </div>
+      </div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  html += `<div style="padding:12px 16px;border-top:1px solid var(--b1)">
+    <button onclick="closeOrderMenu()" style="width:100%;padding:11px;border-radius:9px;background:var(--teal);border:none;color:#fff;font-weight:800;font-size:.85rem;cursor:pointer">✓ تم</button>
+  </div>`;
+
+  let ov=document.getElementById('orderMenuOv');
+  if(!ov){
+    ov=document.createElement('div');
+    ov.id='orderMenuOv';
+    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+    ov.onclick=(e)=>{if(e.target===ov)closeOrderMenu();};
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML=`<div style="background:var(--s1);border-radius:16px 16px 0 0;width:100%;max-width:500px;max-height:80vh;overflow-y:auto;border:1px solid var(--b1);border-bottom:none">${html}</div>`;
+  ov.style.display='flex';
+  _omCurDrv=curDrv; _omCust=cust;
+}
+function closeOrderMenu(){
+  const ov=document.getElementById('orderMenuOv');
+  if(ov)ov.style.display='none';
+  renderDrvBoard();
+}
+let _omCurDrv=null,_omCust=null;
+
+// بناء _waOrder من الأوردرات مع الحفاظ على الترتيب المحفوظ
+function syncWAFromOrders(){
+  const saved=LS.get('iat_waorder',null);
+  const savedMap = saved&&Array.isArray(saved) ? new Map(saved) : new Map();
+  const fresh=new Map();
+  const seen=new Set();
+  [...orders].sort((a,b)=>(a.num||0)-(b.num||0)).forEach(o=>{
+    if(!o.customer) return;
+    const drv=o.driver||'';
+    const displayNum = o.isTender ? `T${o.tNum||o.num||''}` : (o.num||'');
+    const key=`${drv}__${displayNum}__${o.customer}`;
+    if(seen.has(key)) return;
+    seen.add(key);
+    if(!fresh.has(drv)) fresh.set(drv,[]);
+    fresh.get(drv).push({num:displayNum, customer:o.customer});
+  });
+  // طبّق الترتيب المحفوظ لكل سائق
+  fresh.forEach((items,drv)=>{
+    const savedList=savedMap.get(drv);
+    if(savedList&&savedList.length){
+      const savedOrder=savedList.map(s=>s.customer);
+      items.sort((a,b)=>{
+        let ia=savedOrder.indexOf(a.customer), ib=savedOrder.indexOf(b.customer);
+        if(ia<0)ia=999; if(ib<0)ib=999;
+        return ia-ib;
+      });
+    }
+  });
+  _waOrder=fresh;
+  saveWAOrder();
+}
+
+function assignOrderDriver(cust, newDrv){
+  orders.forEach(o=>{if(o.customer===cust)o.driver=newDrv;});
+  saveOrders();
+  syncWAFromOrders();
+  toast(`✓ → ${newDrv||'بدون سائق'}`,'ok');
+  openOrderMenu(cust, newDrv); // أعد فتح المنيو محدّث
+}
+
+function moveOrderPos(drv, idx, dir){
+  const items=_waOrder.get(drv);
+  if(!items)return;
+  const j=idx+dir;
+  if(j<0||j>=items.length)return;
+  [items[idx],items[j]]=[items[j],items[idx]];
+  saveWAOrder();
+  openOrderMenu(_omCust, drv);
+}
+
+// سحب داخل المنيو
+let _omDragIdx=null;
+function omDragStart(e,i){_omDragIdx=i;e.currentTarget.style.opacity='.4';}
+function omDragOver(e,i){e.preventDefault();}
+function omDrop(e,i){
+  e.preventDefault();
+  if(_omDragIdx===null||_omDragIdx===i)return;
+  const items=_waOrder.get(_omCurDrv);
+  if(!items)return;
+  const [m]=items.splice(_omDragIdx,1);
+  items.splice(i,0,m);
+  saveWAOrder();
+  openOrderMenu(_omCust,_omCurDrv);
+}
+function omDragEnd(e){e.currentTarget.style.opacity='1';_omDragIdx=null;}
 
 function renderDriversPage(){
   // Update filter dropdown with drivers
@@ -6819,37 +7032,8 @@ function renderDispatchResults(){
 let _waOrder = new Map();
 
 function initWASend(){
-  // حاول تحميل الترتيب المحفوظ أولاً
-  const saved = LS.get('iat_waorder', null);
-  if(saved && Array.isArray(saved) && saved.length > 0){
-    _waOrder = new Map(saved);
-    renderWASend();
-    return;
-  }
-
-  // أول مرة - ابنِ من الأوردرات
-  _waOrder = new Map();
-  const seen = new Set();
-  [...orders]
-    .sort((a,b)=>(a.num||0)-(b.num||0))
-    .forEach(o=>{
-      if(!o.driver||!o.customer) return;
-      const displayNum = o.isTender ? `T${o.tNum||o.num||''}` : (o.num||'');
-      const key = `${o.driver}__${displayNum}__${o.customer}`;
-      if(seen.has(key)) return;
-      seen.add(key);
-      if(!_waOrder.has(o.driver)) _waOrder.set(o.driver,[]);
-      _waOrder.get(o.driver).push({num:displayNum, customer:o.customer});
-    });
-
-  // رتب حسب أصغر رقم
-  const sorted = [..._waOrder.entries()].sort((a,b)=>{
-    const aMin = Math.min(...a[1].map(i=>parseInt(i.num)||999));
-    const bMin = Math.min(...b[1].map(i=>parseInt(i.num)||999));
-    return aMin - bMin;
-  });
-  _waOrder = new Map(sorted);
-  saveWAOrder();
+  // بناء موحّد من الأوردرات مع الحفاظ على الترتيب المحفوظ (نفس منطق Board)
+  syncWAFromOrders();
   renderWASend();
 }
 
@@ -6860,16 +7044,26 @@ function saveWAOrder(){
 function renderWASend(){
   const el = document.getElementById('waSendList');
   if(!el) return;
-  if(!_waOrder.size){
+  const hasAssigned=[..._waOrder.entries()].some(([drv,items])=>drv&&items.length);
+  if(!hasAssigned){
     el.innerHTML='<div class="empty"><div class="ei">📤</div><p>No drivers assigned yet.</p></div>';
     return;
   }
   let html='';
   _waOrder.forEach((items, drv)=>{
+    if(!drv||!items.length) return; // تجاهل الأوردرات بدون سائق في صفحة الإرسال
     html+=`<div style="background:var(--s1);border:1.5px solid var(--b2);border-radius:8px;margin-bottom:4px">
       <div style="padding:8px 12px;background:rgba(20,184,166,.1);border-bottom:1px solid var(--b2);font-weight:700;font-size:.8rem;color:var(--teal)">🚗 ${drv}</div>
       ${items.map((item,i)=>`
-        <div style="display:flex;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid var(--faint)">
+        <div class="wa-row" draggable="true"
+          ondragstart="waDragStart(event,'${esc(drv)}',${i})"
+          ondragover="event.preventDefault()"
+          ondrop="waDrop(event,'${esc(drv)}',${i})"
+          ondragend="waDragEnd(event)"
+          data-wadrv="${esc(drv)}" data-waidx="${i}"
+          style="display:flex;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid var(--faint)">
+          <span ontouchstart="waTouchStart(event,'${esc(drv)}',${i})" ontouchmove="waTouchMove(event)" ontouchend="waTouchEnd(event)"
+            style="color:var(--blue2);cursor:grab;font-size:1.5rem;flex-shrink:0;padding:4px 8px;background:var(--s3);border-radius:8px;border:1px solid var(--b2);line-height:1;touch-action:none" title="اسحب للترتيب">⠿</span>
           <div style="display:flex;flex-direction:column;gap:1px;flex-shrink:0">
             <button class="cc-mb" ${i===0?'disabled':''} onclick="moveWAItem('${esc(drv)}',${i},-1)">▲</button>
             <button class="cc-mb" ${i===items.length-1?'disabled':''} onclick="moveWAItem('${esc(drv)}',${i},1)">▼</button>
@@ -6917,6 +7111,57 @@ function moveWAItem(drv, idx, dir){
   renderWASend();
 }
 
+// سحب لإعادة الترتيب داخل نفس السائق
+let _waDrag={drv:null,idx:null};
+function waDragStart(e,drv,idx){_waDrag={drv,idx};e.currentTarget.style.opacity='.4';}
+function waDrop(e,drv,idx){
+  e.preventDefault();
+  if(_waDrag.drv!==drv||_waDrag.idx===null||_waDrag.idx===idx)return;
+  const items=_waOrder.get(drv);
+  if(!items)return;
+  const [m]=items.splice(_waDrag.idx,1);
+  items.splice(idx,0,m);
+  saveWAOrder();
+  renderWASend();
+}
+function waDragEnd(e){e.currentTarget.style.opacity='1';_waDrag={drv:null,idx:null};}
+
+// سحب باللمس بصفحة WA Send
+let _waTouch={drv:null,idx:null,el:null};
+function waTouchStart(e,drv,idx){
+  e.stopPropagation();
+  _waTouch={drv,idx,el:e.currentTarget.closest('.wa-row')};
+  if(_waTouch.el)_waTouch.el.style.opacity='.5';
+}
+function waTouchMove(e){
+  if(_waTouch.idx===null)return;
+  e.preventDefault(); e.stopPropagation();
+  const t=e.touches[0];
+  const el=document.elementFromPoint(t.clientX,t.clientY);
+  const row=el?.closest('.wa-row');
+  document.querySelectorAll('.wa-row').forEach(r=>r.style.background='');
+  if(row&&row.dataset.wadrv===_waTouch.drv&&+row.dataset.waidx!==_waTouch.idx){
+    row.style.background='rgba(20,184,166,.12)';
+  }
+}
+function waTouchEnd(e){
+  if(_waTouch.idx===null)return;
+  e.stopPropagation();
+  if(_waTouch.el)_waTouch.el.style.opacity='1';
+  document.querySelectorAll('.wa-row').forEach(r=>r.style.background='');
+  const t=e.changedTouches[0];
+  const el=document.elementFromPoint(t.clientX,t.clientY);
+  const row=el?.closest('.wa-row');
+  if(row&&row.dataset.wadrv===_waTouch.drv){
+    const to=+row.dataset.waidx;
+    if(to!==_waTouch.idx){
+      const items=_waOrder.get(_waTouch.drv);
+      if(items){const[m]=items.splice(_waTouch.idx,1);items.splice(to,0,m);saveWAOrder();renderWASend();}
+    }
+  }
+  _waTouch={drv:null,idx:null,el:null};
+}
+
 function removeWAItem(drv, idx){
   const items = _waOrder.get(drv);
   if(!items) return;
@@ -6930,7 +7175,7 @@ function sendDriversWhatsAppFromPage(){
   if(!_waOrder.size){toast('No drivers assigned yet','err');return;}
   let msg='';
   _waOrder.forEach((items,drv)=>{
-    if(!items.length) return;
+    if(!drv||!items.length) return;
     msg+=`🚗 ${drv}\n`;
     items.forEach(i=>msg+=`${i.num} - ${i.customer}\n`);
     msg+='\n';
