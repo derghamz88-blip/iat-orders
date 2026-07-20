@@ -168,14 +168,16 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
 .pr-qi{width:36px;height:22px;background:var(--s2);border:1.5px solid var(--b2);border-radius:5px;color:var(--txt);font-family:var(--mono);font-size:.72rem;text-align:center;outline:none;}
 .pr-unit{font-family:var(--mono);font-size:.6rem;color:var(--muted);}
 .cc-move{display:flex;flex-direction:column;gap:2px;margin-right:6px;}
-.drv-col{flex-shrink:0;width:160px;background:var(--s2);border-radius:var(--r);border:1.5px solid var(--b1);display:flex;flex-direction:column;gap:0;overflow:hidden}
-.drv-col-head{background:var(--s3);padding:8px 10px;font-size:.75rem;font-weight:700;color:var(--blue2);border-bottom:1.5px solid var(--b1);text-align:center;flex-shrink:0}
-.drv-col-body{flex:1;min-height:60px;padding:6px;display:flex;flex-direction:column;gap:5px;overflow-y:auto}
+.drv-col{flex-shrink:0;width:140px;background:var(--s2);border-radius:var(--r);border:1.5px solid var(--b1);display:flex;flex-direction:column;gap:0}
+.drv-col-head{position:sticky;top:0;z-index:5;background:var(--s3);padding:9px 6px;font-size:.74rem;font-weight:800;color:var(--blue2);border-bottom:1.5px solid var(--b1);text-align:center;word-break:break-word;line-height:1.2;border-radius:var(--r) var(--r) 0 0;box-shadow:0 2px 6px rgba(0,0,0,.4)}
+.drv-col-head.unassigned{color:var(--amber)}
+.drv-col-body{flex:1;min-height:60px;padding:6px;display:flex;flex-direction:column;gap:5px}
 .drv-col-body.drag-over{background:rgba(74,215,206,.08);border:2px dashed var(--teal)}
-.drv-card{background:var(--s1);border:1.5px solid var(--b2);border-radius:6px;padding:5px 7px;cursor:grab;user-select:none;transition:all .15s}
+.drv-drop-hint{font-size:.6rem;color:var(--muted);text-align:center;padding:10px 4px;opacity:.5}
+.drv-card{background:var(--s1);border:1.5px solid var(--b2);border-radius:6px;padding:7px 8px;cursor:grab;user-select:none;transition:all .15s}
 .drv-card:active{cursor:grabbing;opacity:.7;transform:scale(.97)}
-.drv-card .card-num{font-family:var(--mono);font-size:.6rem;color:var(--amber);font-weight:700;margin-bottom:1px}
-.drv-card .card-cust{font-size:.7rem;color:var(--txt);font-weight:600;line-height:1.2}
+.drv-card .card-num{font-family:var(--mono);font-size:.62rem;color:var(--amber);font-weight:800;margin-bottom:2px}
+.drv-card .card-cust{font-size:.76rem;color:var(--txt);font-weight:600;line-height:1.25;word-break:break-word}
 .cc-mb{background:var(--s3);border:1px solid var(--b2);border-radius:4px;width:22px;height:18px;color:var(--muted);cursor:pointer;font-size:.6rem;display:flex;align-items:center;justify-content:center;transition:all .15s;}
 .cc-mb:active{border-color:var(--blue2);color:var(--blue2);}
 .cc-mb:disabled{opacity:.2;cursor:default;}
@@ -473,7 +475,7 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
   <!-- List view -->
   <div style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px" id="drvList"></div>
   <!-- Board view -->
-  <div style="flex:1;overflow-y:auto;overflow-x:hidden;padding:6px;display:none;box-sizing:border-box;width:100%" id="drvBoard"></div>
+  <div style="flex:1;overflow-y:auto;overflow-x:auto;padding:6px;display:none;box-sizing:border-box;width:100%;-webkit-overflow-scrolling:touch" id="drvBoard"></div>
 </div>
 
 
@@ -1680,11 +1682,13 @@ function addToOrder(){
     orders.push({num,customer:selCust,product:p,qty:d.qty,size:d.size,note:d.note});
     freq[p]=(freq[p]||0)+1;
   });
+  saveOrders();          // ← احفظ فوراً باللوكال ستورج
   LS.set('iat_freq',freq);
   toast(`✓ ${selProds.size} item(s) added for ${selCust}`,'ok');
   selProds.clear();
   document.getElementById('prodSrch').value='';
   renderSelRows();renderPDropList('');updateBadges();
+  renderOrders();        // ← حدّث صفحة الأوردرات
 }
 
 // ── TENDER (same as Entry, but for Tender Products) ──
@@ -3363,14 +3367,10 @@ function renderDrvBoard(){
   [...orders].sort((a,b)=>(a.num||0)-(b.num||0)).forEach(o=>{
     if(!custMap.has(o.customer))custMap.set(o.customer,{num:o.num||'',driver:o.driver||''});
   });
-  const numCols=cols.length||1;
-  // حساب حجم الخط حسب عدد السائقين
-  const hSize=numCols<=4?'.75rem':numCols<=6?'.62rem':numCols<=8?'.52rem':'.44rem';
-  const cardCustSize=numCols<=4?'.72rem':numCols<=6?'.62rem':'.54rem';
-  const cardNumSize=numCols<=4?'.65rem':'.55rem';
-  const gap=numCols<=6?'4px':'2px';
-  const colW=`calc((100% - ${(numCols-1)*parseInt(gap)}px) / ${numCols})`;
-  board.innerHTML=`<div style="display:flex;flex-wrap:nowrap;gap:${gap};width:100%;box-sizing:border-box;align-items:start">
+
+  // أعمدة بعرض ثابت مريح + تمرير أفقي (بدل ما تنكبس بالشاشة)
+  const COL_W=140;
+  board.innerHTML=`<div style="display:flex;flex-wrap:nowrap;gap:6px;box-sizing:border-box;align-items:start;padding-bottom:8px">
     ${cols.map(drv=>{
       const cards=[...custMap.entries()]
         .filter(([c,info])=>info.driver===drv)
@@ -3380,15 +3380,16 @@ function renderDrvBoard(){
             ontouchstart="drvTouchStart(event,'${esc(cust)}')"
             ontouchmove="drvTouchMove(event)"
             ontouchend="drvTouchEnd(event)">
-            <div class="card-num" style="font-size:${cardNumSize}">#${info.num}</div>
-            <div class="card-cust" style="font-size:${cardCustSize}">${cust}</div>
+            <div class="card-num">#${info.num}</div>
+            <div class="card-cust">${cust}</div>
           </div>`).join('');
-      return `<div class="drv-col" style="width:${colW};min-width:0;flex-shrink:0"
+      const isUnassigned = drv==='';
+      return `<div class="drv-col" style="width:${COL_W}px;flex-shrink:0"
         ondragover="event.preventDefault();this.querySelector('.drv-col-body').classList.add('drag-over')"
         ondragleave="this.querySelector('.drv-col-body').classList.remove('drag-over')"
         ondrop="drvDrop(event,'${esc(drv)}')">
-        <div class="drv-col-head" style="font-size:${hSize};padding:5px 3px;text-align:center;word-break:break-word;line-height:1.2">${drv||'❓'}</div>
-        <div class="drv-col-body" data-drv="${esc(drv)}">${cards||'<div style="font-size:.55rem;color:var(--muted);text-align:center;padding:6px">+</div>'}</div>
+        <div class="drv-col-head${isUnassigned?' unassigned':''}">${drv||'❓ Unassigned'}</div>
+        <div class="drv-col-body" data-drv="${esc(drv)}">${cards||'<div class="drv-drop-hint">drop here</div>'}</div>
       </div>`;
     }).join('')}
   </div>`;
