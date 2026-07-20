@@ -1442,7 +1442,7 @@ function showPage(n,t){
   if(tenderBtn) tenderBtn.style.display=n==='tender-view'?'flex':'none';
   if(n==='orders'){renderOrders();setTimeout(()=>{const el=document.querySelector('#pg-orders [style*="overflow-y"]');if(el)el.scrollTop=el.scrollHeight;},100);}
   if(n==='view-orders'){renderViewOrders();setTimeout(()=>{const el=document.querySelector('#pg-view-orders [style*="overflow-y"]');if(el)el.scrollTop=el.scrollHeight;},100);}
-  if(n==='drivers')renderDriversPage();
+  if(n==='drivers'){renderDriversPage();if(drvBoardView)renderDrvBoard();}
   if(n==='qty')renderQtyPage();
   if(n==='invoice'){renderInvOrdersList();renderPricingPage();renderInvoiceList();}
   if(n==='tender'){
