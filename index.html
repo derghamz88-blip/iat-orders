@@ -5499,8 +5499,10 @@ const CUST_ALIASES = [
   [/\bunion\s*(al\s*)?khawaneej\b/i,           'UNION Al khawaneej'],
   [/\bunion\s*umm\s*suqeim\b/i,               'UNION Umm Suqeim'],
   [/\bunion\s*(al\s*)?wasl\b/i,                'UNION Al Wasl'],
-  [/\bunion\s*rumailah\b/i,                    'union Rumailah'],
-  [/\bunion\s*jurf\b/i,                        'UNION Jurf'],
+  [/\bunion\s*rumailah\b|\bajman\s*coop\s*rum(?:ai|i|a)?lah?\b/i, 'union Rumailah'],
+  [/\bjum(eirah)?\.?\s*village\s*circle\b|\bjvc\b/i, 'Aswaaq – (JVC)'],
+  [/\bm[a]?nazel\s*sham\b|\bmanazil\s*(al)?sha(a)?m\b/i, 'manazil alshaam'],
+  [/\bunion\s*jurf\b|\bajman\s*coop\s*(?:al)?\s*jurf\b/i, 'UNION Jurf'],
   [/\bunion\s*international\b/i,               'UNION International'],
   [/\bunion\s*trolley/i,                       "union TROLLEY'S"],
 
@@ -5560,7 +5562,7 @@ function extractBranch(s) {
 }
 
 function isGMGBrand(s) {
-  return /(gmg|géant|geant|aswaaq|aswaak)/i.test(s);
+  return /\b(gmg|géant|geant|aswaaq|aswaak)\b/i.test(s);
 }
 
 function matchCustomer(raw) {
@@ -5612,14 +5614,15 @@ function matchProduct(raw) {
   raw = raw.replace(/\*/g, '').replace(/\s+/g, ' ').trim();
   const learned = learnLookup('p', raw);
   if (learned) return learned;
+  if (/^(800|900|1000|1100|1200|1300|1400|1500)(\s*[~\-–]\s*\d{3,4})?$/.test(raw)) return 'Chicken'; // size only e.g. "1 ctn 1200"
   const r = raw.toLowerCase();
 
   // CTN → Chicken (القياس يُحدد من picker)
   if(/\bctn\b/i.test(r)) return 'Chicken';
 
   // BL-SL / BL-SO / SL variants first
-  const isBLSL = /\bbl[.\-\s]?sl\b|boneless[.\-\s]?skinless|b\/l[.\-\s]?s\/l/i.test(r);
-  const isBLSO = /\bbl[.\-\s]?so\b|b\/l[.\-\s]?s\/o/i.test(r);
+  const isBLSL = /\bbl[.\-\/\s]?sl\b|boneless[.\-\s]?skinless|b\/l[.\-\s]?s\/l/i.test(r);
+  const isBLSO = /\bbl[.\-\/\s]?so\b|b\/l[.\-\s]?s\/o/i.test(r);
   const isSL   = /\bskinless\b|\bsl\b/i.test(r) && !isBLSL && !isBLSO;
   const is500  = /\b500\s*g(m|r)?\b|\b500\b/i.test(r);
 
@@ -5671,7 +5674,7 @@ function matchProduct(raw) {
   if (/kashra/i.test(r)) return 'Kashra';
   if (/\btail\b/i.test(r)) return 'Tail';
   if (/chicken\s*blw\s*wings?/i.test(r)) return 'Chicken BLW Wings';
-  if (/frozen.*chicken|whole.*chicken.*frozen/i.test(r)) return 'Whole Chicken Frozen';
+  if (/frozen.*chicken|chicken.*frozen|whole.*chicken.*frozen/i.test(r)) return 'Whole Chicken Frozen';
   if (/mix.*chicken|chicken.*mix/i.test(r)) return 'Mix Chicken';
   if (/\bchicken\b|\bchkn\b/i.test(r)) return 'Chicken';
 
@@ -5763,7 +5766,7 @@ function parseLine(line) {
   const clean = line.replace(/\*([^*]*)\*/g, '$1').replace(/\s+/g, ' ').trim();
   const isCtn  = /\bctn\b/i.test(clean);
   const note   = isCtn ? 'ctn' : '';
-  const sizeM  = clean.match(/\b(800|900|1000|1100|1200|1300|1400|1500)\b/);
+  const sizeM  = clean.match(/\b(800|900|1000|1100|1200|1300|1400|1500)(?:\s*(?:gm|gr|g))?\b/i);
   const size   = sizeM ? sizeM[1] : '';
 
   // ✅ CTN: عدد كراتين × 10 × size
@@ -5814,7 +5817,7 @@ function parseLine(line) {
 
 function isCustomerLine(line) {
   // A line is a customer name if it has NO quantity pattern
-  const hasQty = /\d+(?:\.\d+)?\s*(?:kg|kgs|tray[s]?|ctn)?/i.test(line);
+  const hasQty = /\b\d+(?:\.\d+)?\s*(?:kg|kgs|tray[s]?|ctn)?\b/i.test(line);
   const parsed = parseLine(line);
   // If it parses as a product line with a known product keyword, it's a product
   if (parsed) {
@@ -5826,7 +5829,7 @@ function isCustomerLine(line) {
 
 function parseOrdersFromText(text) {
   const results = [];
-  const skipRe = /^@|remraam|apartment|community|floor|building|villa|^\s*$|^https?:|^www\./i;
+  const skipRe = /^@|remraam(?!\s*$)|apartment|community|floor|building|\bvilla\b|home\s*no\b|^[+\d][\d\s\-]{8,}$|^\s*$|^https?:|^www\./i;
 
   const cleanLine = l => l
     .replace(/\*([^*]*)\*/g, '$1')
@@ -5986,7 +5989,7 @@ async function extractBOF(status) {
     if (!bofProductRe.test(line)) return;
     if (skipBofRe.test(line)) return;
     // Extract all numbers from line
-    const nums = [...line.matchAll(/(\d+(?:\.\d+)?)/g)].map(m => parseFloat(m[1]));
+    const nums = [...line.matchAll(/\b(\d+(?:\.\d+)?)\b/g)].map(m => parseFloat(m[1]));
     if (!nums.length) return;
     // Qty Reqd is typically a small integer (1-300), not a barcode/code
     // Barcodes are usually 6+ digits
@@ -5996,8 +5999,8 @@ async function extractBOF(status) {
     if (!qty) return;
     // Clean product name
     const prodRaw = line
-      .replace(/\d+(?:\.\d+)?/g, '')
-      .replace(/(kg|kgs|KG|fresh|FRESH|al\s*balad|AL\s*BALAD|qassab\s*go|QASSAB|safi|SAFI)/gi, '')
+      .replace(/\b\d+(?:\.\d+)?\b/g, '')
+      .replace(/\b(kg|kgs|KG|fresh|FRESH|al\s*balad|AL\s*BALAD|qassab\s*go|QASSAB|safi|SAFI)\b/gi, '')
       .replace(/[^\w\s]/g, ' ')
       .replace(/\s+/g, ' ').trim();
     if (prodRaw.length < 3) return;
@@ -7212,6 +7215,231 @@ function sendDriversWhatsAppFromPage(){
     <button class="btn btn-green btn-full" onclick="sendDriversWhatsAppFromPage()" style="font-size:.85rem;padding:12px">📤 Send via WhatsApp</button>
   </div>
 </div>
+
+<!-- ══ WHATSAPP AUTO-IMPORT (with edit/save/print locks) ══ -->
+<script>
+(function(){
+  const INC_FILE='incoming_orders.json', ACK_FILE='incoming_orders_ack.json';
+  const G='https://graph.microsoft.com/v1.0/me/drive/root:/';
+  const DEV=(function(){let d=LS.get('iat_dev_id',null);if(!d){d='d'+Math.random().toString(36).slice(2,8);LS.set('iat_dev_id',d);}return d;})();
+  let on=LS.get('iat_inc_on',false), hold=false, busyOps=0, lastTyped=0, polling=false;
+  let waiting={n:0,why:'',dates:[]}, notInExcel=LS.get('iat_inc_notxl',0), otherDev=false, alerts=LS.get('iat_inc_alerts',[]);
+  const ack=LS.get('iat_inc_ack',{imported:[],failed:{},alerted:[]});
+  if(!Array.isArray(ack.imported)) ack.imported=[];
+  if(!ack.failed||typeof ack.failed!=='object') ack.failed={};
+  if(!Array.isArray(ack.alerted)) ack.alerted=[];
+  let dirty=false;
+
+  // ── tiny status panel (bottom-left) ──
+  const box=document.createElement('div');
+  box.style.cssText='position:fixed;left:6px;bottom:6px;z-index:60;display:flex;flex-direction:column;gap:4px;align-items:flex-start';
+  const mk=()=>{const c=document.createElement('div');c.style.cssText='font:600 11px/1 monospace;padding:6px 9px;border-radius:12px;background:#1b2230;border:1px solid #33415c;opacity:.93;cursor:pointer;user-select:none;display:none';box.appendChild(c);return c;};
+  const cWait=mk(), cXl=mk(), cAlert=mk(), cHold=mk(), cMain=mk(); cMain.style.display='block';
+  document.body.appendChild(box);
+  cMain.onclick=()=>{on=!on;LS.set('iat_inc_on',on);if(!on)hold=false;paint('ok');if(on)poll();};
+  cHold.onclick=()=>{hold=!hold;paint('ok');if(!hold)poll();};
+  cWait.onclick=()=>{ if(confirm('Import '+waiting.n+' waiting order(s) NOW?\n(reason: '+waiting.why+(waiting.dates.length?' / for '+waiting.dates.join(', '):'')+')\nOrders for another date go onto the header date '+hdrDate()+'.')){poll(true);} };
+  cXl.onclick=()=>toast('Press ☁ Save to write the new orders to Excel','ok');
+  cAlert.onclick=()=>{ alert('Edited in WhatsApp AFTER import - check these orders by hand:\n\n'+alerts.join('\n\n')); alerts=[];LS.set('iat_inc_alerts',alerts);paint('ok'); };
+
+  function paint(s){
+    const col={ok:'#2dd4bf',off:'#9fb0cc',auth:'#fbbf24',err:'#f87171'}[s]||'#9fb0cc';
+    cMain.textContent=(on?'📥 WA auto: ON':'📥 WA auto: OFF')+(s==='auth'?' - sign in ☁':'')+(s==='err'?' - error':'');
+    cMain.style.color=on?col:'#9fb0cc';
+    cHold.style.display=on?'block':'none';
+    cHold.textContent=hold?'▶ release hold':'✋ hold imports';cHold.style.color=hold?'#fbbf24':'#9fb0cc';
+    cWait.style.display=(on&&waiting.n)?'block':'none';
+    cWait.textContent='⏸ '+waiting.n+' waiting ('+waiting.why+')';cWait.style.color='#fbbf24';
+    cXl.style.display=(on&&notInExcel>0)?'block':'none';
+    cXl.textContent='⚠ '+notInExcel+' new order(s) not in Excel yet';cXl.style.color='#fb923c';
+    cAlert.style.display=alerts.length?'block':'none';
+    cAlert.textContent='✏ '+alerts.length+' edited in WhatsApp';cAlert.style.color='#f87171';
+    if(otherDev&&on){cMain.textContent+='  ⚠ ANOTHER DEVICE IS ALSO ON';cMain.style.color='#f87171';}
+  }
+  paint(on?'ok':'off');
+
+  const hdrDate=()=>(document.getElementById('orderDate')||{}).value||todayStr();
+  const isDate=d=>/^\d{4}-\d{2}-\d{2}$/.test(d||'');
+
+  // ── LOCK 1: never import while the app is saving / printing / writing to Excel ──
+  const GUARDED=['saveOrdersToLoading','saveToOneDriveAuto','clearLoadingSheet','clearTenderSheet','backupProductionFile','saveProductionDaily',
+    'addPrintJobWithOrders','sendOrdersDirect','printDrivers','sendRangeToExcel','savePrintTender','sendReprintRange','directPrintOrders',
+    'directPrintLabels','saveAllThenPrint','saveAll','printAllFresh','printAllTender','tenderSaveToExcel','saveAllInvoicesOneDrive'];
+  const XL_SAVERS=['saveOrdersToLoading','saveToOneDriveAuto','saveAllThenPrint','saveAll'];
+  GUARDED.forEach(name=>{
+    const f=window[name]; if(typeof f!=='function') return;
+    window[name]=async function(){
+      busyOps++; const startedAt=Date.now();
+      if(XL_SAVERS.includes(name)) notInExcel=0;          // snapshot is taken now; nothing can import until it ends
+      LS.set('iat_inc_notxl',notInExcel);
+      try{ return await f.apply(this,arguments); }
+      finally{ busyOps--; lastTyped=Math.max(lastTyped,0); paint('ok'); }
+    };
+  });
+
+  // ── LOCK 2: never import while you are editing (modal open / typing) ──
+  ['input','keydown','change'].forEach(ev=>document.addEventListener(ev,e=>{
+    const t=e.target||{}; if(t.id==='orderDate') return;
+    if(/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)||t.isContentEditable) lastTyped=Date.now();
+  },true));
+  function overlayOpen(){
+    return [...document.querySelectorAll('.ov, [id$="Ov"], [id$="Modal"]')].some(el=>{
+      if(el===box||box.contains(el)) return false;
+      const cs=getComputedStyle(el);
+      return cs.display!=='none'&&cs.visibility!=='hidden'&&el.offsetWidth>0&&el.offsetHeight>0;
+    });
+  }
+  function busyReason(){
+    if(hold) return 'hold';
+    if(busyOps>0) return 'saving/printing';
+    if(overlayOpen()) return 'editing';
+    if(Date.now()-lastTyped<12000) return 'typing';
+    return '';
+  }
+
+  async function tok(){            // silent only - never a popup from the background
+    await initMsal();
+    const acc=msalApp.getAllAccounts();
+    if(!acc.length) return null;
+    try{return (await msalApp.acquireTokenSilent({scopes:['Files.ReadWrite'],account:acc[0]})).accessToken;}catch(e){return null;}
+  }
+  async function readJSON(name,t){
+    const r=await fetch(G+name+':/content',{headers:{Authorization:'Bearer '+t},cache:'no-store'});
+    if(r.status===404) return null;
+    if(!r.ok) throw new Error('Graph '+r.status);
+    const s=(await r.text()).replace(/^\uFEFF/,'').trim();
+    return s?JSON.parse(s):null;
+  }
+  const union=(a,b)=>[...new Set([...(a||[]),...(b||[])])];
+  function mergeRemoteAck(r){
+    if(!r||typeof r!=='object') return;
+    ack.imported=union(ack.imported,r.imported);
+    ack.alerted=union(ack.alerted,r.alerted);
+    ack.failed=Object.assign({},r.failed||{},ack.failed);
+    otherDev=!!(r.device&&r.device!==DEV&&Date.now()-(r.ts||0)<600000);
+  }
+  async function writeAck(t){
+    mergeRemoteAck(await readJSON(ACK_FILE,t));            // never overwrite what another device recorded
+    ack.imported=ack.imported.slice(-600); ack.alerted=ack.alerted.slice(-300);
+    const k=Object.keys(ack.failed); if(k.length>200) k.slice(0,k.length-200).forEach(x=>delete ack.failed[x]);
+    ack.ts=Date.now(); ack.device=DEV; LS.set('iat_inc_ack',ack);
+    const r=await fetch(G+ACK_FILE+':/content',{method:'PUT',headers:{Authorization:'Bearer '+t,'Content-Type':'application/json'},body:JSON.stringify(ack)});
+    if(!r.ok) throw new Error('ack write '+r.status);
+    dirty=false;
+  }
+
+  // ── FRESH: same result as the app's own "AI Import → Add to Orders", without switching pages ──
+  function importFresh(o){
+    const items=parseOrdersFromText(o.text||'');
+    if(!items.length) throw new Error('no items parsed');
+    if(new Set(items.map(x=>x.customer)).size>1) throw new Error('several customers in one message - add by hand');
+    if(items.some(x=>!(x.qty>0)||x.qty>1000)) throw new Error('odd quantity - add by hand');
+    const cust=items[0].customer;
+    const num=orders.reduce((m,x)=>Math.max(m,x.num||0),0)+1;
+    const prev=new Set(orders.filter(x=>x.customer===cust).map(x=>x.num));
+    const orderCount=prev.size>0?prev.size+1:0;
+    items.forEach((it,i)=>{
+      const note=(i===0&&orderCount>=2)?('order '+orderCount):(it.note||'');
+      orders.push({customer:it.customer,product:it.product,qty:it.qty||1,size:it.size||'',note,num,driver:''});
+      if(it._rawP&&it._rawP!==it.product&&typeof learnSave==='function') learnSave('p',it._rawP,it.product);
+    });
+    saveOrders();renderOrders();updateBadges();
+    const unk=!customers.includes(cust);
+    toast('📥 Fresh #'+num+' '+cust+': '+items.length+' items'+(unk?' ⚠ customer not in list':''),unk?'err':'ok');
+  }
+
+  // ── TENDER: same logic as the app's tender AI import, without the popup/textarea ──
+  function importTender(o){
+    const lines=(o.text||'').split('\n').map(l=>l.replace(/\*/g,'').trim()).filter(Boolean);
+    const ci=lines.findIndex(l=>!/^\d/.test(l));
+    if(ci<0) throw new Error('no customer line');
+    const custLine=lines[ci].replace(/\btender\b/gi,'').replace(/in vacuum.*/gi,'').replace(/\(\s*\d+.*?\)/g,'').replace(/\([^)]*\)/g,'').trim();
+    if(custLine.length<2) throw new Error('no customer name');
+    const cust=matchCustomer(custLine)||custLine;
+    const out=[];
+    for(const line of lines){
+      const m=line.match(/^(\d+(?:\.\d+)?)\s*(.*)$/);
+      if(!m) continue;                       // notes like "Vacuum bags 2 kg / pack"
+      const qty=parseFloat(m[1]); if(!qty||qty>9999) continue;
+      const rest=m[2], low=line.toLowerCase();
+      let product='';
+      for(const p of tenderProds){ if(p!=='KG' && low.includes(p.toLowerCase())){product=p;break;} }
+      if(!product){
+        const isKG=/\b(kg|kgs)\b/i.test(line) && !/tray/i.test(line);
+        const g=rest.match(/\b(\d{3,4})\s*(?:gm|gr|g)\b/i)||rest.match(/\b(400|450|500)\b/);
+        if(isKG) product='KG';
+        else if(g){const gr=parseInt(g[1]);product=tenderProds.find(p=>p.includes(String(gr)))||('Tender '+gr+'gr');}
+      }
+      if(!product) throw new Error('cannot read "'+line+'"');
+      out.push({product,qty});
+    }
+    if(!out.length) throw new Error('no tender items parsed');
+    let maxNum=tenderOrders.reduce((mx,x)=>Math.max(mx,x.num||0),0);
+    const nums=new Map(); tenderOrders.forEach(x=>{if(x.num&&x.customer)nums.set(x.customer,x.num);});
+    if(!nums.has(cust)){maxNum++;nums.set(cust,maxNum);}
+    out.forEach(it=>tenderOrders.push({customer:cust,product:it.product,qty:it.qty,num:nums.get(cust)}));
+    LS.set('iat_to',tenderOrders);
+    if(typeof renderTOrdersPage==='function') renderTOrdersPage();
+    if(typeof renderTenderOrdersList==='function') renderTenderOrdersList();
+    const unk=!customers.includes(cust);
+    toast('📥 Tender '+cust+': '+out.length+' items'+(unk?' ⚠ customer not in list':''),unk?'err':'ok');
+  }
+
+  async function poll(force){
+    if(!on||polling) return;
+    polling=true;
+    try{
+      const t=await tok();
+      if(!t){paint('auth');return;}
+      const remote=await readJSON(ACK_FILE,t); mergeRemoteAck(remote);
+      if(dirty) await writeAck(t);
+      const list=await readJSON(INC_FILE,t);
+      if(!Array.isArray(list)){waiting={n:0,why:'',dates:[]};paint('ok');return;}
+
+      // edits made in WhatsApp after the order was already imported -> alert once, never overwrite
+      for(const o of list){
+        if(o&&o.status==='imported'&&o.edited_after_import&&o.id&&!ack.alerted.includes(o.id)){
+          ack.alerted.push(o.id); dirty=true;
+          alerts.push((o.customer_raw||'?')+'  (was imported, then edited in WhatsApp)\nNEW TEXT:\n'+(o.new_text||''));
+          LS.set('iat_inc_alerts',alerts);
+          toast('✏ Edited in WhatsApp after import: '+(o.customer_raw||'?'),'err');
+        }
+      }
+
+      const pend=list.filter(o=>o&&o.status==='pending'&&o.id&&!ack.imported.includes(o.id)&&!(o.id in ack.failed));
+      const why=force?'':busyReason();
+      const hd=hdrDate(), todo=[], hdates=new Set();
+      if(!why){
+        for(const o of pend){
+          // an order for another delivery date than the header date waits (days never get mixed)
+          if(!force && isDate(o.delivery_date) && o.delivery_date!==hd){hdates.add(o.delivery_date.slice(5).split('-').reverse().join('/'));continue;}
+          todo.push(o);
+        }
+      }
+      waiting={n:pend.length-todo.length,why:why||(hdates.size?'other date - change header date':''),dates:[...hdates]};
+
+      for(const o of todo){            // one at a time
+        try{
+          const cat=String(o.category||'').toUpperCase();
+          if(cat==='FRESH') importFresh(o);
+          else if(cat==='TENDER') importTender(o);
+          else throw new Error('unknown category');
+          ack.imported.push(o.id); notInExcel++; LS.set('iat_inc_notxl',notInExcel);
+        }catch(e){
+          ack.failed[o.id]=String(e.message||e);
+          toast('📥 WA order failed: '+(o.customer_raw||'?')+' — '+ack.failed[o.id],'err');
+        }
+        dirty=true; LS.set('iat_inc_ack',ack);
+      }
+      if(dirty) await writeAck(t);
+      paint('ok');
+    }catch(e){console.warn('WA auto-import',e);paint('err');}
+    finally{polling=false;}
+  }
+  setInterval(()=>poll(false),3000);
+  setTimeout(()=>poll(false),2500);
+})();
+</script>
 
 </body>
 </html>
