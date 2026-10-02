@@ -5838,6 +5838,8 @@ function parseOrdersFromText(text) {
     .replace(/[📦🍟🚚✅❌🎯🍗🐔🥩🍖]/gu, '')
     .replace(/\s+/g, ' ').trim();
 
+  const parenNote = l => [...String(l).matchAll(/\(([^)]*)\)/g)].map(m => m[1].replace(/[*_]/g, '').replace(/\s+/g, ' ').trim()).filter(t => t && t.length <= 40).join(' · ');
+
   // Strip WhatsApp headers: [date, time] Sender:
   const msgRe = /\[\d{1,2}\/\d{1,2}(?:\/\d{2,4})?,\s*\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?\]\s*[^:]+:/gi;
   const isWhatsApp = msgRe.test(text);
@@ -5846,7 +5848,8 @@ function parseOrdersFromText(text) {
   if (isWhatsApp) {
     const parts = text.split(msgRe).map(p => p.trim()).filter(p => p);
     parts.forEach(msg => {
-      const lines = msg.split(/\n/).map(cleanLine).filter(l => l && !skipRe.test(l));
+      const rawL = msg.split(/\n/).map(r => ({ c: cleanLine(r), n: parenNote(r) })).filter(o => o.c && !skipRe.test(o.c));
+      const lines = rawL.map(o => o.c);
       if (!lines.length) return;
       // ✅ اسم الزبون: نحذف الأقواس فقط لا محتواها
       const custRaw = lines[0]
@@ -5860,19 +5863,19 @@ function parseOrdersFromText(text) {
         const parsed = parseLine(lines[i]);
         if (parsed && parsed.qty > 0) {
           const product = matchProduct(parsed.prodRaw);
-          results.push({ customer, product, qty: parsed.qty, size: parsed.size, note: parsed.note, _rawC: custRaw, _rawP: parsed.prodRaw });
+          results.push({ customer, product, qty: parsed.qty, size: parsed.size, note: [parsed.note, rawL[i].n].filter(Boolean).join(' · '), _rawC: custRaw, _rawP: parsed.prodRaw });
         }
       }
     });
   } else {
     // Plain text: customer then products
-    const lines = text.split(/\n/).map(cleanLine).filter(l => l && !skipRe.test(l));
+    const rawL = text.split(/\n/).map(r => ({ c: cleanLine(r), n: parenNote(r) })).filter(o => o.c && !skipRe.test(o.c));
     let currentCust = '';
-    lines.forEach(line => {
+    rawL.forEach(({ c: line, n: pn }) => {
       const parsed = parseLine(line);
       if (parsed && parsed.qty > 0 && currentCust) {
         const product = matchProduct(parsed.prodRaw);
-        results.push({ customer: currentCust, product, qty: parsed.qty, size: parsed.size, note: parsed.note, _rawC: line, _rawP: parsed.prodRaw });
+        results.push({ customer: currentCust, product, qty: parsed.qty, size: parsed.size, note: [parsed.note, pn].filter(Boolean).join(' · '), _rawC: line, _rawP: parsed.prodRaw });
       } else if (!parsed || isCustomerLine(line) || (!currentCust && !/breast|leg|drum|thigh|wing|liver|heart|gizzard|chicken|bone|minced|neck|skin|kashra|tail|tawook|shawarma|tender/i.test(parsed.prodRaw))) {
         const custRaw = line.replace(/order\s*\d+/gi, '').replace(/^\d+[\.\)]\s*/, '').trim();
         if (custRaw) currentCust = matchCustomer(custRaw);
@@ -7224,6 +7227,7 @@ function sendDriversWhatsAppFromPage(){
   const DEV=(function(){let d=LS.get('iat_dev_id',null);if(!d){d='d'+Math.random().toString(36).slice(2,8);LS.set('iat_dev_id',d);}return d;})();
   let on=LS.get('iat_inc_on',false), hold=false, busyOps=0, lastTyped=0, polling=false;
   let waiting={n:0,why:'',dates:[]}, notInExcel=LS.get('iat_inc_notxl',0), otherDev=false, alerts=LS.get('iat_inc_alerts',[]), dups=LS.get('iat_inc_dups',[]);
+  const batchOK=d=>{const b=LS.get('iat_inc_batch',null);return !!(b&&b.date===d&&Date.now()-b.ts<36*3600*1000);};   // same batch as the orders already in the list
   const LATE_MIN=5;      // an order that waited longer than this is checked against what was added by hand
   const ack=LS.get('iat_inc_ack',{imported:[],failed:{},alerted:[]});
   if(!Array.isArray(ack.imported)) ack.imported=[];
@@ -7416,7 +7420,7 @@ function sendDriversWhatsAppFromPage(){
     const prev=new Set(orders.filter(x=>x.customer===cust).map(x=>x.num));
     const orderCount=prev.size>0?prev.size+1:0;
     items.forEach((it,i)=>{
-      const note=(i===0&&orderCount>=2)?('order '+orderCount):(it.note||'');
+      const note=[(i===0&&orderCount>=2)?('order '+orderCount):'',it.note||''].filter(Boolean).join(' · ');
       orders.push({customer:it.customer,product:it.product,qty:it.qty||1,size:it.size||'',note,num,driver:'',waId:o.id||''});
       if(it._rawP&&it._rawP!==it.product&&typeof learnSave==='function') learnSave('p',it._rawP,it.product);
     });
@@ -7489,8 +7493,8 @@ function sendDriversWhatsAppFromPage(){
       const hd=hdrDate(), todo=[], hdates=new Set();
       if(!why){
         for(const o of pend){
-          // an order for another delivery date than the header date waits (days never get mixed)
-          if(!force && isDate(o.delivery_date) && o.delivery_date!==hd){hdates.add(o.delivery_date.slice(5).split('-').reverse().join('/'));continue;}
+          // an order for another delivery date waits (days never get mixed) - unless it belongs to the same batch as the orders already in the list (e.g. after midnight, before the next date message)
+          if(!force && isDate(o.delivery_date) && o.delivery_date!==hd && !batchOK(o.delivery_date)){hdates.add(o.delivery_date.slice(5).split('-').reverse().join('/'));continue;}
           todo.push(o);
         }
       }
@@ -7503,6 +7507,7 @@ function sendDriversWhatsAppFromPage(){
           else if(cat==='TENDER') importTender(o);
           else throw new Error('unknown category');
           ack.imported.push(o.id); notInExcel++; LS.set('iat_inc_notxl',notInExcel);
+          LS.set('iat_inc_batch',{date:(!force&&isDate(o.delivery_date))?o.delivery_date:hd,ts:Date.now()});
         }catch(e){
           if(e&&e.dup){
             ack.imported.push(o.id);
