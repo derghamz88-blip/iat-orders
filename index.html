@@ -7223,7 +7223,8 @@ function sendDriversWhatsAppFromPage(){
   const G='https://graph.microsoft.com/v1.0/me/drive/root:/';
   const DEV=(function(){let d=LS.get('iat_dev_id',null);if(!d){d='d'+Math.random().toString(36).slice(2,8);LS.set('iat_dev_id',d);}return d;})();
   let on=LS.get('iat_inc_on',false), hold=false, busyOps=0, lastTyped=0, polling=false;
-  let waiting={n:0,why:'',dates:[]}, notInExcel=LS.get('iat_inc_notxl',0), otherDev=false, alerts=LS.get('iat_inc_alerts',[]);
+  let waiting={n:0,why:'',dates:[]}, notInExcel=LS.get('iat_inc_notxl',0), otherDev=false, alerts=LS.get('iat_inc_alerts',[]), dups=LS.get('iat_inc_dups',[]);
+  const LATE_MIN=5;      // an order that waited longer than this is checked against what was added by hand
   const ack=LS.get('iat_inc_ack',{imported:[],failed:{},alerted:[]});
   if(!Array.isArray(ack.imported)) ack.imported=[];
   if(!ack.failed||typeof ack.failed!=='object') ack.failed={};
@@ -7234,7 +7235,7 @@ function sendDriversWhatsAppFromPage(){
   const box=document.createElement('div');            // the panel (opens under the top bar, hidden by default)
   box.style.cssText='position:fixed;left:6px;top:96px;z-index:70;display:none;flex-direction:column;gap:5px;align-items:flex-start;padding:7px;background:rgba(10,14,24,.97);border:1px solid #33415c;border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.55)';
   const mk=()=>{const c=document.createElement('div');c.style.cssText='font:600 11px/1 monospace;padding:7px 10px;border-radius:12px;background:#1b2230;border:1px solid #33415c;cursor:pointer;user-select:none;display:none';box.appendChild(c);return c;};
-  const cWait=mk(), cXl=mk(), cAlert=mk(), cHold=mk(), cMain=mk(); cMain.style.display='block';
+  const cWait=mk(), cXl=mk(), cDup=mk(), cAlert=mk(), cHold=mk(), cMain=mk(); cMain.style.display='block';
   const btn=document.createElement('div');            // the icon
   btn.id='waAutoBtn'; btn.title='WhatsApp auto-import - tap for details';
   btn.style.cssText='position:relative;width:22px;height:20px;display:flex;align-items:center;justify-content:center;font-size:12px;line-height:1;border-radius:7px;border:1.5px solid #4b5870;background:#101827;cursor:pointer;user-select:none;flex-shrink:0;opacity:.65';
@@ -7262,6 +7263,15 @@ function sendDriversWhatsAppFromPage(){
   cHold.onclick=()=>{hold=!hold;paint('ok');if(!hold)poll();};
   cWait.onclick=()=>{ if(confirm('Import '+waiting.n+' waiting order(s) NOW?\n(reason: '+waiting.why+(waiting.dates.length?' / for '+waiting.dates.join(', '):'')+')\nOrders for another date go onto the header date '+hdrDate()+'.')){poll(true);} };
   cXl.onclick=()=>toast('Press ☁ Save to write the new orders to Excel','ok');
+  cDup.onclick=()=>{
+    const list=dups.slice(); if(!list.length) return;
+    const msg=list.map(d=>'• '+d.customer+'  ('+d.cat+')').join('\n');
+    if(confirm('These WhatsApp orders were NOT imported because the same order was already added by hand:\n\n'+msg+'\n\nImport them anyway?\nOK = import them     Cancel = leave them out')){
+      list.forEach(d=>{ try{ if(d.cat==='TENDER') importTender({text:d.text},true); else importFresh({text:d.text},true); notInExcel++; }catch(e){ toast('Import failed: '+e.message,'err'); } });
+      LS.set('iat_inc_notxl',notInExcel);
+    }
+    dups=[]; LS.set('iat_inc_dups',dups); paint('ok');
+  };
   cAlert.onclick=()=>{ alert('Edited in WhatsApp AFTER import - check these orders by hand:\n\n'+alerts.join('\n\n')); alerts=[];LS.set('iat_inc_alerts',alerts);paint('ok'); };
 
   function paint(s){
@@ -7274,6 +7284,8 @@ function sendDriversWhatsAppFromPage(){
     cWait.textContent='⏸ '+waiting.n+' waiting ('+waiting.why+')';cWait.style.color='#fbbf24';
     cXl.style.display=(on&&notInExcel>0)?'block':'none';
     cXl.textContent='⚠ '+notInExcel+' new order(s) not in Excel yet';cXl.style.color='#fb923c';
+    cDup.style.display=dups.length?'block':'none';
+    cDup.textContent='↷ '+dups.length+' skipped (already added by hand)';cDup.style.color='#a78bfa';
     cAlert.style.display=alerts.length?'block':'none';
     cAlert.textContent='✏ '+alerts.length+' edited in WhatsApp';cAlert.style.color='#f87171';
     if(otherDev&&on){cMain.textContent+='  ⚠ ANOTHER DEVICE IS ALSO ON';cMain.style.color='#f87171';}
@@ -7281,7 +7293,7 @@ function sendDriversWhatsAppFromPage(){
     const bad=(s==='err')||(otherDev&&on);
     const c=!on?'#4b5870':(bad?'#f87171':(s==='auth'?'#fbbf24':'#2dd4bf'));
     btn.style.borderColor=c; btn.style.opacity=on?'1':'.65'; btn.style.background=on?'rgba(45,212,191,.12)':'#101827';
-    const att=(on?waiting.n:0)+alerts.length+((on&&notInExcel>0)?1:0);
+    const att=(on?waiting.n:0)+alerts.length+dups.length+((on&&notInExcel>0)?1:0);
     badge.style.display=att>0?'block':'none'; badge.textContent=att>9?'9+':String(att);
   }
   paint(on?'ok':'off');
@@ -7356,19 +7368,46 @@ function sendDriversWhatsAppFromPage(){
     dirty=false;
   }
 
+  // ── duplicate guard: only for orders that waited (listener was off / app was off): was the same order already ADDED BY HAND? ──
+  const ageMin=o=>{const t=Date.parse(o.sent_at||o.received_at||'');return t?(Date.now()-t)/60000:0;};
+  const dupErr=()=>{const e=new Error('already added by hand');e.dup=true;return e;};
+  function dupFresh(cust,items){
+    const pool=orders.filter(x=>x.customer===cust&&!x.waId).map(x=>({p:x.product,q:Number(x.qty),s:String(x.size||'')}));
+    if(!pool.length) return false;
+    for(const it of items){
+      const q=Number(it.qty||1), sz=String(it.size||'');
+      const k=pool.findIndex(x=>x.p===it.product&&x.q===q&&(x.s===sz||!x.s||!sz));
+      if(k<0) return false;
+      pool.splice(k,1);
+    }
+    return true;
+  }
+  const nameKey=c=>String(c||'').toLowerCase().replace(/\btender\b/g,'').replace(/\s+/g,' ').trim();
+  function dupTender(cust,out){
+    const pool=tenderOrders.filter(x=>nameKey(x.customer)===nameKey(cust)&&!x.waId).map(x=>({p:x.product,q:Number(x.qty)}));
+    if(!pool.length) return false;
+    for(const it of out){
+      const k=pool.findIndex(x=>x.p===it.product&&x.q===Number(it.qty));
+      if(k<0) return false;
+      pool.splice(k,1);
+    }
+    return true;
+  }
+
   // ── FRESH: same result as the app's own "AI Import → Add to Orders", without switching pages ──
-  function importFresh(o){
+  function importFresh(o,force){
     const items=parseOrdersFromText(o.text||'');
     if(!items.length) throw new Error('no items parsed');
     if(new Set(items.map(x=>x.customer)).size>1) throw new Error('several customers in one message - add by hand');
     if(items.some(x=>!(x.qty>0)||x.qty>1000)) throw new Error('odd quantity - add by hand');
     const cust=items[0].customer;
+    if(!force&&ageMin(o)>LATE_MIN&&dupFresh(cust,items)) throw dupErr();
     const num=orders.reduce((m,x)=>Math.max(m,x.num||0),0)+1;
     const prev=new Set(orders.filter(x=>x.customer===cust).map(x=>x.num));
     const orderCount=prev.size>0?prev.size+1:0;
     items.forEach((it,i)=>{
       const note=(i===0&&orderCount>=2)?('order '+orderCount):(it.note||'');
-      orders.push({customer:it.customer,product:it.product,qty:it.qty||1,size:it.size||'',note,num,driver:''});
+      orders.push({customer:it.customer,product:it.product,qty:it.qty||1,size:it.size||'',note,num,driver:'',waId:o.id||''});
       if(it._rawP&&it._rawP!==it.product&&typeof learnSave==='function') learnSave('p',it._rawP,it.product);
     });
     saveOrders();renderOrders();updateBadges();
@@ -7377,7 +7416,7 @@ function sendDriversWhatsAppFromPage(){
   }
 
   // ── TENDER: same logic as the app's tender AI import, without the popup/textarea ──
-  function importTender(o){
+  function importTender(o,force){
     const lines=(o.text||'').split('\n').map(l=>l.replace(/\*/g,'').trim()).filter(Boolean);
     const ci=lines.findIndex(l=>!/^\d/.test(l));
     if(ci<0) throw new Error('no customer line');
@@ -7402,10 +7441,11 @@ function sendDriversWhatsAppFromPage(){
       out.push({product,qty});
     }
     if(!out.length) throw new Error('no tender items parsed');
+    if(!force&&ageMin(o)>LATE_MIN&&dupTender(cust,out)) throw dupErr();
     let maxNum=tenderOrders.reduce((mx,x)=>Math.max(mx,x.num||0),0);
     const nums=new Map(); tenderOrders.forEach(x=>{if(x.num&&x.customer)nums.set(x.customer,x.num);});
     if(!nums.has(cust)){maxNum++;nums.set(cust,maxNum);}
-    out.forEach(it=>tenderOrders.push({customer:cust,product:it.product,qty:it.qty,num:nums.get(cust)}));
+    out.forEach(it=>tenderOrders.push({customer:cust,product:it.product,qty:it.qty,num:nums.get(cust),waId:o.id||''}));
     LS.set('iat_to',tenderOrders);
     if(typeof renderTOrdersPage==='function') renderTOrdersPage();
     if(typeof renderTenderOrdersList==='function') renderTenderOrdersList();
@@ -7454,8 +7494,14 @@ function sendDriversWhatsAppFromPage(){
           else throw new Error('unknown category');
           ack.imported.push(o.id); notInExcel++; LS.set('iat_inc_notxl',notInExcel);
         }catch(e){
-          ack.failed[o.id]=String(e.message||e);
-          toast('📥 WA order failed: '+(o.customer_raw||'?')+' — '+ack.failed[o.id],'err');
+          if(e&&e.dup){
+            ack.imported.push(o.id);
+            dups.push({id:o.id,cat:String(o.category||'').toUpperCase(),customer:o.customer_raw||'?',text:o.text||''}); LS.set('iat_inc_dups',dups);
+            toast('↷ Skipped "'+(o.customer_raw||'?')+'": already added by hand (tap the 📥 icon to review)','err');
+          }else{
+            ack.failed[o.id]=String(e.message||e);
+            toast('📥 WA order failed: '+(o.customer_raw||'?')+' — '+ack.failed[o.id],'err');
+          }
         }
         dirty=true; LS.set('iat_inc_ack',ack);
       }
@@ -7466,6 +7512,10 @@ function sendDriversWhatsAppFromPage(){
   }
   setInterval(()=>poll(false),3000);
   setTimeout(()=>poll(false),2500);
+  // phones pause pages in the background: import right away when the app comes back to the screen / the network returns
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') setTimeout(()=>poll(false),300); });
+  window.addEventListener('focus',()=>setTimeout(()=>poll(false),300));
+  window.addEventListener('online',()=>setTimeout(()=>poll(false),1000));
 })();
 </script>
 
