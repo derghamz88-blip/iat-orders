@@ -5784,7 +5784,7 @@ function parseLine(line) {
     const countM = clean.match(/^(\d+(?:\.\d+)?)\s/);
     const count  = countM ? parseFloat(countM[1]) : 1;
     const sizeVal= parseInt(size);
-    const qty    = +(count * sizeVal / 1000).toFixed(2);
+    const qty    = Number.isInteger(count) ? +(count * sizeVal / 1000).toFixed(2) : count;   // decimal = already kg
     return { qty, prodRaw: 'chicken', note:'', size: String(sizeVal) };
   }
 
@@ -5793,7 +5793,7 @@ function parseLine(line) {
     const countM = clean.match(/^(\d+(?:\.\d+)?)\s/);
     const count  = countM ? parseFloat(countM[1]) : 1;
     const sizeVal= parseInt(size);
-    const qty    = +(count * sizeVal / 1000).toFixed(2);
+    const qty    = Number.isInteger(count) ? +(count * sizeVal / 1000).toFixed(2) : count;   // decimal = already kg
     return { qty, prodRaw: 'chicken', note:'', size: String(sizeVal) };
   }
 
@@ -5873,7 +5873,7 @@ function parseOrdersFromText(text) {
       if (parsed && parsed.qty > 0 && currentCust) {
         const product = matchProduct(parsed.prodRaw);
         results.push({ customer: currentCust, product, qty: parsed.qty, size: parsed.size, note: parsed.note, _rawC: line, _rawP: parsed.prodRaw });
-      } else if (!parsed || isCustomerLine(line)) {
+      } else if (!parsed || isCustomerLine(line) || (!currentCust && !/breast|leg|drum|thigh|wing|liver|heart|gizzard|chicken|bone|minced|neck|skin|kashra|tail|tawook|shawarma|tender/i.test(parsed.prodRaw))) {
         const custRaw = line.replace(/order\s*\d+/gi, '').replace(/^\d+[\.\)]\s*/, '').trim();
         if (custRaw) currentCust = matchCustomer(custRaw);
       }
@@ -7235,7 +7235,7 @@ function sendDriversWhatsAppFromPage(){
   const box=document.createElement('div');            // the panel (opens under the top bar, hidden by default)
   box.style.cssText='position:fixed;left:6px;top:96px;z-index:70;display:none;flex-direction:column;gap:5px;align-items:flex-start;padding:7px;background:rgba(10,14,24,.97);border:1px solid #33415c;border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.55)';
   const mk=()=>{const c=document.createElement('div');c.style.cssText='font:600 11px/1 monospace;padding:7px 10px;border-radius:12px;background:#1b2230;border:1px solid #33415c;cursor:pointer;user-select:none;display:none';box.appendChild(c);return c;};
-  const cWait=mk(), cXl=mk(), cDup=mk(), cAlert=mk(), cHold=mk(), cMain=mk(); cMain.style.display='block';
+  const cWait=mk(), cDate=mk(), cXl=mk(), cDup=mk(), cAlert=mk(), cHold=mk(), cMain=mk(); cMain.style.display='block';
   const btn=document.createElement('div');            // the icon
   btn.id='waAutoBtn'; btn.title='WhatsApp auto-import - tap for details';
   btn.style.cssText='position:relative;width:22px;height:20px;display:flex;align-items:center;justify-content:center;font-size:12px;line-height:1;border-radius:7px;border:1.5px solid #4b5870;background:#101827;cursor:pointer;user-select:none;flex-shrink:0;opacity:.65';
@@ -7274,6 +7274,9 @@ function sendDriversWhatsAppFromPage(){
   };
   cAlert.onclick=()=>{ alert('Edited in WhatsApp AFTER import - check these orders by hand:\n\n'+alerts.join('\n\n')); alerts=[];LS.set('iat_inc_alerts',alerts);paint('ok'); };
 
+  const hdrDate=()=>(document.getElementById('orderDate')||{}).value||todayStr();
+  const isDate=d=>/^\d{4}-\d{2}-\d{2}$/.test(d||'');
+
   function paint(s){
     const col={ok:'#2dd4bf',off:'#9fb0cc',auth:'#fbbf24',err:'#f87171'}[s]||'#9fb0cc';
     cMain.textContent=(on?'📥 WA auto: ON':'📥 WA auto: OFF')+(s==='auth'?' - sign in ☁':'')+(s==='err'?' - error':'');
@@ -7281,7 +7284,15 @@ function sendDriversWhatsAppFromPage(){
     cHold.style.display=on?'block':'none';
     cHold.textContent=hold?'▶ release hold':'✋ hold imports';cHold.style.color=hold?'#fbbf24':'#9fb0cc';
     cWait.style.display=(on&&waiting.n)?'block':'none';
-    cWait.textContent='⏸ '+waiting.n+' waiting ('+waiting.why+')';cWait.style.color='#fbbf24';
+    const fmtD=d=>String(d).split('-').reverse().join('/');
+    cWait.textContent=waiting.dates.length&&/date/.test(waiting.why)
+      ? '⏸ '+waiting.n+' waiting for '+waiting.dates.join(', ')+' — header date is '+fmtD(hdrDate())+' (change it, or tap to import now)'
+      : '⏸ '+waiting.n+' waiting ('+waiting.why+')';
+    cWait.style.color='#fbbf24';
+    const hdv=hdrDate(), todayDxb=new Date(Date.now()+4*3600*1000).toISOString().slice(0,10);
+    const hdBad=on&&isDate(hdv)&&Math.abs(Date.parse(hdv)-Date.parse(todayDxb))/86400000>1;
+    cDate.style.display=hdBad?'block':'none';
+    cDate.textContent='⚠ header date is '+fmtD(hdv)+' but today is '+fmtD(todayDxb)+' — check the month/day';cDate.style.color='#f87171';
     cXl.style.display=(on&&notInExcel>0)?'block':'none';
     cXl.textContent='⚠ '+notInExcel+' new order(s) not in Excel yet';cXl.style.color='#fb923c';
     cDup.style.display=dups.length?'block':'none';
@@ -7293,13 +7304,12 @@ function sendDriversWhatsAppFromPage(){
     const bad=(s==='err')||(otherDev&&on);
     const c=!on?'#4b5870':(bad?'#f87171':(s==='auth'?'#fbbf24':'#2dd4bf'));
     btn.style.borderColor=c; btn.style.opacity=on?'1':'.65'; btn.style.background=on?'rgba(45,212,191,.12)':'#101827';
-    const att=(on?waiting.n:0)+alerts.length+dups.length+((on&&notInExcel>0)?1:0);
+    const att=(on?waiting.n:0)+alerts.length+dups.length+((on&&notInExcel>0)?1:0)+(hdBad?1:0);
     badge.style.display=att>0?'block':'none'; badge.textContent=att>9?'9+':String(att);
   }
   paint(on?'ok':'off');
+  setTimeout(()=>{const od=document.getElementById('orderDate'); if(od) od.addEventListener('change',()=>paint('ok'));},0);
 
-  const hdrDate=()=>(document.getElementById('orderDate')||{}).value||todayStr();
-  const isDate=d=>/^\d{4}-\d{2}-\d{2}$/.test(d||'');
 
   // ── LOCK 1: never import while the app is saving / printing / writing to Excel ──
   const GUARDED=['saveOrdersToLoading','saveToOneDriveAuto','clearLoadingSheet','clearTenderSheet','backupProductionFile','saveProductionDaily',
