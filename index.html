@@ -5474,6 +5474,13 @@ async function extractOrdersAI(){
 }
 
 // ── CUSTOMER ALIASES ──
+// ── READING RULES (file parse_rules.json on OneDrive, written by Claude and pasted in the ⚙ Rules page) ──
+let IAT_RULES = (function(){ try { const r = LS.get('iat_rules', null); return r && typeof r === 'object' ? r : {}; } catch(e) { return {}; } })();
+const _rmatch = (rule, text) => { try { if (rule.regex) return new RegExp(rule.regex, 'i').test(text); const w = String(rule.when||'').toLowerCase().replace(/\s+/g,' ').trim(); return !!w && String(text).toLowerCase().replace(/\s+/g,' ').includes(w); } catch(e) { return false; } };
+const rulesCustomer = raw => { for (const r of (IAT_RULES.customerAliases||[])) if (r && r.customer && _rmatch(r, raw)) return r.customer; return null; };
+const rulesProduct  = raw => { for (const r of (IAT_RULES.productAliases||[])) if (r && r.product && _rmatch(r, raw)) return r.product; return null; };
+const rulesIgnore   = line => (IAT_RULES.ignoreLines||[]).some(r => r && _rmatch(r, line));
+const rulesFix      = text => { let t = String(text); for (const f of (IAT_RULES.textFixes||[])) { try { t = t.replace(new RegExp(f.find, 'gi'), f.replace == null ? '' : String(f.replace)); } catch(e) {} } return t; };
 const CUST_ALIASES = [
   // ── UNION ──
   [/\bunion\s*barsha\s*south\b/i,             'Union barsha south'],
@@ -5573,6 +5580,9 @@ function matchCustomer(raw) {
   const exact = customers.find(c => c.toLowerCase() === inp.toLowerCase());
   if (exact) return exact;
 
+  // 2b. reading rules (file)
+  const _rc = rulesCustomer(inp); if (_rc) return _rc;
+
   // 3. Alias map
   for (const [re, val] of CUST_ALIASES) {
     if (re.test(inp)) return val;
@@ -5615,6 +5625,7 @@ function matchProduct(raw) {
   const learned = learnLookup('p', raw);
   if (learned) return learned;
   if (/^(800|900|1000|1100|1200|1300|1400|1500)(\s*[~\-–]\s*\d{3,4})?$/.test(raw)) return 'Chicken'; // size only e.g. "1 ctn 1200"
+  const _rp = rulesProduct(raw); if (_rp) return _rp;   // reading rules (file)
   const r = raw.toLowerCase();
 
   // CTN → Chicken (القياس يُحدد من picker)
@@ -5828,6 +5839,12 @@ function isCustomerLine(line) {
 }
 
 function parseOrdersFromText(text) {
+  text = rulesFix(text);   // reading rules (file)
+  const prodOf = (parsed, rawLine) => {
+    const nm = String(parsed.prodRaw).replace(/\*/g, '').replace(/\s+/g, ' ').trim();
+    const lrn = learnLookup('p', nm); if (lrn) return lrn;          // corrections you made always win
+    return rulesProduct(rawLine) || matchProduct(parsed.prodRaw);
+  };
   const results = [];
   const skipRe = /^@|remraam(?!\s*$)|apartment|community|floor|building|\bvilla\b|home\s*no\b|^[+\d][\d\s\-]{8,}$|^\s*$|^https?:|^www\./i;
 
@@ -5848,7 +5865,7 @@ function parseOrdersFromText(text) {
   if (isWhatsApp) {
     const parts = text.split(msgRe).map(p => p.trim()).filter(p => p);
     parts.forEach(msg => {
-      const rawL = msg.split(/\n/).map(r => ({ c: cleanLine(r), n: parenNote(r) })).filter(o => o.c && !skipRe.test(o.c));
+      const rawL = msg.split(/\n/).map(r => ({ c: cleanLine(r), n: parenNote(r), r })).filter(o => o.c && !skipRe.test(o.c) && !rulesIgnore(o.c));
       const lines = rawL.map(o => o.c);
       if (!lines.length) return;
       // ✅ اسم الزبون: نحذف الأقواس فقط لا محتواها
@@ -5858,27 +5875,27 @@ function parseOrdersFromText(text) {
         .replace(/^\d+[\.\)]\s*/, '')
         .replace(/\s+/g,' ').trim();
       if (!custRaw) return;
-      const customer = matchCustomer(custRaw);
+      const customer = rulesCustomer(rawL[0].r) || matchCustomer(custRaw);
       for (let i = 1; i < lines.length; i++) {
         const parsed = parseLine(lines[i]);
         if (parsed && parsed.qty > 0) {
-          const product = matchProduct(parsed.prodRaw);
+          const product = prodOf(parsed, rawL[i].r);
           results.push({ customer, product, qty: parsed.qty, size: parsed.size, note: [parsed.note, rawL[i].n].filter(Boolean).join(' · '), _rawC: custRaw, _rawP: parsed.prodRaw });
         }
       }
     });
   } else {
     // Plain text: customer then products
-    const rawL = text.split(/\n/).map(r => ({ c: cleanLine(r), n: parenNote(r) })).filter(o => o.c && !skipRe.test(o.c));
+    const rawL = text.split(/\n/).map(r => ({ c: cleanLine(r), n: parenNote(r), r })).filter(o => o.c && !skipRe.test(o.c) && !rulesIgnore(o.c));
     let currentCust = '';
-    rawL.forEach(({ c: line, n: pn }) => {
+    rawL.forEach(({ c: line, n: pn, r: rr }) => {
       const parsed = parseLine(line);
       if (parsed && parsed.qty > 0 && currentCust) {
-        const product = matchProduct(parsed.prodRaw);
+        const product = prodOf(parsed, rr);
         results.push({ customer: currentCust, product, qty: parsed.qty, size: parsed.size, note: [parsed.note, pn].filter(Boolean).join(' · '), _rawC: line, _rawP: parsed.prodRaw });
       } else if (!parsed || isCustomerLine(line) || (!currentCust && !/breast|leg|drum|thigh|wing|liver|heart|gizzard|chicken|bone|minced|neck|skin|kashra|tail|tawook|shawarma|tender/i.test(parsed.prodRaw))) {
         const custRaw = line.replace(/order\s*\d+/gi, '').replace(/^\d+[\.\)]\s*/, '').trim();
-        if (custRaw) currentCust = matchCustomer(custRaw);
+        if (custRaw) currentCust = rulesCustomer(rr) || matchCustomer(custRaw);
       }
     });
   }
@@ -7239,7 +7256,7 @@ function sendDriversWhatsAppFromPage(){
   const box=document.createElement('div');            // the panel (opens under the top bar, hidden by default)
   box.style.cssText='position:fixed;left:6px;top:96px;z-index:70;display:none;flex-direction:column;gap:5px;align-items:flex-start;padding:7px;background:rgba(10,14,24,.97);border:1px solid #33415c;border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.55)';
   const mk=()=>{const c=document.createElement('div');c.style.cssText='font:600 11px/1 monospace;padding:7px 10px;border-radius:12px;background:#1b2230;border:1px solid #33415c;cursor:pointer;user-select:none;display:none';box.appendChild(c);return c;};
-  const cWait=mk(), cDate=mk(), cXl=mk(), cDup=mk(), cAlert=mk(), cHold=mk(), cMain=mk(); cMain.style.display='block';
+  const cWait=mk(), cDate=mk(), cXl=mk(), cDup=mk(), cAlert=mk(), cHold=mk(), cRules=mk(), cMain=mk(); cMain.style.display='block'; cRules.style.display='block';
   const btn=document.createElement('div');            // the icon
   btn.id='waAutoBtn'; btn.title='WhatsApp auto-import - tap for details';
   btn.style.cssText='position:relative;width:22px;height:20px;display:flex;align-items:center;justify-content:center;font-size:12px;line-height:1;border-radius:7px;border:1.5px solid #4b5870;background:#101827;cursor:pointer;user-select:none;flex-shrink:0;opacity:.65';
@@ -7266,6 +7283,7 @@ function sendDriversWhatsAppFromPage(){
   cMain.onclick=()=>{on=!on;LS.set('iat_inc_on',on);if(!on)hold=false;paint('ok');if(on)poll();};
   cHold.onclick=()=>{hold=!hold;paint('ok');if(!hold)poll();};
   cWait.onclick=()=>{ if(confirm('Import '+waiting.n+' waiting order(s) NOW?\n(reason: '+waiting.why+(waiting.dates.length?' / for '+waiting.dates.join(', '):'')+')\nOrders for another date go onto the header date '+hdrDate()+'.')){poll(true);} };
+  cRules.onclick=()=>openRules();
   cXl.onclick=()=>toast('Press ☁ Save to write the new orders to Excel','ok');
   cDup.onclick=()=>{
     const list=dups.slice(); if(!list.length) return;
@@ -7299,6 +7317,7 @@ function sendDriversWhatsAppFromPage(){
     cDate.textContent='⚠ header date is '+fmtD(hdv)+' but today is '+fmtD(todayDxb)+' — check the month/day';cDate.style.color='#f87171';
     cXl.style.display=(on&&notInExcel>0)?'block':'none';
     cXl.textContent='⚠ '+notInExcel+' new order(s) not in Excel yet';cXl.style.color='#fb923c';
+    cRules.textContent='⚙ Reading rules ('+ruleCount()+')'; cRules.style.color='#7dd3fc';
     cDup.style.display=dups.length?'block':'none';
     cDup.textContent='↷ '+dups.length+' skipped (already added by hand)';cDup.style.color='#a78bfa';
     cAlert.style.display=alerts.length?'block':'none';
@@ -7467,6 +7486,127 @@ function sendDriversWhatsAppFromPage(){
     toast('📥 Tender '+cust+': '+out.length+' items'+(unk?' ⚠ customer not in list':''),unk?'err':'ok');
   }
 
+
+  // ══ ⚙ READING RULES: parse_rules.json on OneDrive. Claude writes the rules, you paste them here (no typing of rules) ══
+  const RULES_FILE='parse_rules.json';
+  const RULE_KEYS=['customerAliases','productAliases','ignoreLines','textFixes'];
+  let rulesInfo='', rulesOv=null;
+  const esc=x=>String(x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  function emptyRules(){return {version:1,customerAliases:[],productAliases:[],ignoreLines:[],textFixes:[]};}
+  function normRules(r){const o=emptyRules(); if(r&&typeof r==='object') RULE_KEYS.forEach(k=>{ if(Array.isArray(r[k])) o[k]=r[k].filter(x=>x&&typeof x==='object'); }); return o;}
+  function ruleCount(){const r=IAT_RULES||{}; return ['customerAliases','productAliases','ignoreLines','textFixes'].reduce((n,k)=>n+(Array.isArray(r[k])?r[k].length:0),0);}   // (no later-defined consts: paint() runs before them)
+  function validateRule(k,r){
+    if(k!=='textFixes'&&!(r.when||r.regex)) return 'a rule needs "when" (or "regex")';
+    if(r.regex){ try{new RegExp(r.regex,'i');}catch(e){return 'bad regex: '+r.regex;} }
+    if(k==='customerAliases'&&!r.customer) return 'customer rule needs "customer"';
+    if(k==='productAliases'&&!r.product) return 'product rule needs "product"';
+    if(k==='textFixes'){ if(!r.find) return 'fix rule needs "find"'; try{new RegExp(r.find,'gi');}catch(e){return 'bad regex in find: '+r.find;} }
+    return '';
+  }
+  function mergeRules(base,add){
+    const out=normRules(base); let added=0; const errors=[];
+    const trig=(k,x)=>k==='textFixes'?String(x.find):(x.regex?'re:'+x.regex:'w:'+String(x.when||'').toLowerCase().replace(/\s+/g,' ').trim());
+    RULE_KEYS.forEach(k=>{
+      if(add[k]===undefined) return;
+      if(!Array.isArray(add[k])){errors.push(k+' must be a list');return;}
+      add[k].forEach(r=>{
+        if(!r||typeof r!=='object'){errors.push(k+': one item is not a rule');return;}
+        const err=validateRule(k,r); if(err){errors.push(k+': '+err);return;}
+        const i=out[k].findIndex(x=>trig(k,x)===trig(k,r));
+        if(i>=0){ if(JSON.stringify(out[k][i])!==JSON.stringify(r)){out[k][i]=r;added++;} } else {out[k].push(r);added++;}
+      });
+    });
+    return {rules:out,added,errors};
+  }
+  async function loadRules(quiet){
+    try{
+      const t=await tok(); if(!t) return;
+      const r=await readJSON(RULES_FILE,t);
+      if(r){ IAT_RULES=normRules(r); LS.set('iat_rules',IAT_RULES); rulesInfo='loaded from OneDrive '+new Date().toTimeString().slice(0,5); }
+      else rulesInfo='no rules file on OneDrive yet';
+      paint('ok'); if(rulesOv&&rulesOv.style.display!=='none') refreshRulesUI();
+    }catch(e){ console.warn('rules load',e); }
+  }
+  async function saveRules(rules){
+    const t=await tok(); if(!t) throw new Error('Sign in with ☁ OneDrive first, then try again');
+    rules.updated=new Date().toISOString();
+    const r=await fetch(G+RULES_FILE+':/content',{method:'PUT',headers:{Authorization:'Bearer '+t,'Content-Type':'application/json'},body:JSON.stringify(rules,null,1)});
+    if(!r.ok) throw new Error('OneDrive refused the save ('+r.status+')');
+    IAT_RULES=rules; LS.set('iat_rules',IAT_RULES); rulesInfo='saved to OneDrive '+new Date().toTimeString().slice(0,5); paint('ok');
+  }
+  const $r=id=>rulesOv.querySelector('#'+id);
+  function openRules(){ if(!rulesOv) buildRulesUI(); rulesOv.style.display='block'; refreshRulesUI(); togglePanel(false); loadRules(true); }
+  function buildRulesUI(){
+    rulesOv=document.createElement('div'); rulesOv.id='iatRulesOv';
+    rulesOv.style.cssText='position:fixed;left:0;top:0;right:0;bottom:0;z-index:90;background:#0b1020;color:#e5e9f5;overflow:auto;padding:12px 12px 90px;font:13px/1.5 system-ui,sans-serif;display:none';
+    rulesOv.innerHTML='<style>#iatRulesOv textarea{width:100%;box-sizing:border-box;min-height:96px;background:#111a2e;color:#e5e9f5;border:1px solid #33415c;border-radius:10px;padding:10px;font:14px/1.4 monospace}#iatRulesOv button{background:#1b2a4a;color:#cfe3ff;border:1px solid #3b4f7a;border-radius:10px;padding:10px 14px;font:600 13px system-ui;cursor:pointer}#iatRulesOv h4{margin:20px 0 6px;color:#7dd3fc;font-size:13px;letter-spacing:.5px}#iatRulesOv .row{display:flex;gap:8px;margin:8px 0;flex-wrap:wrap}#iatRulesOv .rule{display:flex;gap:8px;align-items:flex-start;padding:7px 9px;margin:4px 0;background:#101a2d;border:1px solid #243049;border-radius:9px;font:12px/1.4 monospace;word-break:break-word}#iatRulesOv .x{color:#f87171;cursor:pointer;flex-shrink:0;font-size:15px;line-height:1}#iatRulesOv .it{padding:5px 8px;margin:3px 0;background:#101a2d;border-radius:8px;font:12px monospace}</style>'
+     +'<div style="display:flex;align-items:center;gap:8px"><b style="font-size:17px;flex:1">⚙ Reading rules</b><button id="rl_close">✕ Close</button></div>'
+     +'<div id="rl_status" style="color:#8fa0c0;font-size:12px;margin-top:4px"></div>'
+     +'<h4>1) TEST A MESSAGE</h4><textarea id="rl_test" placeholder="Paste an order message here"></textarea>'
+     +'<div class="row"><button id="rl_parse">▶ Parse</button><button id="rl_copy">📋 Copy for Claude</button></div><div id="rl_res"></div>'
+     +'<h4>2) PASTE RULES FROM CLAUDE</h4><textarea id="rl_paste" placeholder="Paste here the rules Claude wrote for you"></textarea>'
+     +'<div class="row"><button id="rl_save">💾 Save rules</button></div><div id="rl_msg"></div>'
+     +'<h4>3) CURRENT RULES <span id="rl_count"></span></h4><div id="rl_list"></div>';
+    document.body.appendChild(rulesOv);
+    $r('rl_close').onclick=()=>{rulesOv.style.display='none';paint('ok');};
+    $r('rl_parse').onclick=rulesParse; $r('rl_copy').onclick=rulesCopy; $r('rl_save').onclick=rulesSave;
+    $r('rl_list').onclick=e=>{const x=e.target.closest('.x'); if(x) rulesDelete(x.dataset.k,+x.dataset.i);};
+  }
+  function describeRule(k,r){
+    const w=r.regex?'/'+esc(r.regex)+'/':'"'+esc(r.when)+'"';
+    if(k==='customerAliases') return 'customer: '+w+' → <b>'+esc(r.customer)+'</b>';
+    if(k==='productAliases') return 'product: '+w+' → <b>'+esc(r.product)+'</b>';
+    if(k==='ignoreLines') return 'ignore lines containing '+w;
+    return 'replace /'+esc(r.find)+'/ with "'+esc(r.replace==null?'':r.replace)+'"';
+  }
+  function refreshRulesUI(){
+    $r('rl_status').textContent=rulesInfo||'offline copy (open the OneDrive sign-in to sync)';
+    $r('rl_count').textContent='('+ruleCount()+')';
+    const rules=normRules(IAT_RULES); let h='';
+    RULE_KEYS.forEach(k=>rules[k].forEach((r,i)=>{ h+='<div class="rule"><span class="x" data-k="'+k+'" data-i="'+i+'" title="delete">✕</span><span>'+describeRule(k,r)+'</span></div>'; }));
+    $r('rl_list').innerHTML=h||'<div style="color:#8fa0c0">No rules yet. Send Claude the message that was read wrongly, and paste the rules he gives you in box 2.</div>';
+  }
+  function understood(text){
+    let items=[]; try{items=parseOrdersFromText(text);}catch(e){return {err:String(e.message||e),items:[]};}
+    return {err:'',items};
+  }
+  function rulesParse(){
+    const box=$r('rl_res'), u=understood($r('rl_test').value);
+    if(u.err){box.innerHTML='<div style="color:#f87171">Error: '+esc(u.err)+'</div>';return;}
+    if(!u.items.length){box.innerHTML='<div style="color:#f87171;margin:6px 0">❌ The app understood nothing from this message.</div>';return;}
+    const c=u.items[0].customer, known=customers.includes(c);
+    box.innerHTML='<div style="margin:6px 0">Customer: <b>'+esc(c)+'</b>'+(known?' ✅':' <span style="color:#fbbf24">⚠ not in your customer list</span>')+'</div>'
+      +u.items.map(x=>'<div class="it">'+esc(x.product)+' &nbsp;|&nbsp; '+esc(x.qty)+(x.size?' &nbsp;|&nbsp; size '+esc(x.size):'')+(x.note?' &nbsp;|&nbsp; note: '+esc(x.note):'')+'</div>').join('');
+  }
+  function rulesCopy(){
+    const text=$r('rl_test').value, u=understood(text);
+    let out='Message:\n'+text+'\n\nThe app understood:\n';
+    if(u.err) out+='ERROR '+u.err+'\n';
+    else if(!u.items.length) out+='nothing (no items)\n';
+    else { out+='Customer: '+u.items[0].customer+(customers.includes(u.items[0].customer)?'':'  (NOT in my customer list)')+'\n'; u.items.forEach(x=>{out+='- '+x.product+' | '+x.qty+(x.size?' | size '+x.size:'')+(x.note?' | note: '+x.note:'')+'\n';}); }
+    out+='\nWhat should be different: ';
+    const done=()=>toast('Copied - paste it to Claude and add what is wrong','ok');
+    if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(out).then(done,()=>prompt('Copy this text:',out)); else prompt('Copy this text:',out);
+  }
+  async function rulesSave(){
+    const msg=$r('rl_msg'); let raw=$r('rl_paste').value.trim();
+    const bad=t=>{msg.innerHTML='<span style="color:#f87171">'+t+'</span>';};
+    if(!raw){msg.innerHTML='<span style="color:#fbbf24">Paste the rules first.</span>';return;}
+    raw=raw.replace(/^```[a-z]*/i,'').replace(/```\s*$/,'').trim();
+    let obj; try{obj=JSON.parse(raw);}catch(e){bad('❌ This text is not valid ('+esc(e.message)+'). Copy the WHOLE block from Claude again.');return;}
+    if(!obj||typeof obj!=='object'||Array.isArray(obj)){bad('❌ Wrong format.');return;}
+    const m=mergeRules(IAT_RULES,obj);
+    if(m.errors.length){bad('❌ Nothing was saved:<br>'+m.errors.map(esc).join('<br>'));return;}
+    if(!m.added){msg.innerHTML='<span style="color:#fbbf24">Nothing new - these rules are already saved.</span>';return;}
+    try{ await saveRules(m.rules); msg.innerHTML='<span style="color:#2dd4bf">✅ '+m.added+' rule(s) saved. They work now on every device.</span>'; $r('rl_paste').value=''; refreshRulesUI(); }
+    catch(e){ bad('❌ '+esc(e.message||e)); }
+  }
+  async function rulesDelete(k,i){
+    if(!confirm('Delete this rule?')) return;
+    const rules=normRules(IAT_RULES); rules[k].splice(i,1);
+    try{ await saveRules(rules); refreshRulesUI(); }catch(e){ $r('rl_msg').innerHTML='<span style="color:#f87171">❌ '+esc(e.message||e)+'</span>'; }
+  }
+
   async function poll(force){
     if(!on||polling) return;
     polling=true;
@@ -7527,6 +7667,7 @@ function sendDriversWhatsAppFromPage(){
   }
   setInterval(()=>poll(false),3000);
   setTimeout(()=>poll(false),2500);
+  setTimeout(()=>loadRules(true),5000); setInterval(()=>loadRules(true),300000);   // reading rules: load now and every 5 minutes
   // phones pause pages in the background: import right away when the app comes back to the screen / the network returns
   document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') setTimeout(()=>poll(false),300); });
   window.addEventListener('focus',()=>setTimeout(()=>poll(false),300));
