@@ -7665,6 +7665,144 @@ function sendDriversWhatsAppFromPage(){
     }catch(e){console.warn('WA auto-import',e);paint('err');}
     finally{polling=false;}
   }
+  // ══ 🖨 AUTO-PRINT (Save+Print All by itself, X minutes after the first NEW WhatsApp order) ══
+  // Fresh: prints from (last printed + 1) to the newest order. Tender: same, separately. Manual Save+Print keeps working exactly as before.
+  const AP_KEY='iat_ap_state';
+  let apOn=LS.get('iat_ap_on',false), apMin=Math.max(1,parseInt(LS.get('iat_ap_min',15))||15), apRunning=false, apMsg='';
+  const cAP=mk(), cAPnow=mk(), cAPset=mk(); cAP.style.display='block'; cAPset.style.display='block';
+  const apGet=()=>{const s=LS.get(AP_KEY,null); return s?{pf:+s.pf||0,pt:+s.pt||0,pids:Array.isArray(s.pids)?s.pids:[],deadline:+s.deadline||0,tries:+s.tries||0,paused:!!s.paused,next:+s.next||0,last:s.last||''}:null;};
+  const apPut=s=>{ s.pids=(s.pids||[]).slice(-600); LS.set(AP_KEY,s); };
+  const nOf=o=>Number(o.num)||0;
+  const maxN=a=>a.reduce((m,o)=>Math.max(m,nOf(o)),0);
+  const freshRows=()=>orders.filter(o=>!o.isTender);
+  function apBaseline(){                       // "from now on": everything already in the list counts as handled
+    const s={pf:maxN(freshRows()),pt:maxN(tenderOrders),pids:tenderOrders.map(o=>o.waId).filter(Boolean),deadline:0,tries:0,paused:false,next:0,last:(apGet()||{}).last||''};
+    apPut(s); return s;
+  }
+  function apPlan(){
+    const s=apGet()||apBaseline();
+    const mf=maxN(freshRows()), mt=maxN(tenderOrders);
+    if(mf<s.pf) s.pf=0;                        // list was cleared / numbering restarted
+    if(mt<s.pt){ s.pt=0; s.pids=[]; }
+    const pf=freshRows().filter(o=>nOf(o)>s.pf);
+    const pt=tenderOrders.filter(o=>nOf(o)>s.pt||(o.waId&&!s.pids.includes(o.waId)));
+    return {s,mf,mt,pf,pt,doF:pf.length>0,doT:pt.length>0,wa:pf.some(o=>o.waId)||pt.some(o=>o.waId),
+      fFrom:s.pf+1,fTo:mf,tFrom:pt.length?Math.min(...pt.map(nOf)):0,tTo:pt.length?maxN(pt):0};
+  }
+  const apFmt=ms=>{const t=Math.max(0,Math.ceil(ms/1000));return Math.floor(t/60)+':'+String(t%60).padStart(2,'0');};
+  const apRange=p=>[p.doF?'Fresh '+(p.fFrom===p.fTo?p.fTo:p.fFrom+'–'+p.fTo):'',p.doT?'Tender '+(p.tFrom===p.tTo?p.tTo:p.tFrom+'–'+p.tTo):''].filter(Boolean).join(' · ');
+  function apPaint(){
+    const s=apGet()||{}, p=apPlan();
+    const armed=apOn&&p.wa&&s.deadline&&(p.doF||p.doT);
+    let txt, col='#9fb0cc';
+    if(!apOn) txt='🖨 Auto-print: OFF (tap to turn on)';
+    else if(s.paused){ txt='⚠ Auto-print STOPPED after 3 failures - tap to resume'; col='#f87171'; }
+    else if(apRunning){ txt='🖨 Auto-print: printing…'; col='#2dd4bf'; }
+    else if(armed){ const left=s.deadline-Date.now(); txt='🖨 Auto-print in '+(left>0?apFmt(left):'0:00')+' → '+apRange(p)+(apMsg?'  ('+apMsg+')':''); col='#fbbf24'; }
+    else { txt='🖨 Auto-print: ON · waits '+apMin+' min after the first new order'+(s.last?'\n   last: '+s.last:''); col='#2dd4bf'; }
+    cAP.style.whiteSpace='pre'; cAP.textContent=txt; cAP.style.color=col;
+    cAPnow.style.display=(armed&&!apRunning)?'block':'none'; cAPnow.textContent='⚡ Print these now'; cAPnow.style.color='#fbbf24';
+    cAPset.textContent='⏱ wait time: '+apMin+' min (tap to change)'; cAPset.style.color='#8fa0c0';
+  }
+  cAP.onclick=()=>{
+    const s=apGet();
+    if(apOn&&s&&s.paused){ s.paused=false; s.tries=0; s.deadline=0; s.next=0; apPut(s); apMsg=''; apPaint(); return; }
+    apOn=!apOn; LS.set('iat_ap_on',apOn);
+    if(apOn){ apBaseline(); toast('🖨 Auto-print ON - only NEW orders from now on','ok'); }
+    else { const t=apGet(); if(t){ t.deadline=0; apPut(t); } toast('🖨 Auto-print OFF','ok'); }
+    apPaint();
+  };
+  cAPset.onclick=()=>{
+    const v=parseInt(prompt('Wait how many minutes after the first new order before printing?',String(apMin)),10);
+    if(v>=1&&v<=120){ apMin=v; LS.set('iat_ap_min',v); const s=apGet(); if(s&&s.deadline){ s.deadline=Math.min(s.deadline,Date.now()+v*60000); apPut(s); } apPaint(); }
+  };
+  cAPnow.onclick=()=>{ if(!apRunning) apRun(); };
+
+  async function apRun(){
+    if(apRunning) return;
+    apRunning=true; apMsg=''; apPaint();
+    const p=apPlan(), s=p.s;
+    try{
+      if(!p.doF&&!p.doT){ s.deadline=0; apPut(s); return; }
+      try{ await getODTokenSilent(); }catch(e){ throw new Error('sign in: tap the ☁ button once'); }
+      const date=hdrDate();
+      const setIn=(id,v)=>{const el=document.getElementById(id); if(el) el.value=v;};
+      if(p.doF){ setIn('printRangeFrom',p.fFrom); setIn('printRangeTo',p.fTo); LS.set('iat_pfrom',String(p.fFrom)); LS.set('iat_pto',String(p.fTo)); }
+      if(p.doT){ setIn('tenderPrintFrom',p.tFrom); setIn('tenderPrintTo',p.tTo); LS.set('iat_tpr_from',String(p.tFrom)); LS.set('iat_tpr_to',String(p.tTo)); }
+      const signalTs=Date.now(); const jobs=[];
+      if(p.doF){
+        window._lastSaveTs=0; await saveOrdersToLoading(p.fFrom,p.fTo,date);
+        if(!(window._lastSaveTs>0)) throw new Error('could not save the fresh orders to Excel');
+        jobs.push({action:'',from:p.fFrom,to:p.fTo,_includeSaveTs:true},{action:'print_labels',from:p.fFrom,to:p.fTo,_includeSaveTs:true});
+      }
+      if(p.doT){
+        window._lastSaveTs=0; await tenderSaveToExcel(p.tFrom,p.tTo);
+        if(!(window._lastSaveTs>0)) throw new Error('could not save the tender orders to Excel');
+        jobs.push({action:'print_tender_orders',from:p.tFrom,to:p.tTo,_includeSaveTs:true},{action:'print_tender_labels',from:p.tFrom,to:p.tTo,_includeSaveTs:true});
+      }
+      const token=await getODTokenSilent();
+      const r=await fetch('https://graph.microsoft.com/v1.0/me/drive/root:/print_signal.json:/content',{
+        method:'PUT',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+        body:JSON.stringify({jobs,ts:signalTs,save_ts:signalTs})
+      });
+      if(!r.ok) throw new Error('print signal refused ('+r.status+')');
+      window._lastSaveTs=signalTs;
+      const t=apGet()||s;
+      if(p.doF) t.pf=Math.max(t.pf,p.fTo);
+      if(p.doT){ t.pt=Math.max(t.pt,p.tTo); t.pids=(t.pids||[]).concat(p.pt.map(o=>o.waId).filter(Boolean)); }
+      t.deadline=0; t.tries=0; t.next=0; t.paused=false;
+      t.last=new Date().toTimeString().slice(0,5)+' - '+apRange(p);
+      apPut(t);
+      toast('🖨 Auto-print sent: '+apRange(p),'ok');
+    }catch(e){
+      const t=apGet()||s;
+      t.tries=(t.tries||0)+1; t.next=Date.now()+120000;
+      if(t.tries>=3){ t.paused=true; toast('⚠ Auto-print failed 3 times ('+(e.message||e)+') - use Save+Print All by hand, then tap 🖨 in the 📥 panel','err'); }
+      else { apMsg='retry in 2 min: '+(e.message||e); toast('🖨 Auto-print problem: '+(e.message||e)+' - retrying in 2 min','err'); }
+      apPut(t);
+    }finally{ apRunning=false; apPaint(); }
+  }
+
+  function apTick(){
+    try{
+      if(!apOn){ apPaint(); return; }
+      const p=apPlan(), s=p.s;
+      if(!(p.doF||p.doT)||!p.wa){ if(s.deadline){ s.deadline=0; } apPut(s); apMsg=''; apPaint(); return; }
+      if(!s.deadline){
+        s.deadline=Date.now()+apMin*60000; s.tries=0; apPut(s);
+        toast('🖨 Auto-print in '+apMin+' min: '+apRange(p),'ok');
+      } else apPut(s);
+      if(!s.paused&&!apRunning&&Date.now()>=s.deadline&&Date.now()>=s.next){
+        const why=busyReason();
+        if(why){ apMsg='waiting: '+why; }
+        else { apRun(); return; }
+      }
+      apPaint();
+    }catch(e){ console.warn('auto-print tick',e); }
+  }
+  // a manual Save+Print / Print counts as "printed" so the automatic one never repeats it
+  function apMarkFresh(from,to){
+    const s=apGet()||apBaseline(), mf=maxN(freshRows());
+    if(from&&from<=s.pf+1&&to) s.pf=Math.max(s.pf,Math.min(to,mf));
+    apPut(s);
+  }
+  function apMarkTender(from,to){
+    const s=apGet()||apBaseline(), mt=maxN(tenderOrders);
+    tenderOrders.forEach(o=>{ if(o.waId&&nOf(o)>=from&&nOf(o)<=to&&!s.pids.includes(o.waId)) s.pids.push(o.waId); });
+    if(from&&from<=s.pt+1&&to) s.pt=Math.max(s.pt,Math.min(to,mt));
+    apPut(s);
+  }
+  const apIn=id=>parseInt((document.getElementById(id)||{}).value,10)||0;
+  const apWrap=(name,fn)=>{ const f=window[name]; if(typeof f!=='function') return; window[name]=async function(){ const r=await f.apply(this,arguments); try{fn();}catch(e){} return r; }; };
+  apWrap('saveAllThenPrint',()=>{ apMarkFresh(apIn('printRangeFrom'),apIn('printRangeTo')); apMarkTender(apIn('tenderPrintFrom'),apIn('tenderPrintTo')); });
+  apWrap('printAllFresh',()=>apMarkFresh(apIn('printRangeFrom'),apIn('printRangeTo')));
+  apWrap('printAllTender',()=>apMarkTender(apIn('tenderPrintFrom'),apIn('tenderPrintTo')));
+  apWrap('savePrintTender',()=>apMarkTender(apIn('tenderPrintFrom'),apIn('tenderPrintTo')));
+  setInterval(apTick,5000); setTimeout(apTick,4000);
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') setTimeout(apTick,500); });
+  window.addEventListener('focus',()=>setTimeout(apTick,500));
+  apPaint();
+
   setInterval(()=>poll(false),3000);
   setTimeout(()=>poll(false),2500);
   setTimeout(()=>loadRules(true),5000); setInterval(()=>loadRules(true),300000);   // reading rules: load now and every 5 minutes
