@@ -2432,6 +2432,16 @@ async function saveOrdersToLoading(from,to,dateVal){
     });
     if(!r1.ok){const e=await r1.text();throw new Error('Loading write failed: '+e);}
 
+    // ── 1b. BB = رقم الـ PO للزبون (مشترك مع شيت tender) - على كل سطر ──
+    try{
+      const bbOf=window.iatBBFor?window.iatBBFor():(()=>'');
+      const bbVals=Array.from({length:1000-startRow+1},(_,i)=>[i<sorted.length?bbOf(sorted[i]):'']);
+      const rb=await fetch(baseUrl+`Loading/range(address='BB${startRow}:BB1000')`,{
+        method:'PATCH',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({values:bbVals})
+      });
+      if(!rb.ok) throw new Error(await rb.text());
+    }catch(e){ toast('⚠ BB column not written: '+(e.message||e).slice(0,80),'err'); }
+
     // ── 2. كتابة BS1=from, BT1=to ──
     const r2=await fetch(baseUrl+"Loading/range(address='BS1:BT1')",{
       method:'PATCH',
@@ -2522,7 +2532,7 @@ async function saveToOneDriveAuto(){
 // ── PRINT ──
 // ── Clear Loading Sheet ──
 async function clearLoadingSheet(){
-  confDlg('Clear A5:AQ1000 from Loading sheet?', async ()=>{
+  confDlg('Clear A5:AQ1000 + BB from Loading sheet?', async ()=>{
     const btn=document.getElementById('clearLoadingBtn');
     if(btn){btn.disabled=true;btn.textContent='⏳...';}
     try{
@@ -2541,7 +2551,7 @@ async function clearLoadingSheet(){
 }
 
 async function clearTenderSheet(){
-  confDlg('Clear AI5:AR1000 from tender order sheet?', async ()=>{
+  confDlg('Clear AI5:AR1000 + BB from tender order sheet?', async ()=>{
     try{
       const token=await getODToken();
       const fileRes=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,{headers:{'Authorization':'Bearer '+token}});
@@ -2974,6 +2984,7 @@ async function _clearLoadingSheetInner(token, fileId){
     body:JSON.stringify({applyTo:'Contents'})
   });
   if(!r.ok){const e=await r.text();throw new Error('Loading: '+e);}
+  await fetch(base+`Loading/range(address='BB5:BB1000')/clear`,{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({applyTo:'Contents'})});
 }
 
 async function _clearTenderSheetInner(token, fileId){
@@ -2984,6 +2995,7 @@ async function _clearTenderSheetInner(token, fileId){
     body:JSON.stringify({applyTo:'Contents'})
   });
   if(!r.ok){const e=await r.text();throw new Error('Tender: '+e);}
+  await fetch(base+`tender%20order/range(address='BB5:BB1000')/clear`,{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({applyTo:'Contents'})});
 }
 
 function resetAll(){
@@ -3021,6 +3033,7 @@ function resetAll(){
         body:JSON.stringify({applyTo:'Contents'})
       });
       if(!r1.ok){const e=await r1.text();throw new Error('Loading: '+e);}
+      await fetch(base+`Loading/range(address='BB5:BB1000')/clear`,{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({applyTo:'Contents'})});
       toast('✓ Loading cleared','ok');
 
       // Tender sheet
@@ -3030,6 +3043,7 @@ function resetAll(){
         body:JSON.stringify({applyTo:'Contents'})
       });
       if(!r2.ok){const e=await r2.text();throw new Error('Tender: '+e);}
+      await fetch(base+`tender%20order/range(address='BB5:BB1000')/clear`,{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({applyTo:'Contents'})});
 
       toast('✓ Reset All done!','ok');
     }catch(e){
@@ -3120,6 +3134,15 @@ async function tenderSaveToExcel(fromOverride, toOverride){
       body:JSON.stringify({values})
     });
     if(!r1.ok){const e=await r1.text();throw new Error('Tender write failed: '+e);}
+    // BB = رقم الـ PO للزبون (مشترك مع شيت Loading) - على كل سطر
+    try{
+      const bbOf=window.iatBBFor?window.iatBBFor():(()=>'');
+      const bbVals=Array.from({length:1000-startRow+1},(_,i)=>[i<sorted.length?bbOf(sorted[i]):'']);
+      const rb=await fetch(baseUrl+`tender order/range(address='BB${startRow}:BB1000')`,{
+        method:'PATCH',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({values:bbVals})
+      });
+      if(!rb.ok) throw new Error(await rb.text());
+    }catch(e){ toast('⚠ BB column not written (tender): '+(e.message||e).slice(0,80),'err'); }
     // كتابة BS1=from, BT1=to في شيت tender order
     const r2=await fetch(baseUrl+`tender order/range(address='BS1:BT1')`,{
       method:'PATCH',
@@ -7416,6 +7439,45 @@ function sendDriversWhatsAppFromPage(){
     return true;
   }
   const nameKey=c=>String(c||'').toLowerCase().replace(/\btender\b/g,'').replace(/\s+/g,' ').trim();
+
+  // ══ BB = PO number of the customer (shared by the Loading sheet and the tender order sheet) ══
+  // One real order (PO) can arrive as two messages (fresh part in one group, tender part in the other).
+  // Same PO number in the text -> same PO. No PO number -> a part from the other group, same customer, within PO_WIN minutes = same PO.
+  const PO_WIN=(parseInt(LS.get('iat_po_win',30))||30)*60000;
+  function poRefOf(text){
+    const m=/\bP\.?O\.?(?=[\s:#\-]|$)\s*(?:no\.?|number|#)?\s*[:#\-]?\s*([A-Z0-9][A-Z0-9\-\/_.]{2,})/i.exec(text||'');
+    return (m&&/\d/.test(m[1]))?m[1].toUpperCase().replace(/[.\-]+$/,''):'';
+  }
+  function stampPO(){                           // every row gets a PO key + an arrival time (rows typed by hand are stamped when first seen)
+    let chF=false, chT=false, i=0; const base=Date.now();
+    orders.forEach(r=>{ if(!r.poTs||!r.poKey){ r.poTs=r.poTs||(base+i++); r.poKey=r.poKey||(r.waId?'w:'+r.waId:(r.isTender?'mt:'+(r.tNum||r.num||0):'mf:'+(r.num||0))); chF=true; } });
+    tenderOrders.forEach(r=>{ if(!r.poTs||!r.poKey){ r.poTs=r.poTs||(base+i++); r.poKey=r.poKey||(r.waId?'w:'+r.waId:'mt:'+(r.num||0)); chT=true; } });
+    if(chF) LS.set('iat_orders',orders);
+    if(chT) LS.set('iat_to',tenderOrders);
+  }
+  function poAssign(cust,cat,o){                // -> {poKey,poTs,poRef} for the rows of one imported WhatsApp message
+    stampPO();
+    const ts=Date.parse(o.sent_at||o.received_at||'')||Date.now(), nk=nameKey(cust), ref=poRefOf(o.text||'');
+    const fresh=orders.filter(x=>!x.isTender), mine=cat==='FRESH'?fresh:tenderOrders, other=cat==='FRESH'?tenderOrders:fresh;
+    const groups=new Map();                      // poKey -> earliest arrival, for this customer
+    [...fresh,...tenderOrders].forEach(x=>{ if(nameKey(x.customer)===nk&&x.poKey){ const t=x.poTs||0; if(!groups.has(x.poKey)||t<groups.get(x.poKey)) groups.set(x.poKey,t); } });
+    if(ref){ const key='po:'+nk+'|'+ref; return {poKey:key,poTs:groups.has(key)?groups.get(key):ts,poRef:ref}; }
+    const taken=new Set(mine.filter(x=>nameKey(x.customer)===nk).map(x=>x.poKey));
+    let best=null;
+    other.forEach(x=>{ if(nameKey(x.customer)!==nk||!x.poKey||taken.has(x.poKey)) return; const t=groups.get(x.poKey)||x.poTs||0, d=Math.abs(ts-t); if(d<=PO_WIN&&(!best||d<best.d)) best={d,key:x.poKey,t}; });
+    if(best) return {poKey:best.key,poTs:best.t,poRef:''};
+    return {poKey:'w:'+(o.id||ts),poTs:ts,poRef:''};
+  }
+  function buildBB(){                           // -> function(row) = the PO number (1,2,3...) of that row's customer
+    stampPO();
+    const per=new Map();
+    [...orders,...tenderOrders].forEach(r=>{ const nk=nameKey(r.customer); if(!per.has(nk)) per.set(nk,new Map()); const m=per.get(nk), t=r.poTs||0; if(!m.has(r.poKey)||t<m.get(r.poKey)) m.set(r.poKey,t); });
+    const rank=new Map();
+    per.forEach((m,nk)=>[...m.entries()].sort((a,b)=>(a[1]-b[1])||String(a[0]).localeCompare(String(b[0]))).forEach((e,i)=>rank.set(nk+'||'+e[0],i+1)));
+    return r=>rank.get(nameKey(r.customer)+'||'+r.poKey)||'';
+  }
+  window.iatBBFor=buildBB;
+  setInterval(()=>{ try{stampPO();}catch(e){} },4000);
   function dupTender(cust,out){
     const pool=tenderOrders.filter(x=>nameKey(x.customer)===nameKey(cust)&&!x.waId).map(x=>({p:x.product,q:Number(x.qty)}));
     if(!pool.length) return false;
@@ -7438,9 +7500,10 @@ function sendDriversWhatsAppFromPage(){
     const num=orders.reduce((m,x)=>Math.max(m,x.num||0),0)+1;
     const prev=new Set(orders.filter(x=>x.customer===cust).map(x=>x.num));
     const orderCount=prev.size>0?prev.size+1:0;
+    const po=poAssign(cust,'FRESH',o);
     items.forEach((it,i)=>{
       const note=[(i===0&&orderCount>=2)?('order '+orderCount):'',it.note||''].filter(Boolean).join(' · ');
-      orders.push({customer:it.customer,product:it.product,qty:it.qty||1,size:it.size||'',note,num,driver:'',waId:o.id||''});
+      orders.push({customer:it.customer,product:it.product,qty:it.qty||1,size:it.size||'',note,num,driver:'',waId:o.id||'',poKey:po.poKey,poTs:po.poTs,poRef:po.poRef});
       if(it._rawP&&it._rawP!==it.product&&typeof learnSave==='function') learnSave('p',it._rawP,it.product);
     });
     saveOrders();renderOrders();updateBadges();
@@ -7478,7 +7541,8 @@ function sendDriversWhatsAppFromPage(){
     let maxNum=tenderOrders.reduce((mx,x)=>Math.max(mx,x.num||0),0);
     const nums=new Map(); tenderOrders.forEach(x=>{if(x.num&&x.customer)nums.set(x.customer,x.num);});
     if(!nums.has(cust)){maxNum++;nums.set(cust,maxNum);}
-    out.forEach(it=>tenderOrders.push({customer:cust,product:it.product,qty:it.qty,num:nums.get(cust),waId:o.id||''}));
+    const po=poAssign(cust,'TENDER',o);
+    out.forEach(it=>tenderOrders.push({customer:cust,product:it.product,qty:it.qty,num:nums.get(cust),waId:o.id||'',poKey:po.poKey,poTs:po.poTs,poRef:po.poRef}));
     LS.set('iat_to',tenderOrders);
     if(typeof renderTOrdersPage==='function') renderTOrdersPage();
     if(typeof renderTenderOrdersList==='function') renderTenderOrdersList();
