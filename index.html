@@ -7474,7 +7474,11 @@ function sendDriversWhatsAppFromPage(){
     [...orders,...tenderOrders].forEach(r=>{ const nk=nameKey(r.customer); if(!per.has(nk)) per.set(nk,new Map()); const m=per.get(nk), t=r.poTs||0; if(!m.has(r.poKey)||t<m.get(r.poKey)) m.set(r.poKey,t); });
     const rank=new Map();
     per.forEach((m,nk)=>[...m.entries()].sort((a,b)=>(a[1]-b[1])||String(a[0]).localeCompare(String(b[0]))).forEach((e,i)=>rank.set(nk+'||'+e[0],i+1)));
-    return r=>rank.get(nameKey(r.customer)+'||'+r.poKey)||'';
+    // a real PO number (read from the message, e.g. "(PO 4500123)") is written as it is; otherwise the 1,2,3 counter
+    const refOf=new Map();
+    [...orders,...tenderOrders].forEach(r=>{ if(r.poRef&&r.poKey&&!refOf.has(r.poKey)) refOf.set(r.poKey,r.poRef); });
+    const txt=v=>/^0\d+$/.test(String(v))?"'"+v:v;      // keep leading zeros (Excel would turn 00123 into 123)
+    return r=>{ const ref=refOf.get(r.poKey); return ref?txt(ref):(rank.get(nameKey(r.customer)+'||'+r.poKey)||''); };
   }
   window.iatBBFor=buildBB;
   setInterval(()=>{ try{stampPO();}catch(e){} },4000);
