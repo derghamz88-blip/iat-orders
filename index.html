@@ -7908,9 +7908,13 @@ const trNum=v=>{const n=parseFloat(v);return isFinite(n)?n:0;};
 const trF=x=>(Math.round(x*10)/10).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:1});
 const trSign=x=>(x>0?'+':'')+trF(x);
 let _trDate=null;                                   // report date (YYYY-MM-DD)
-let _trOrd=LS.get('iat_tr_orders',null);            // {src:'excel'|'app', read:ts, rows:[{num,customer,product,qty}]}
+let _trOrd=null,_trOrdDay='';                       // {src:'excel'|'app', file, read:ts, rows:[{num,customer,product,qty}]} (kept per report date)
 const trDay=()=>_trDate||(document.getElementById('orderDate')&&document.getElementById('orderDate').value)||todayStr();
 const trKey=()=>'iat_tr_in_'+trDay(), trManKey=()=>'iat_tr_man_'+trDay();
+function trOrdSync(){ if(_trOrdDay!==trDay()){ _trOrdDay=trDay(); _trOrd=LS.get('iat_tr_orders_'+_trOrdDay,null); } }
+const trFile=()=>LS.get('iat_tr_file_'+trDay(),null);          // {id,name,mod}  the Excel file the orders of THIS date come from
+const trSheetName=()=>LS.get('iat_tr_sheetname','tender order');
+const trSaveOrd=o=>{ _trOrd=o; _trOrdDay=trDay(); LS.set('iat_tr_orders_'+_trOrdDay,o); };
 const trIn=()=>Object.assign({n:'',open:'',ret:'',close:'',trim:'',waste:''},LS.get(trKey(),{})||{});
 const trMan=()=>{const m=LS.get(trManKey(),[]);return Array.isArray(m)?m:[];};
 function trKg(product,qty){                         // "KG" -> qty is kg ; "Zaki 400gr" -> qty trays x 0.4
@@ -7920,28 +7924,62 @@ function trKg(product,qty){                         // "KG" -> qty is kg ; "Zaki
 }
 function trAppOrders(){ return {src:'app',read:Date.now(),rows:(tenderOrders||[]).filter(o=>o&&o.product&&trNum(o.qty)>0).map(o=>({num:o.num||'',customer:o.customer||'',product:o.product,qty:trNum(o.qty)}))}; }
 async function trFetchExcel(silent){
+  const f=trFile(); if(!f||!f.id) throw new Error('no-file');
   const token=silent?await getODTokenSilent():await getODToken(), H={Authorization:'Bearer '+token};
-  const fr=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,{headers:H});
-  if(!fr.ok) throw new Error('production.xlsm not found');
-  const fileId=(await fr.json()).id;
-  const rr=await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/workbook/worksheets/${encodeURIComponent('tender order')}/range(address='AJ5:AQ600')`,{headers:H});
-  if(!rr.ok) throw new Error('could not read the "tender order" sheet');
+  const rr=await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${f.id}/workbook/worksheets/${encodeURIComponent(trSheetName())}/range(address='AJ5:AQ600')`,{headers:H});
+  if(!rr.ok) throw new Error('could not read sheet "'+trSheetName()+'" in '+f.name);
   const rows=[];
   ((await rr.json()).values||[]).forEach(v=>{ const prod=String(v[4]==null?'':v[4]).trim(), q=trNum(v[5]); if(prod&&q>0) rows.push({num:v[0]===''?'':v[0],customer:String(v[2]||v[3]||'').trim(),product:prod,qty:q}); });
-  return {src:'excel',read:Date.now(),rows};
+  return {src:'excel',file:f.name,read:Date.now(),rows};
 }
 async function trRead(){
+  if(!trFile()){ trPick(); return; }
   const btn=document.getElementById('trReadBtn'); if(btn){btn.disabled=true;btn.textContent='⏳...';}
-  try{ _trOrd=await trFetchExcel(false); LS.set('iat_tr_orders',_trOrd); toast('✓ '+_trOrd.rows.length+' order lines read from Excel','ok'); }
-  catch(e){ _trOrd=trAppOrders(); toast('⚠ '+(e.message||e)+' - showing the orders saved in the app','err'); }
+  try{ const o=await trFetchExcel(false); trSaveOrd(o); toast('✓ '+o.rows.length+' order lines read from '+o.file,'ok'); }
+  catch(e){ toast('⚠ '+(e.message||e),'err'); }
   finally{ if(btn){btn.disabled=false;btn.textContent='🔄 Orders';} trRender(); }
 }
-async function trAuto(){                            // opening the page: silent Excel read, else the app's own orders
-  if(!_trOrd){ _trOrd=trAppOrders(); }
-  trRender();
-  try{ _trOrd=await trFetchExcel(true); LS.set('iat_tr_orders',_trOrd); trRender(); }catch(e){ if(!_trOrd||_trOrd.src!=='excel'){ _trOrd=trAppOrders(); trRender(); } }
+async function trAuto(){                            // opening the page: if a file is chosen for this date, re-read it silently
+  trOrdSync(); trRender();
+  if(!trFile()) return;
+  try{ trSaveOrd(await trFetchExcel(true)); trRender(); }catch(e){}
 }
+// ── choose the Excel file the orders are read from (browse OneDrive) ──
+let _trPath=null;
+function trPick(){
+  const dir=PRODUCTION_PATH.split('/').slice(0,-1).join('/');
+  _trPath=_trPath==null?dir:_trPath;
+  let ov=document.getElementById('trPickOv');
+  if(!ov){ ov=document.createElement('div'); ov.id='trPickOv'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+    ov.innerHTML='<div style="background:var(--s1);border:1px solid var(--b2);border-radius:14px 14px 0 0;width:100%;max-width:520px;max-height:80vh;display:flex;flex-direction:column"><div style="padding:12px 14px;border-bottom:1px solid var(--b1);display:flex;justify-content:space-between;align-items:center"><b style="font-size:.85rem">📂 Choose the Excel file for the orders</b><span onclick="document.getElementById(\'trPickOv\').remove()" style="cursor:pointer;padding:4px 8px">✕</span></div><div id="trPickPath" style="padding:6px 14px;font-size:.66rem;color:var(--muted)"></div><div id="trPickList" style="overflow-y:auto;padding:4px 10px 12px"></div><div style="padding:8px 14px;border-top:1px solid var(--b1)"><button class="btn btn-ghost btn-sm" onclick="trUseApp()" style="font-size:.7rem">Use the orders saved in the app instead</button></div></div>';
+    document.body.appendChild(ov); }
+  trList(_trPath);
+}
+async function trList(path){
+  const L=document.getElementById('trPickList'), P=document.getElementById('trPickPath'); if(!L) return;
+  _trPath=path; P.textContent='OneDrive / '+(path||'');
+  L.innerHTML='<div style="padding:14px;color:var(--muted);font-size:.74rem">⏳ Loading...</div>';
+  try{
+    const token=await getODToken();
+    const url='https://graph.microsoft.com/v1.0/me/drive/'+(path?`root:/${path.split('/').map(encodeURIComponent).join('/')}:/children`:'root/children')+'?$top=300&$select=id,name,lastModifiedDateTime,folder,size';
+    const r=await fetch(url,{headers:{Authorization:'Bearer '+token}}); if(!r.ok) throw new Error('OneDrive folder not readable ('+r.status+')');
+    const items=((await r.json()).value||[]).filter(x=>x.folder||/\.(xlsx|xlsm|xls)$/i.test(x.name)&&!/^~\$/.test(x.name));
+    items.sort((a,b)=>(!!b.folder-!!a.folder)||String(b.lastModifiedDateTime).localeCompare(String(a.lastModifiedDateTime)));
+    const up=path?`<div onclick="trList('${path.split('/').slice(0,-1).join('/').replace(/'/g,"\\'")}')" style="padding:9px 6px;border-bottom:1px solid var(--b1);cursor:pointer;font-size:.78rem">⬆ ..</div>`:'';
+    L.innerHTML=up+(items.map(x=>x.folder
+      ?`<div onclick="trList('${((path?path+'/':'')+x.name).replace(/'/g,"\\'")}')" style="padding:9px 6px;border-bottom:1px solid var(--b1);cursor:pointer;font-size:.78rem">📁 ${trEsc(x.name)}</div>`
+      :`<div onclick="trChoose('${x.id}','${trEsc(x.name).replace(/'/g,"&#39;")}','${trEsc(x.lastModifiedDateTime)}')" style="padding:9px 6px;border-bottom:1px solid var(--b1);cursor:pointer;font-size:.78rem">📊 ${trEsc(x.name)}<div style="font-size:.6rem;color:var(--muted)">${trEsc(String(x.lastModifiedDateTime).replace('T',' ').slice(0,16))}</div></div>`).join('')||'<div style="padding:14px;color:var(--muted);font-size:.74rem">No Excel files here.</div>');
+  }catch(e){ L.innerHTML='<div style="padding:14px;color:var(--red);font-size:.74rem">'+trEsc(e.message||e)+'</div>'; }
+}
+async function trChoose(id,name,mod){
+  LS.set('iat_tr_file_'+trDay(),{id,name:String(name).replace(/&#39;/g,"'"),mod});
+  const ov=document.getElementById('trPickOv'); if(ov) ov.remove();
+  _trOrd=null; _trOrdDay=trDay(); LS.set('iat_tr_orders_'+_trOrdDay,null);
+  await trRead();
+}
+function trUseApp(){ const ov=document.getElementById('trPickOv'); if(ov) ov.remove(); LS.set('iat_tr_file_'+trDay(),null); trSaveOrd(trAppOrders()); toast('Using the orders saved in the app','ok'); trRender(); }
 function trCalc(){
+  trOrdSync();
   const i=trIn(), man=trMan(), n=trNum(i.n), batches=n/TREP.BATCH;
   const calc={n,batches,raw:n*TREP.RAW,defrost:n*TREP.KG,chem:batches*TREP.CHEM,water:batches*TREP.WATER};
   const rows=(_trOrd&&_trOrd.rows)||[];
@@ -7976,7 +8014,7 @@ function trRender(){
   const card=(t,body,col)=>`<div style="background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:10px 12px"><div style="font-size:.66rem;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;color:${col||'var(--blue2)'};margin-bottom:6px">${t}</div>${body}</div>`;
   const inp=(k,ph,w)=>`<input type="number" step="0.1" inputmode="decimal" value="${trEsc(r.i[k])}" placeholder="${ph}" onchange="trSet('${k}',this.value)" style="width:${w||'100%'};background:var(--s2);color:var(--txt);border:1px solid var(--b2);border-radius:6px;padding:7px;font-size:.8rem"/>`;
   const lab=(t,el)=>`<label style="display:flex;flex-direction:column;gap:3px;font-size:.62rem;color:var(--muted)">${t}${el}</label>`;
-  document.getElementById('trSub').textContent=trDay()+' · orders: '+(_trOrd?(_trOrd.src==='excel'?'Excel':'saved in the app')+' · '+new Date(_trOrd.read).toTimeString().slice(0,5):'—');
+  document.getElementById('trSub').textContent=trDay()+' · '+(_trOrd?(_trOrd.src==='excel'?trEsc(_trOrd.file||''):'orders saved in the app')+' · '+new Date(_trOrd.read).toTimeString().slice(0,5):'no orders file chosen');
   let h='';
   h+=card('1 · Cartons',
     `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${lab('Cartons used',inp('n','0'))}${lab('Date',`<input type="date" value="${trDay()}" onchange="trSetDate(this.value)" style="background:var(--s2);color:var(--txt);border:1px solid var(--b2);border-radius:6px;padding:6px;font-size:.78rem"/>`)}</div>`
@@ -7987,8 +8025,11 @@ function trRender(){
     `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${lab('Balance at start',inp('open','0'))}${lab('Returns (added at start)',inp('ret','0'))}${lab('Balance at end (measured)',inp('close','0'))}${lab('Trimming (measured)',inp('trim','0'))}${lab('Waste (info only)',inp('waste','0'))}</div>`,'var(--blue2)');
   const sums=r.prods.map(p=>`<tr><td style="padding:3px 0">${trEsc(p.name)}</td><td style="text-align:right">${p.ords.size}</td><td style="text-align:right">${trF(p.qty)}</td><td style="text-align:right"><b>${trF(p.kg)}</b></td></tr>`).join('');
   const ords=r.ords.map(o=>line(`<b>${trEsc(o.num===''?'':'#'+o.num)}</b> ${trEsc(o.customer)}`,trF(o.kg)+' kg',trEsc(o.items.join(' · ')))).join('');
+  const ff=trFile();
   h+=card('3 · Tender orders ('+r.orderCount+' orders)',
-    (r.prods.length?`<table style="width:100%;font-size:.72rem;border-collapse:collapse"><tr style="color:var(--muted);font-size:.62rem"><td>Product</td><td style="text-align:right">Orders</td><td style="text-align:right">Qty</td><td style="text-align:right">KG</td></tr>${sums}<tr style="border-top:1px solid var(--b2)"><td colspan="3" style="padding-top:4px"><b>Total orders</b></td><td style="text-align:right;padding-top:4px"><b>${trF(r.ordersKg)}</b></td></tr></table>`:'<div style="font-size:.74rem;color:var(--muted)">No tender orders found.</div>')
+    `<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap"><div style="flex:1;min-width:120px;font-size:.72rem">${ff?'📊 <b>'+trEsc(ff.name)+'</b>':(_trOrd&&_trOrd.src==='app'?'From the orders saved in the app':'<span style="color:var(--amber)">Choose the Excel file the orders come from</span>')}</div><button class="btn btn-teal btn-sm" onclick="trPick()" style="font-size:.7rem;padding:4px 10px">📂 ${ff?'Change':'Choose'} file</button></div>`
+    +`<div style="font-size:.62rem;color:var(--muted);margin-bottom:6px">Sheet: <input value="${trEsc(trSheetName())}" onchange="LS.set('iat_tr_sheetname',this.value.trim()||'tender order')" style="background:var(--s2);color:var(--txt);border:1px solid var(--b2);border-radius:6px;padding:4px;font-size:.68rem;width:120px"/> · the file is remembered for this date</div>`
+    +(r.prods.length?`<table style="width:100%;font-size:.72rem;border-collapse:collapse"><tr style="color:var(--muted);font-size:.62rem"><td>Product</td><td style="text-align:right">Orders</td><td style="text-align:right">Qty</td><td style="text-align:right">KG</td></tr>${sums}<tr style="border-top:1px solid var(--b2)"><td colspan="3" style="padding-top:4px"><b>Total orders</b></td><td style="text-align:right;padding-top:4px"><b>${trF(r.ordersKg)}</b></td></tr></table>`:'<div style="font-size:.74rem;color:var(--muted)">No tender orders found.</div>')
     +(ords?`<div style="margin-top:8px;font-size:.62rem;color:var(--muted)">Each order</div>${ords}`:''),'var(--teal)');
   const mans=r.man.map((x,k)=>`<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:.74rem;border-bottom:1px dashed var(--b1)"><span onclick="trDelMan(${k})" style="color:var(--red);cursor:pointer;padding:0 4px">✕</span><span style="flex:1">${x.t==='order'?'📦 order not in system':x.t==='in'?'⬇ other input':'⬆ other output'} · ${trEsc(x.l||'')}${x.t==='order'?' × '+trF(trNum(x.q)):''}</span><b>${trF(x.t==='order'?trKg(x.l,x.q):trNum(x.q))} kg</b></div>`).join('');
   h+=card('4 · Extras (orders not entered, anything else)',
