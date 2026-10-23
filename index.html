@@ -269,7 +269,7 @@ nav{background:var(--s1);border-bottom:1px solid var(--b1);padding:0 8px;display
     </div>
     <!-- Tender report -->
     <div style="display:flex;flex-direction:column;flex-shrink:0;min-width:62px">
-      <div class="ntab" style="flex:1;font-size:.68rem;padding:6px 8px;color:var(--amber);justify-content:center;display:flex;align-items:center" onclick="showPage('treport',this);trRender()">📈 T.Report</div>
+      <div class="ntab" style="flex:1;font-size:.68rem;padding:6px 8px;color:var(--amber);justify-content:center;display:flex;align-items:center" onclick="showPage('treport',this);trAuto()">📈 T.Report</div>
     </div>
     <!-- Invoice pair -->
     <div style="display:flex;flex-direction:column;flex-shrink:0;min-width:60px">
@@ -7264,14 +7264,14 @@ function sendDriversWhatsAppFromPage(){
 </div>
 
 
-<!-- ══ T.REPORT PAGE (tender yield report: reads the Excel report sheet, adds manual lines) ══ -->
+<!-- ══ T.REPORT PAGE: type cartons -> water/chemical by the rules; orders are read from the Excel; balances/trimming/extras typed here ══ -->
 <div class="page" id="pg-treport">
   <div class="orders-head">
     <div><div style="font-size:.68rem;font-family:var(--mono);color:var(--amber);letter-spacing:.1em;text-transform:uppercase">📈 Tender Report</div>
       <div id="trSub" style="font-size:.6rem;color:var(--muted);margin-top:2px"></div></div>
     <div style="display:flex;gap:6px">
-      <button class="btn btn-teal btn-sm" id="trReadBtn" onclick="trRead()" style="font-size:.7rem;padding:4px 8px">🔄 Read Excel</button>
-      <button class="btn btn-ghost btn-sm" onclick="trCopy()" style="font-size:.7rem;padding:4px 8px">📋 Copy</button>
+      <button class="btn btn-teal btn-sm" id="trReadBtn" onclick="trRead()" style="font-size:.7rem;padding:4px 8px">🔄 Orders</button>
+      <button class="btn btn-ghost btn-sm" onclick="trPrint()" style="font-size:.7rem;padding:4px 8px">📄 Report</button>
       <button class="btn btn-green btn-sm" onclick="trWA()" style="font-size:.7rem;padding:4px 8px">💬</button>
     </div>
   </div>
@@ -7898,141 +7898,153 @@ function sendDriversWhatsAppFromPage(){
 
 
 <script>
-// ══ T.REPORT: cartons -> expected defrost/chemical/water, input vs output, loss/gain % ══
-// Reads the Excel report sheet (default "REPORT TENDER (2)") + manual lines you add here (kept per report date).
-const TREP={KG:10,RAW:12,CHEM:1.4,WATER:20,BATCH:8};   // per carton after defrost / before defrost; per machine of 8 cartons: 1.4 kg chemical, 20 kg water
-let _trData=LS.get('iat_tr_data',null);
+// ══ T.REPORT ══
+// You type: cartons used, balances, trimming, returns, extras. The app computes defrost / chemical / water by the rules
+// (12 kg raw -> 10 kg after defrost per carton; one machine = 8 cartons = 1.4 kg chemical + 20 kg water)
+// and takes the tender orders from the Excel ("tender order" sheet). Result = output - input, as kg and %.
+const TREP={KG:10,RAW:12,CHEM:1.4,WATER:20,BATCH:8};
 const trEsc=x=>String(x==null?'':x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const trNum=v=>{const n=parseFloat(v);return isFinite(n)?n:0;};
-const trR=x=>Math.round(x*100)/100;
-const trSheet=()=>LS.get('iat_tr_sheet','REPORT TENDER (2)');
-function trDate(v){ if(typeof v==='number'&&v>30000){return new Date(Math.round((v-25569)*86400000)).toISOString().slice(0,10);} return String(v||'').slice(0,10)||todayStr(); }
-function trParse(v,sh){
-  const c=a=>{const m=/^([A-Z]+)(\d+)$/.exec(a); return ((v[+m[2]-1]||[])[colNum(m[1])-1]);};
-  const rows=(r1,r2,f)=>{const o=[];for(let r=r1;r<=r2;r++)o.push(f(r));return o;};
-  return {sheet:sh,read:Date.now(),date:trDate(c('A3')),
-    defrost:trNum(c('F3')),chem:trNum(c('G3')),water:trNum(c('H3')),
-    open:{tender:trNum(c('G4')),defrost:trNum(c('G5')),ret:trNum(c('G6')),urossa:trNum(c('G7'))},
-    brands:rows(9,12,r=>({name:String(c('F'+r)||''),size:trNum(c('G'+r)),ctn:trNum(c('H'+r))})),
-    goods:rows(3,10,r=>({name:String(c('J'+r)||''),size:trNum(c('K'+r)),qty:trNum(c('L'+r)),kg:trNum(c('M'+r))})),
-    closing:rows(12,14,r=>({name:String(c('J'+r)||''),size:trNum(c('K'+r)),qty:trNum(c('L'+r)),kg:trNum(c('M'+r))})),
-    returns:rows(15,20,r=>({name:String(c('F'+r)||''),size:trNum(c('G'+r)),qty:trNum(c('H'+r))})).map(x=>({...x,kg:x.size*x.qty*0.001})),
-    waste:rows(17,24,r=>({name:String(c('J'+r)||''),size:trNum(c('K'+r)),qty:trNum(c('L'+r))})).map(x=>({...x,kg:x.size*x.qty*0.001}))};
+const trF=x=>(Math.round(x*10)/10).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:1});
+const trSign=x=>(x>0?'+':'')+trF(x);
+let _trDate=null;                                   // report date (YYYY-MM-DD)
+let _trOrd=LS.get('iat_tr_orders',null);            // {src:'excel'|'app', read:ts, rows:[{num,customer,product,qty}]}
+const trDay=()=>_trDate||(document.getElementById('orderDate')&&document.getElementById('orderDate').value)||todayStr();
+const trKey=()=>'iat_tr_in_'+trDay(), trManKey=()=>'iat_tr_man_'+trDay();
+const trIn=()=>Object.assign({n:'',open:'',ret:'',close:'',trim:'',waste:''},LS.get(trKey(),{})||{});
+const trMan=()=>{const m=LS.get(trManKey(),[]);return Array.isArray(m)?m:[];};
+function trKg(product,qty){                         // "KG" -> qty is kg ; "Zaki 400gr" -> qty trays x 0.4
+  const q=trNum(qty), m=/(\d{3,4})\s*(?:gr|g|gm)?\b/i.exec(String(product||''));
+  if(!m||/^\s*kg\s*$/i.test(String(product||''))) return q;
+  return q*parseInt(m[1])/1000;
+}
+function trAppOrders(){ return {src:'app',read:Date.now(),rows:(tenderOrders||[]).filter(o=>o&&o.product&&trNum(o.qty)>0).map(o=>({num:o.num||'',customer:o.customer||'',product:o.product,qty:trNum(o.qty)}))}; }
+async function trFetchExcel(silent){
+  const token=silent?await getODTokenSilent():await getODToken(), H={Authorization:'Bearer '+token};
+  const fr=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,{headers:H});
+  if(!fr.ok) throw new Error('production.xlsm not found');
+  const fileId=(await fr.json()).id;
+  const rr=await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/workbook/worksheets/${encodeURIComponent('tender order')}/range(address='AJ5:AQ600')`,{headers:H});
+  if(!rr.ok) throw new Error('could not read the "tender order" sheet');
+  const rows=[];
+  ((await rr.json()).values||[]).forEach(v=>{ const prod=String(v[4]==null?'':v[4]).trim(), q=trNum(v[5]); if(prod&&q>0) rows.push({num:v[0]===''?'':v[0],customer:String(v[2]||v[3]||'').trim(),product:prod,qty:q}); });
+  return {src:'excel',read:Date.now(),rows};
 }
 async function trRead(){
   const btn=document.getElementById('trReadBtn'); if(btn){btn.disabled=true;btn.textContent='⏳...';}
-  try{
-    const token=await getODToken(), H={Authorization:'Bearer '+token};
-    const fr=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/${PRODUCTION_PATH}`,{headers:H});
-    if(!fr.ok) throw new Error('production.xlsm not found');
-    const fileId=(await fr.json()).id, sh=trSheet();
-    const rr=await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/workbook/worksheets/${encodeURIComponent(sh)}/range(address='A1:M25')`,{headers:H});
-    if(!rr.ok) throw new Error('could not read sheet "'+sh+'"');
-    _trData=trParse((await rr.json()).values,sh); LS.set('iat_tr_data',_trData);
-    trRender(); toast('✓ Report read from Excel','ok');
-  }catch(e){ toast('⚠ '+(e.message||e),'err'); }
-  finally{ if(btn){btn.disabled=false;btn.textContent='🔄 Read Excel';} }
+  try{ _trOrd=await trFetchExcel(false); LS.set('iat_tr_orders',_trOrd); toast('✓ '+_trOrd.rows.length+' order lines read from Excel','ok'); }
+  catch(e){ _trOrd=trAppOrders(); toast('⚠ '+(e.message||e)+' - showing the orders saved in the app','err'); }
+  finally{ if(btn){btn.disabled=false;btn.textContent='🔄 Orders';} trRender(); }
 }
-const trManKey=d=>'iat_tr_man_'+d, trNKey=d=>'iat_tr_n_'+d;
-const trMan=d=>{const m=LS.get(trManKey(d),[]); return Array.isArray(m)?m:[];};
-function trCalc(d){
-  const man=trMan(d.date), nSheet=d.brands.reduce((s,b)=>s+b.ctn,0), nOv=trNum(LS.get(trNKey(d.date),''));
-  const n=nOv>0?nOv:nSheet, batches=n/TREP.BATCH;
-  const exp={raw:n*TREP.RAW,defrost:n*TREP.KG,chem:batches*TREP.CHEM,water:batches*TREP.WATER};
-  const openSum=d.open.tender+d.open.defrost+d.open.ret+d.open.urossa;
-  const retKg=d.returns.reduce((s,x)=>s+x.kg,0);
-  const manIn=man.filter(x=>x.t==='in').reduce((s,x)=>s+trNum(x.kg),0);
-  const manOut=man.filter(x=>x.t==='out').reduce((s,x)=>s+trNum(x.kg),0);
-  const goodsKg=d.goods.reduce((s,x)=>s+x.kg,0), closeKg=d.closing.reduce((s,x)=>s+x.kg,0), waste=d.waste.reduce((s,x)=>s+x.kg,0);
-  const inA=d.defrost+d.chem+d.water+openSum+retKg+manIn;
-  const inE=exp.defrost+exp.chem+exp.water+openSum+retKg+manIn;
-  const out=goodsKg+closeKg+manOut;
-  const mk=i=>({inp:i,diff:out-i,pct:i?(out-i)/i*100:0,afterWaste:out+waste-i,pctW:i?(out+waste-i)/i*100:0});
-  return {man,n,nSheet,nOv,batches,exp,openSum,retKg,manIn,manOut,goodsKg,closeKg,waste,out,act:mk(inA),est:mk(inE)};
+async function trAuto(){                            // opening the page: silent Excel read, else the app's own orders
+  if(!_trOrd){ _trOrd=trAppOrders(); }
+  trRender();
+  try{ _trOrd=await trFetchExcel(true); LS.set('iat_tr_orders',_trOrd); trRender(); }catch(e){ if(!_trOrd||_trOrd.src!=='excel'){ _trOrd=trAppOrders(); trRender(); } }
 }
-const trF=x=>(Math.round(x*10)/10).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:1});
-const trSign=x=>(x>0?'+':'')+trF(x);
-function trVerdict(r){
-  const loss=r.diff<0, c=Math.abs(r.pct)<0.05?'var(--muted)':(loss?'var(--red)':'var(--teal)');
-  return `<span style="color:${c};font-weight:800">${trSign(r.diff)} kg &nbsp;(${r.pct>0?'+':''}${(Math.round(r.pct*10)/10)}%)</span> <span style="color:var(--muted);font-size:.62rem">${Math.abs(r.pct)<0.05?'':(loss?'loss':'gain')}</span>`;
+function trCalc(){
+  const i=trIn(), man=trMan(), n=trNum(i.n), batches=n/TREP.BATCH;
+  const calc={n,batches,raw:n*TREP.RAW,defrost:n*TREP.KG,chem:batches*TREP.CHEM,water:batches*TREP.WATER};
+  const rows=(_trOrd&&_trOrd.rows)||[];
+  const byProd=new Map(), byOrd=new Map();
+  rows.forEach(r=>{
+    const kg=trKg(r.product,r.qty), pk=String(r.product).toLowerCase().replace(/\s+/g,' ').trim();
+    const ok=(r.num===''?'':r.num)+'|'+r.customer;
+    if(!byProd.has(pk)) byProd.set(pk,{name:r.product,qty:0,kg:0,ords:new Set()});
+    const p=byProd.get(pk); p.qty+=r.qty; p.kg+=kg; p.ords.add(ok);
+    if(!byOrd.has(ok)) byOrd.set(ok,{num:r.num,customer:r.customer,kg:0,items:[]});
+    const o=byOrd.get(ok); o.kg+=kg; o.items.push(r.product+' × '+trF(r.qty));
+  });
+  const prods=[...byProd.values()].sort((a,b)=>b.kg-a.kg), ords=[...byOrd.values()].sort((a,b)=>(trNum(a.num)-trNum(b.num))||String(a.customer).localeCompare(String(b.customer)));
+  const ordersKg=prods.reduce((s,p)=>s+p.kg,0);
+  const manOrderKg=man.filter(x=>x.t==='order').reduce((s,x)=>s+trKg(x.l,x.q),0);
+  const manOut=man.filter(x=>x.t==='out').reduce((s,x)=>s+trNum(x.q),0), manIn=man.filter(x=>x.t==='in').reduce((s,x)=>s+trNum(x.q),0);
+  const open=trNum(i.open), ret=trNum(i.ret), close=trNum(i.close), trim=trNum(i.trim), waste=trNum(i.waste);
+  const inp=calc.defrost+calc.chem+calc.water+open+ret+manIn;
+  const out=ordersKg+manOrderKg+trim+close+manOut;
+  const diff=out-inp, pct=inp?diff/inp*100:0;
+  return {i,man,calc,prods,ords,ordersKg,manOrderKg,manOut,manIn,open,ret,close,trim,waste,inp,out,diff,pct,afterWaste:diff+waste,pctW:inp?(diff+waste)/inp*100:0,orderCount:ords.length};
 }
+function trVerdict(diff,pct){
+  const z=Math.abs(pct)<0.05, c=z?'var(--muted)':(diff<0?'var(--red)':'var(--teal)');
+  return `<span style="color:${c};font-weight:800">${trSign(diff)} kg &nbsp;(${pct>0?'+':''}${Math.round(pct*10)/10}%)</span> <span style="color:var(--muted);font-size:.62rem">${z?'':(diff<0?'loss':'gain')}</span>`;
+}
+function trSet(k,v){ const i=trIn(); i[k]=v; LS.set(trKey(),i); trRender(); }
+function trSetDate(v){ _trDate=v||null; trRender(); }
 function trRender(){
-  const box=document.getElementById('trBody'), sub=document.getElementById('trSub'); if(!box) return;
-  const d=_trData;
-  if(!d){ box.innerHTML='<div style="color:var(--muted);text-align:center;padding:30px 10px;font-size:.8rem">Tap <b>🔄 Read Excel</b> to load the tender report from production.xlsm.</div>'+trSettingsHTML(); return; }
-  const r=trCalc(d), line=(a,b,c)=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:3px 0;font-size:.74rem;border-bottom:1px dashed var(--b1)"><span style="color:var(--muted)">${a}</span><span style="text-align:right">${b}${c?` <span style="color:var(--muted);font-size:.62rem">${c}</span>`:''}</span></div>`;
+  const box=document.getElementById('trBody'); if(!box) return;
+  const r=trCalc(), c=r.calc, line=(a,b,x)=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:3px 0;font-size:.74rem;border-bottom:1px dashed var(--b1)"><span style="color:var(--muted)">${a}</span><span style="text-align:right">${b}${x?` <span style="color:var(--muted);font-size:.62rem">${x}</span>`:''}</span></div>`;
   const card=(t,body,col)=>`<div style="background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:10px 12px"><div style="font-size:.66rem;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;color:${col||'var(--blue2)'};margin-bottom:6px">${t}</div>${body}</div>`;
-  const dlt=(a,e)=>{const x=a-e; return `${trF(a)} <span style="color:${Math.abs(x)<0.05?'var(--muted)':(x<0?'var(--amber)':'var(--teal)')};font-size:.62rem">(${trSign(x)} vs expected ${trF(e)})</span>`;};
-  sub.textContent=d.date+' · sheet "'+d.sheet+'" · read '+new Date(d.read).toTimeString().slice(0,5);
+  const inp=(k,ph,w)=>`<input type="number" step="0.1" inputmode="decimal" value="${trEsc(r.i[k])}" placeholder="${ph}" onchange="trSet('${k}',this.value)" style="width:${w||'100%'};background:var(--s2);color:var(--txt);border:1px solid var(--b2);border-radius:6px;padding:7px;font-size:.8rem"/>`;
+  const lab=(t,el)=>`<label style="display:flex;flex-direction:column;gap:3px;font-size:.62rem;color:var(--muted)">${t}${el}</label>`;
+  document.getElementById('trSub').textContent=trDay()+' · orders: '+(_trOrd?(_trOrd.src==='excel'?'Excel':'saved in the app')+' · '+new Date(_trOrd.read).toTimeString().slice(0,5):'—');
   let h='';
-  h+=card('Result',
-    `<div style="font-size:.7rem;color:var(--muted)">Actual (what you typed in Excel)</div><div style="font-size:1.05rem;margin:2px 0 6px">${trVerdict(r.act)}</div>`
-    +`<div style="font-size:.7rem;color:var(--muted)">Expected (from cartons: ${trF(r.n)} ctn, water ${TREP.WATER} kg per 8)</div><div style="font-size:.95rem;margin:2px 0 6px">${trVerdict(r.est)}</div>`
-    +(r.waste>0?`<div style="font-size:.7rem;color:var(--muted)">Actual, counting the recorded waste (${trF(r.waste)} kg) as accounted for</div><div style="font-size:.85rem;margin-top:2px">${trVerdict({diff:r.act.afterWaste,pct:r.act.pctW})}</div>`:''),'var(--amber)');
-  h+=card('Cartons & machine',
-    line('Cartons used',trF(r.n)+(r.nOv>0?' <span style="color:var(--amber)">(manual)</span>':''),r.nOv>0?'sheet: '+trF(r.nSheet):'from the sheet')
-    +line('Machine loads (8 ctn each)',trF(r.batches))
-    +d.brands.filter(b=>b.ctn>0).map(b=>line(trEsc(b.name),trF(b.ctn)+' ctn',trF(b.ctn*b.size)+' kg raw')).join('')
-    +line('Raw weight (12 kg/ctn)',trF(r.exp.raw)+' kg')
-    +line('After defrost',dlt(d.defrost,r.exp.defrost)+' kg',r.n?trF(d.defrost/r.n)+' kg/ctn':'')
-    +line('Chemical',dlt(d.chem,r.exp.chem)+' kg')
-    +line('Water',dlt(d.water,r.exp.water)+' kg'));
-  h+=card('Input',
-    line('After defrost',trF(d.defrost))+line('Chemical',trF(d.chem))+line('Water',trF(d.water))
-    +line('Balance tender (start)',trF(d.open.tender))+line('Balance defrost (start)',trF(d.open.defrost))
-    +line('Balance return (start)',trF(d.open.ret))+line('Balance urossa (start)',trF(d.open.urossa))
-    +line('Returns today',trF(r.retKg),d.returns.filter(x=>x.kg>0).map(x=>trEsc(x.name)+' '+x.size+'g×'+trF(x.qty)).join(', '))
-    +(r.manIn?line('Manual additions (in)',trSign(r.manIn)):'')
-    +line('<b>Total input (actual)</b>','<b>'+trF(r.act.inp)+'</b>'),'var(--teal)');
-  h+=card('Output',
-    d.goods.filter(x=>x.kg).map(x=>line(trEsc(x.name)+' '+x.size,trF(x.kg),trF(x.qty)+' qty')).join('')
-    +d.closing.filter(x=>x.kg).map(x=>line(trEsc(x.name)+' (end)',trF(x.kg))).join('')
-    +(r.manOut?line('Manual additions (out)',trSign(r.manOut)):'')
-    +line('<b>Total output</b>','<b>'+trF(r.out)+'</b>')
-    +(r.waste>0?line('Waste (not in total)',trF(r.waste),d.waste.filter(x=>x.kg).map(x=>trEsc(x.name)+' '+x.size+'g×'+trF(x.qty)).join(', ')):''),'var(--amber)');
-  const mans=r.man.map((x,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:.74rem;border-bottom:1px dashed var(--b1)"><span class="x" onclick="trDelMan(${i})" style="color:var(--red);cursor:pointer;padding:0 4px">✕</span><span style="flex:1">${x.t==='in'?'⬇ in':'⬆ out'} · ${trEsc(x.l||'')}${x.n?` <span style="color:var(--muted)">(${trEsc(x.n)})</span>`:''}</span><b>${trF(trNum(x.kg))} kg</b></div>`).join('');
-  h+=card('Manual lines (extra quantity / balance / anything)',
-    (mans||'<div style="font-size:.7rem;color:var(--muted);padding:2px 0 6px">None yet. Added lines are saved for this date and counted in the result.</div>')
+  h+=card('1 · Cartons',
+    `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${lab('Cartons used',inp('n','0'))}${lab('Date',`<input type="date" value="${trDay()}" onchange="trSetDate(this.value)" style="background:var(--s2);color:var(--txt);border:1px solid var(--b2);border-radius:6px;padding:6px;font-size:.78rem"/>`)}</div>`
+    +`<div style="margin-top:8px">`+line('Machine loads (8 cartons each)',trF(c.batches))+line('Raw weight (12 kg per carton)',trF(c.raw)+' kg')
+    +line('After defrost (10 kg per carton)',trF(c.defrost)+' kg')+line('Chemical (1.4 kg per machine)',trF(c.chem)+' kg')+line('Water (20 kg per machine)',trF(c.water)+' kg')
+    +line('<b>Into the tenderizer</b>','<b>'+trF(c.defrost+c.chem+c.water)+' kg</b>')+`</div>`,'var(--amber)');
+  h+=card('2 · Balances, returns, trimming (typed by you, kg)',
+    `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${lab('Balance at start',inp('open','0'))}${lab('Returns (added at start)',inp('ret','0'))}${lab('Balance at end (measured)',inp('close','0'))}${lab('Trimming (measured)',inp('trim','0'))}${lab('Waste (info only)',inp('waste','0'))}</div>`,'var(--blue2)');
+  const sums=r.prods.map(p=>`<tr><td style="padding:3px 0">${trEsc(p.name)}</td><td style="text-align:right">${p.ords.size}</td><td style="text-align:right">${trF(p.qty)}</td><td style="text-align:right"><b>${trF(p.kg)}</b></td></tr>`).join('');
+  const ords=r.ords.map(o=>line(`<b>${trEsc(o.num===''?'':'#'+o.num)}</b> ${trEsc(o.customer)}`,trF(o.kg)+' kg',trEsc(o.items.join(' · ')))).join('');
+  h+=card('3 · Tender orders ('+r.orderCount+' orders)',
+    (r.prods.length?`<table style="width:100%;font-size:.72rem;border-collapse:collapse"><tr style="color:var(--muted);font-size:.62rem"><td>Product</td><td style="text-align:right">Orders</td><td style="text-align:right">Qty</td><td style="text-align:right">KG</td></tr>${sums}<tr style="border-top:1px solid var(--b2)"><td colspan="3" style="padding-top:4px"><b>Total orders</b></td><td style="text-align:right;padding-top:4px"><b>${trF(r.ordersKg)}</b></td></tr></table>`:'<div style="font-size:.74rem;color:var(--muted)">No tender orders found.</div>')
+    +(ords?`<div style="margin-top:8px;font-size:.62rem;color:var(--muted)">Each order</div>${ords}`:''),'var(--teal)');
+  const mans=r.man.map((x,k)=>`<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:.74rem;border-bottom:1px dashed var(--b1)"><span onclick="trDelMan(${k})" style="color:var(--red);cursor:pointer;padding:0 4px">✕</span><span style="flex:1">${x.t==='order'?'📦 order not in system':x.t==='in'?'⬇ other input':'⬆ other output'} · ${trEsc(x.l||'')}${x.t==='order'?' × '+trF(trNum(x.q)):''}</span><b>${trF(x.t==='order'?trKg(x.l,x.q):trNum(x.q))} kg</b></div>`).join('');
+  h+=card('4 · Extras (orders not entered, anything else)',
+    (mans||'<div style="font-size:.7rem;color:var(--muted);padding:2px 0 6px">None.</div>')
     +`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
-      <select id="trT" style="background:var(--s2);color:var(--txt);border:1px solid var(--b2);border-radius:6px;padding:6px;font-size:.74rem"><option value="in">in (adds to input)</option><option value="out">out (adds to output)</option></select>
-      <input id="trL" placeholder="What" style="flex:1;min-width:90px;background:var(--s2);color:var(--txt);border:1px solid var(--b2);border-radius:6px;padding:6px;font-size:.74rem"/>
-      <input id="trK" type="number" step="0.1" inputmode="decimal" placeholder="kg" style="width:70px;background:var(--s2);color:var(--txt);border:1px solid var(--b2);border-radius:6px;padding:6px;font-size:.74rem"/>
-      <button class="btn btn-teal btn-sm" onclick="trAddMan()" style="font-size:.72rem;padding:5px 10px">＋ Add</button></div>`,'var(--blue2)');
-  box.innerHTML=h+trSettingsHTML();
-}
-function trSettingsHTML(){
-  const d=_trData, nOv=d?LS.get(trNKey(d.date),''):'';
-  return `<div style="background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:10px 12px;font-size:.72rem;color:var(--muted);display:flex;flex-direction:column;gap:6px">
-    <div>Excel sheet to read: <input id="trSh" value="${trEsc(trSheet())}" onchange="LS.set('iat_tr_sheet',this.value.trim()||'REPORT TENDER (2)')" style="background:var(--s2);color:var(--txt);border:1px solid var(--b2);border-radius:6px;padding:5px;font-size:.72rem;width:170px"/></div>
-    ${d?`<div>Cartons (empty = from the sheet): <input type="number" id="trN" value="${trEsc(nOv)}" onchange="LS.set(trNKey(_trData.date),this.value);trRender()" style="background:var(--s2);color:var(--txt);border:1px solid var(--b2);border-radius:6px;padding:5px;font-size:.72rem;width:70px"/></div>`:''}
-    <div>Rules: 12 kg raw → 10 kg after defrost per carton · machine = 8 cartons · chemical 1.4 kg and water 20 kg per machine.</div></div>`;
+      <select id="trT" style="background:var(--s2);color:var(--txt);border:1px solid var(--b2);border-radius:6px;padding:6px;font-size:.74rem"><option value="order">order not entered</option><option value="out">other output (kg)</option><option value="in">other input (kg)</option></select>
+      <input id="trL" list="trProds" placeholder="Product / what" style="flex:1;min-width:110px;background:var(--s2);color:var(--txt);border:1px solid var(--b2);border-radius:6px;padding:6px;font-size:.74rem"/>
+      <datalist id="trProds">${(typeof tenderProds!=='undefined'?tenderProds:[]).map(p=>`<option value="${trEsc(p)}">`).join('')}</datalist>
+      <input id="trK" type="number" step="0.1" inputmode="decimal" placeholder="qty / kg" style="width:80px;background:var(--s2);color:var(--txt);border:1px solid var(--b2);border-radius:6px;padding:6px;font-size:.74rem"/>
+      <button class="btn btn-teal btn-sm" onclick="trAddMan()" style="font-size:.72rem;padding:5px 10px">＋ Add</button></div>
+      <div style="font-size:.6rem;color:var(--muted);margin-top:4px">For "order not entered": product like <i>Zaki 400gr</i> and the number of trays (or kg for KG).</div>`,'var(--blue2)');
+  h+=card('Result',
+    line('Total input',trF(r.inp)+' kg')+line('Total output (orders + extras + trimming + end balance)',trF(r.out)+' kg')
+    +`<div style="font-size:1.1rem;margin:8px 0 2px">${trVerdict(r.diff,r.pct)}</div>`
+    +(r.waste>0?`<div style="font-size:.7rem;color:var(--muted);margin-top:4px">With the waste (${trF(r.waste)} kg) counted as accounted for:</div><div style="font-size:.85rem">${trVerdict(r.afterWaste,r.pctW)}</div>`:''),'var(--amber)');
+  box.innerHTML=h;
 }
 function trAddMan(){
-  if(!_trData){toast('Read the Excel first','err');return;}
-  const t=document.getElementById('trT').value, l=document.getElementById('trL').value.trim(), k=trNum(document.getElementById('trK').value);
-  if(!k){toast('Type the kg','err');return;}
-  const m=trMan(_trData.date); m.push({t,l,kg:k}); LS.set(trManKey(_trData.date),m); trRender();
+  const t=document.getElementById('trT').value, l=document.getElementById('trL').value.trim(), q=trNum(document.getElementById('trK').value);
+  if(!q){toast('Type the quantity','err');return;}
+  if(t==='order'&&!l){toast('Type the product','err');return;}
+  const m=trMan(); m.push({t,l,q}); LS.set(trManKey(),m); trRender();
 }
-function trDelMan(i){ const m=trMan(_trData.date); m.splice(i,1); LS.set(trManKey(_trData.date),m); trRender(); }
+function trDelMan(k){ const m=trMan(); m.splice(k,1); LS.set(trManKey(),m); trRender(); }
 function trText(){
-  const d=_trData; if(!d) return '';
-  const r=trCalc(d), L=[];
-  L.push('📈 *Tender report* '+d.date,'');
-  L.push(`Cartons: ${trF(r.n)} (${trF(r.batches)} machine loads)`);
-  L.push(`After defrost: ${trF(d.defrost)} kg | Chemical: ${trF(d.chem)} | Water: ${trF(d.water)}`);
-  L.push(`Start balances: ${trF(r.openSum)} kg | Returns: ${trF(r.retKg)} kg`+(r.manIn?` | Manual in: ${trSign(r.manIn)}`:''));
-  L.push('','*Input:* '+trF(r.act.inp)+' kg','*Output:* '+trF(r.out)+' kg'+(r.manOut?` (manual ${trSign(r.manOut)})`:''));
-  L.push('*Result:* '+trSign(r.act.diff)+' kg ('+(r.act.pct>0?'+':'')+(Math.round(r.act.pct*10)/10)+'%) '+(r.act.diff<0?'loss':'gain'));
-  if(r.waste>0) L.push('Waste: '+trF(r.waste)+' kg');
-  r.man.forEach(x=>L.push('• '+(x.t==='in'?'in':'out')+' '+(x.l||'')+': '+trF(trNum(x.kg))+' kg'));
+  const r=trCalc(), c=r.calc, L=[];
+  L.push('📈 *Tender report* '+trDay(),'');
+  L.push(`Cartons: ${trF(c.n)} (${trF(c.batches)} machines)`,`After defrost ${trF(c.defrost)} kg | Chemical ${trF(c.chem)} | Water ${trF(c.water)}`);
+  if(r.open||r.ret) L.push(`Start balance ${trF(r.open)} kg | Returns ${trF(r.ret)} kg`);
+  L.push('',`*Orders (${r.orderCount}):*`); r.prods.forEach(p=>L.push(`• ${p.name}: ${trF(p.qty)} = ${trF(p.kg)} kg`));
+  L.push(`Total orders: ${trF(r.ordersKg)} kg`);
+  r.man.forEach(x=>L.push(`+ ${x.t==='order'?'order not entered: ':x.t==='in'?'input: ':'output: '}${x.l||''} ${x.t==='order'?'× '+trF(trNum(x.q))+' = '+trF(trKg(x.l,x.q))+' kg':trF(trNum(x.q))+' kg'}`));
+  L.push(`Trimming: ${trF(r.trim)} kg | End balance: ${trF(r.close)} kg`+(r.waste?` | Waste: ${trF(r.waste)} kg`:''));
+  L.push('',`*Input:* ${trF(r.inp)} kg`,`*Output:* ${trF(r.out)} kg`,`*Result:* ${trSign(r.diff)} kg (${r.pct>0?'+':''}${Math.round(r.pct*10)/10}%) ${r.diff<0?'loss':'gain'}`);
   return L.join('\n');
 }
-function trCopy(){
-  const t=trText(); if(!t){toast('Read the Excel first','err');return;}
-  const done=()=>toast('Copied','ok');
-  if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done,()=>prompt('Copy:',t)); else prompt('Copy:',t);
+function trWA(){ window.open('https://wa.me/?text='+encodeURIComponent(trText()),'_blank'); }
+function trPrint(){
+  const r=trCalc(), c=r.calc, e=trEsc, row=(a,b,x)=>`<tr><td>${a}</td><td class="r">${b}</td><td class="n">${x||''}</td></tr>`;
+  const cls=Math.abs(r.pct)<0.05?'':(r.diff<0?'loss':'gain');
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Tender report ${trDay()}</title><style>
+  @page{size:A4;margin:12mm}body{font-family:Arial,sans-serif;color:#000;font-size:12px}h1{margin:0;font-size:22px}.sub{color:#555;margin:2px 0 12px}
+  h2{font-size:13px;margin:14px 0 4px;border-bottom:2px solid #333;padding-bottom:2px}table{width:100%;border-collapse:collapse}
+  td,th{padding:4px 6px;border-bottom:1px solid #ddd;text-align:left}th{background:#eee;font-size:11px}.r{text-align:right;white-space:nowrap}.n{color:#666;font-size:10px}
+  .tot td{font-weight:bold;border-top:2px solid #333;background:#f3f3f3}.res{margin-top:14px;padding:10px;border:2px solid #333;font-size:16px;font-weight:bold}.loss{color:#b00020}.gain{color:#08733c}
+  </style></head><body><h1>IAT Trading — Tender Report</h1><div class="sub">${e(trDay())}</div>
+  <h2>Production</h2><table>${row('Cartons used',trF(c.n))}${row('Machine loads (8 cartons)',trF(c.batches))}${row('Raw weight (12 kg/ctn)',trF(c.raw)+' kg')}${row('After defrost (10 kg/ctn)',trF(c.defrost)+' kg')}${row('Chemical',trF(c.chem)+' kg')}${row('Water',trF(c.water)+' kg')}</table>
+  <h2>Input</h2><table>${row('Into the tenderizer (defrost + chemical + water)',trF(c.defrost+c.chem+c.water)+' kg')}${row('Balance at start',trF(r.open)+' kg')}${row('Returns',trF(r.ret)+' kg')}${r.manIn?row('Other input',trF(r.manIn)+' kg'):''}<tr class="tot"><td>Total input</td><td class="r">${trF(r.inp)} kg</td><td></td></tr></table>
+  <h2>Tender orders (${r.orderCount})</h2><table><tr><th>Product</th><th class="r">Orders</th><th class="r">Qty</th><th class="r">KG</th></tr>${r.prods.map(p=>`<tr><td>${e(p.name)}</td><td class="r">${p.ords.size}</td><td class="r">${trF(p.qty)}</td><td class="r">${trF(p.kg)}</td></tr>`).join('')}<tr class="tot"><td colspan="3">Total orders</td><td class="r">${trF(r.ordersKg)}</td></tr></table>
+  ${r.ords.length?`<h2>Each order</h2><table>${r.ords.map(o=>row((o.num===''?'':'#'+e(o.num)+' ')+e(o.customer),trF(o.kg)+' kg',e(o.items.join(' · ')))).join('')}</table>`:''}
+  <h2>Output</h2><table>${row('Orders',trF(r.ordersKg)+' kg')}${r.man.filter(x=>x.t==='order').map(x=>row('Order not entered: '+e(x.l),trF(trKg(x.l,x.q))+' kg','× '+trF(trNum(x.q)))).join('')}${r.manOut?row('Other output',trF(r.manOut)+' kg'):''}${row('Trimming',trF(r.trim)+' kg')}${row('Balance at end',trF(r.close)+' kg')}<tr class="tot"><td>Total output</td><td class="r">${trF(r.out)} kg</td><td></td></tr>${r.waste?row('Waste (info)',trF(r.waste)+' kg'):''}</table>
+  <div class="res">Result: <span class="${cls}">${trSign(r.diff)} kg (${r.pct>0?'+':''}${Math.round(r.pct*10)/10}%) ${cls==='loss'?'loss':cls==='gain'?'gain':''}</span></div>
+  <script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`;
+  const w=window.open('','_blank'); if(!w){toast('Allow pop-ups to open the report','err');return;}
+  w.document.write(html); w.document.close();
 }
-function trWA(){ const t=trText(); if(!t){toast('Read the Excel first','err');return;} window.open('https://wa.me/?text='+encodeURIComponent(t),'_blank'); }
 document.addEventListener('DOMContentLoaded',()=>{ try{trRender();}catch(e){} });
 </script>
 
