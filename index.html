@@ -7271,8 +7271,9 @@ function sendDriversWhatsAppFromPage(){
       <div id="trSub" style="font-size:.6rem;color:var(--muted);margin-top:2px"></div></div>
     <div style="display:flex;gap:6px">
       <button class="btn btn-teal btn-sm" id="trReadBtn" onclick="trRead()" style="font-size:.7rem;padding:4px 8px">🔄 Orders</button>
-      <button class="btn btn-ghost btn-sm" onclick="trPrint()" style="font-size:.7rem;padding:4px 8px">📄 Report</button>
-      <button class="btn btn-green btn-sm" onclick="trWA()" style="font-size:.7rem;padding:4px 8px">💬</button>
+      <button class="btn btn-ghost btn-sm" onclick="trPrint()" title="Details (for me)" style="font-size:.7rem;padding:4px 8px">📄 Details</button>
+      <button class="btn btn-ghost btn-sm" onclick="trPrintPresent()" title="Report to present" style="font-size:.7rem;padding:4px 8px">📤 Present</button>
+      <button class="btn btn-green btn-sm" onclick="trWA()" title="Send the presented report on WhatsApp" style="font-size:.7rem;padding:4px 8px">💬</button>
     </div>
   </div>
   <div id="trBody" style="flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:10px"></div>
@@ -8031,16 +8032,17 @@ function trRender(){
     +`<div style="font-size:.62rem;color:var(--muted);margin-bottom:6px">Sheet: <input value="${trEsc(trSheetName())}" onchange="LS.set('iat_tr_sheetname',this.value.trim()||'tender order')" style="background:var(--s2);color:var(--txt);border:1px solid var(--b2);border-radius:6px;padding:4px;font-size:.68rem;width:120px"/> · the file is remembered for this date</div>`
     +(r.prods.length?`<table style="width:100%;font-size:.72rem;border-collapse:collapse"><tr style="color:var(--muted);font-size:.62rem"><td>Product</td><td style="text-align:right">Orders</td><td style="text-align:right">Qty</td><td style="text-align:right">KG</td></tr>${sums}<tr style="border-top:1px solid var(--b2)"><td colspan="3" style="padding-top:4px"><b>Total orders</b></td><td style="text-align:right;padding-top:4px"><b>${trF(r.ordersKg)}</b></td></tr></table>`:'<div style="font-size:.74rem;color:var(--muted)">No tender orders found.</div>')
     +(ords?`<div style="margin-top:8px;font-size:.62rem;color:var(--muted)">Each order</div>${ords}`:''),'var(--teal)');
-  const mans=r.man.map((x,k)=>`<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:.74rem;border-bottom:1px dashed var(--b1)"><span onclick="trDelMan(${k})" style="color:var(--red);cursor:pointer;padding:0 4px">✕</span><span style="flex:1">${x.t==='order'?'📦 order not in system':x.t==='in'?'⬇ other input':'⬆ other output'} · ${trEsc(x.l||'')}${x.t==='order'?' × '+trF(trNum(x.q)):''}</span><b>${trF(x.t==='order'?trKg(x.l,x.q):trNum(x.q))} kg</b></div>`).join('');
+  const mans=r.man.map((x,k)=>`<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:.74rem;border-bottom:1px dashed var(--b1)"><span onclick="trDelMan(${k})" style="color:var(--red);cursor:pointer;padding:0 4px">✕</span><span style="flex:1">${x.t==='order'?'📦 extra order'+(x.c?' · '+trEsc(x.c):''):x.t==='in'?'⬇ other input':'⬆ other output'} · ${trEsc(x.l||'')}${x.t==='order'?' × '+trF(trNum(x.q)):''}</span><b>${trF(x.t==='order'?trKg(x.l,x.q):trNum(x.q))} kg</b></div>`).join('');
   h+=card('4 · Extras (orders not entered, anything else)',
     (mans||'<div style="font-size:.7rem;color:var(--muted);padding:2px 0 6px">None.</div>')
     +`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
       <select id="trT" style="background:var(--s2);color:var(--txt);border:1px solid var(--b2);border-radius:6px;padding:6px;font-size:.74rem"><option value="order">order not entered</option><option value="out">other output (kg)</option><option value="in">other input (kg)</option></select>
+      <input id="trC" placeholder="Customer (optional)" style="flex:1;min-width:110px;background:var(--s2);color:var(--txt);border:1px solid var(--b2);border-radius:6px;padding:6px;font-size:.74rem"/>
       <input id="trL" list="trProds" placeholder="Product / what" style="flex:1;min-width:110px;background:var(--s2);color:var(--txt);border:1px solid var(--b2);border-radius:6px;padding:6px;font-size:.74rem"/>
       <datalist id="trProds">${(typeof tenderProds!=='undefined'?tenderProds:[]).map(p=>`<option value="${trEsc(p)}">`).join('')}</datalist>
       <input id="trK" type="number" step="0.1" inputmode="decimal" placeholder="qty / kg" style="width:80px;background:var(--s2);color:var(--txt);border:1px solid var(--b2);border-radius:6px;padding:6px;font-size:.74rem"/>
       <button class="btn btn-teal btn-sm" onclick="trAddMan()" style="font-size:.72rem;padding:5px 10px">＋ Add</button></div>
-      <div style="font-size:.6rem;color:var(--muted);margin-top:4px">For "order not entered": product like <i>Zaki 400gr</i> and the number of trays (or kg for KG).</div>`,'var(--blue2)');
+      <div style="font-size:.6rem;color:var(--muted);margin-top:4px">For "order not entered": product like <i>Zaki 400gr</i> and the number of trays (or kg for KG). In the presented report these get the next order numbers.</div>`,'var(--blue2)');
   h+=card('Result',
     line('Total input',trF(r.inp)+' kg')+line('Total output (orders + extras + trimming + end balance)',trF(r.out)+' kg')
     +`<div style="font-size:1.1rem;margin:8px 0 2px">${trVerdict(r.diff,r.pct)}</div>`
@@ -8051,7 +8053,7 @@ function trAddMan(){
   const t=document.getElementById('trT').value, l=document.getElementById('trL').value.trim(), q=trNum(document.getElementById('trK').value);
   if(!q){toast('Type the quantity','err');return;}
   if(t==='order'&&!l){toast('Type the product','err');return;}
-  const m=trMan(); m.push({t,l,q}); LS.set(trManKey(),m); trRender();
+  const m=trMan(); m.push({t,l,q,c:(t==='order'?(document.getElementById('trC').value||'').trim():'')}); LS.set(trManKey(),m); trRender();
 }
 function trDelMan(k){ const m=trMan(); m.splice(k,1); LS.set(trManKey(),m); trRender(); }
 function trText(){
@@ -8066,7 +8068,82 @@ function trText(){
   L.push('',`*Input:* ${trF(r.inp)} kg`,`*Output:* ${trF(r.out)} kg`,`*Result:* ${trSign(r.diff)} kg (${r.pct>0?'+':''}${Math.round(r.pct*10)/10}%) ${r.diff<0?'loss':'gain'}`);
   return L.join('\n');
 }
-function trWA(){ window.open('https://wa.me/?text='+encodeURIComponent(trText()),'_blank'); }
+
+// ── PRESENTED report: no machine loads / input / defrost / chemical / water / start balance / result ──
+function trPresentData(){
+  const r=trCalc(), rows=((_trOrd&&_trOrd.rows)||[]).slice();
+  let last=0; rows.forEach(x=>{const n=parseInt(x.num); if(isFinite(n)&&n>last) last=n;});
+  const ords=r.ords.map(o=>({num:o.num,customer:o.customer,kg:o.kg,items:o.items,extra:false}));
+  r.man.filter(x=>x.t==='order').forEach(x=>{ last++; ords.push({num:last,customer:x.c||'Extra order',kg:trKg(x.l,x.q),items:[x.l+' × '+trF(trNum(x.q))],extra:true}); });
+  const g=new Map();
+  rows.forEach(x=>{ const k=String(x.product).toLowerCase().replace(/\s+/g,' ').trim(); if(!g.has(k)) g.set(k,{name:x.product,qty:0,kg:0}); const p=g.get(k); p.qty+=x.qty; p.kg+=trKg(x.product,x.qty); });
+  r.man.filter(x=>x.t==='order').forEach(x=>{ const k=String(x.l).toLowerCase().replace(/\s+/g,' ').trim(); if(!g.has(k)) g.set(k,{name:x.l,qty:0,kg:0}); const p=g.get(k); p.qty+=trNum(x.q); p.kg+=trKg(x.l,x.q); });
+  const prods=[...g.values()].sort((a,b)=>(/^\s*kg\s*$/i.test(b.name)-/^\s*kg\s*$/i.test(a.name))||String(a.name).localeCompare(String(b.name)));
+  const incBal=true;                                  // Total Output = products + trimming + Balance Tender
+  const prodKg=prods.reduce((s,p)=>s+p.kg,0);
+  const total=prodKg+r.trim+r.manOut+(incBal?r.close:0);
+  return {r,ords,prods,prodKg,incBal,total,n:r.calc.n};
+}
+function trSplitOut(d){
+  const isKg=n=>/^\s*kg\s*$/i.test(String(n));
+  const trays=d.prods.filter(p=>!isKg(p.name)), kgP=d.prods.filter(p=>isKg(p.name));
+  return {trays,trayQty:trays.reduce((s,p)=>s+p.qty,0),trayKg:trays.reduce((s,p)=>s+p.kg,0),kgSold:kgP.reduce((s,p)=>s+p.kg,0)};
+}
+function trTextPresent(){
+  const d=trPresentData(), r=d.r, o=trSplitOut(d), L=[];
+  L.push('📈 *Tender report* — '+trDay(),'');
+  L.push('Cartons used: '+trF(d.n)); if(r.ret>0) L.push('Returns: '+trF(r.ret)+' kg');
+  L.push('',`*Orders (${d.ords.length}):*`);
+  d.ords.forEach(x=>L.push(`${x.num===''?'•':'#'+x.num} ${x.customer} — ${trF(x.kg)} kg`));
+  L.push('','*Output*');
+  if(o.trays.length){ L.push('🟢 Trays:'); o.trays.forEach(p=>L.push(`   ${p.name}: ${trF(p.qty)} trays = ${trF(p.kg)} kg`)); L.push(`   Trays total: ${trF(o.trayQty)} trays = ${trF(o.trayKg)} kg`); }
+  if(o.kgSold>0) L.push(`🔵 Sold by KG: ${trF(o.kgSold)} kg`);
+  if(r.trim>0) L.push(`🟠 Trimming: ${trF(r.trim)} kg`);
+  if(r.manOut>0) L.push(`⚪ Other: ${trF(r.manOut)} kg`);
+  if(r.close>0) L.push(`🟣 Balance Tender: ${trF(r.close)} kg`);
+  L.push('',`*Total Output: ${trF(d.total)} kg*`);
+  return L.join('\n');
+}
+function trPrintPresent(){
+  const d=trPresentData(), r=d.r, o=trSplitOut(d), e=trEsc;
+  const kgBig=x=>`<td class="num"><b>${trF(x)}</b><span> kg</span></td>`;
+  const tray=o.trays.map(p=>`<tr class="g"><td>${e(p.name)}</td><td class="num">${trF(p.qty)}</td>${kgBig(p.kg)}</tr>`).join('');
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Tender report ${e(trDay())}</title><style>
+  @page{size:A4;margin:10mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body{font-family:"Segoe UI",Arial,sans-serif;color:#1c2733;font-size:13px;margin:0;background:#fff}
+  .band{background:linear-gradient(120deg,#0f2a4a,#1d4e89);color:#fff;padding:18px 20px;border-radius:12px;display:flex;justify-content:space-between;align-items:center}
+  .band h1{margin:0;font-size:22px;letter-spacing:.3px}.band .d{font-size:13px;opacity:.85;margin-top:3px}.band .tag{font-size:11px;letter-spacing:.14em;text-transform:uppercase;background:#ffffff22;padding:5px 10px;border-radius:20px}
+  .tiles{display:flex;gap:10px;margin:14px 0}.tile{flex:1;border-radius:10px;padding:10px 12px;border:1px solid #e3e8ef}.tile small{display:block;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#6b7a8c}.tile b{font-size:20px}
+  .t1{background:#eef4ff;border-color:#c9dcff}.t2{background:#e8f8f3;border-color:#bfe9dc}.t3{background:#fff5e3;border-color:#ffe0a8}.t4{background:#eaf7ec;border-color:#b7e2bf}
+  h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;margin:18px 0 6px;padding-left:10px;border-left:5px solid #1d4e89;color:#0f2a4a}
+  h2.o{border-color:#16a085}table{width:100%;border-collapse:separate;border-spacing:0;border-radius:10px;overflow:hidden;border:1px solid #e3e8ef}
+  th{background:#0f2a4a;color:#fff;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;padding:7px 10px;text-align:left}
+  td{padding:7px 10px;border-top:1px solid #edf0f4}tr:nth-child(even) td{background:#f8fafc}.num{text-align:right;white-space:nowrap}.num span{color:#7a8794;font-size:11px}th.num{text-align:right}
+  .n{color:#6b7a8c;font-size:11px}.ex td{background:#fff9e0!important}.ex .badge{background:#f4b400;color:#3b2b00}
+  .badge{display:inline-block;min-width:22px;text-align:center;background:#1d4e89;color:#fff;border-radius:11px;padding:1px 7px;font-size:11px;font-weight:700;margin-right:6px}
+  .sec td{background:#f1f5fa!important;font-weight:700;color:#0f2a4a;font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+  .g td:first-child{border-left:4px solid #16a085}.k td:first-child{border-left:4px solid #2f80ed}.tr td:first-child{border-left:4px solid #f2994a}.bl td:first-child{border-left:4px solid #9b51e0}.ot td:first-child{border-left:4px solid #9aa5b1}
+  .sub td{background:#e8f8f3!important;font-weight:700}
+  .total{margin-top:12px;background:linear-gradient(120deg,#0b6b3a,#16a085);color:#fff;border-radius:12px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center}
+  .total span{font-size:12px;letter-spacing:.14em;text-transform:uppercase;opacity:.9}.total b{font-size:30px}.total b small{font-size:14px;font-weight:600;opacity:.9}
+  .foot{margin-top:12px;font-size:10px;color:#8a97a5;text-align:center}
+  </style></head><body>
+  <div class="band"><div><h1>Tender Report</h1><div class="d">IAT Trading · ${e(trDay())}</div></div><div class="tag">Daily summary</div></div>
+  <div class="tiles"><div class="tile t1"><small>Cartons used</small><b>${trF(d.n)}</b></div><div class="tile t2"><small>Orders</small><b>${d.ords.length}</b></div>${r.ret>0?`<div class="tile t3"><small>Returns</small><b>${trF(r.ret)}</b> kg</div>`:''}<div class="tile t4"><small>Total output</small><b>${trF(d.total)}</b> kg</div></div>
+  <h2>Orders</h2><table><tr><th>Customer</th><th class="num">KG</th><th>Items</th></tr>${d.ords.map(x=>`<tr class="${x.extra?'ex':''}"><td><span class="badge">${e(x.num===''?'·':x.num)}</span>${e(x.customer)}</td><td class="num"><b>${trF(x.kg)}</b></td><td class="n">${e(x.items.join(' · '))}</td></tr>`).join('')}</table>
+  <h2 class="o">Output</h2><table><tr><th>Type</th><th class="num">Trays</th><th class="num">Equivalent weight</th></tr>
+  ${o.trays.length?`<tr class="sec"><td colspan="3">Trays</td></tr>${tray}<tr class="sub"><td>Total trays</td><td class="num">${trF(o.trayQty)}</td>${kgBig(o.trayKg)}</tr>`:''}
+  ${o.kgSold>0?`<tr class="sec"><td colspan="3">Sold by kilo</td></tr><tr class="k"><td>KG</td><td class="num">—</td>${kgBig(o.kgSold)}</tr>`:''}
+  ${(r.trim>0||r.manOut>0||r.close>0)?`<tr class="sec"><td colspan="3">Other</td></tr>`:''}
+  ${r.trim>0?`<tr class="tr"><td>Trimming</td><td class="num">—</td>${kgBig(r.trim)}</tr>`:''}${r.manOut>0?`<tr class="ot"><td>Other</td><td class="num">—</td>${kgBig(r.manOut)}</tr>`:''}${r.close>0?`<tr class="bl"><td>Balance Tender</td><td class="num">—</td>${kgBig(r.close)}</tr>`:''}</table>
+  <div class="total"><span>Total Output</span><b>${trF(d.total)} <small>kg</small></b></div>
+  <div class="foot">Generated by IAT Orders · ${e(new Date().toTimeString().slice(0,5))}</div>
+  <script>window.onload=()=>setTimeout(()=>window.print(),400)<\/script></body></html>`;
+  const w=window.open('','_blank'); if(!w){toast('Allow pop-ups to open the report','err');return;}
+  w.document.write(html); w.document.close();
+}
+function trWA(){ window.open('https://wa.me/?text='+encodeURIComponent(trTextPresent()),'_blank'); }
+function trWAdetail(){ window.open('https://wa.me/?text='+encodeURIComponent(trText()),'_blank'); }
 function trPrint(){
   const r=trCalc(), c=r.calc, e=trEsc, row=(a,b,x)=>`<tr><td>${a}</td><td class="r">${b}</td><td class="n">${x||''}</td></tr>`;
   const cls=Math.abs(r.pct)<0.05?'':(r.diff<0?'loss':'gain');
