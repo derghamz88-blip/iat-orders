@@ -8092,7 +8092,7 @@ function trSplitOut(d){
 function trTextPresent(){
   const d=trPresentData(), r=d.r, o=trSplitOut(d), L=[];
   L.push('📈 *Tender report* — '+trDay(),'');
-  L.push('Cartons used: '+trF(d.n)); if(r.ret>0) L.push('Returns: '+trF(r.ret)+' kg');
+  L.push('Balance at start: '+trF(r.open)+' kg','Cartons used: '+trF(d.n)); if(r.ret>0) L.push('Returns: '+trF(r.ret)+' kg');
   L.push('',`*Orders (${d.ords.length}):*`);
   d.ords.forEach(x=>L.push(`${x.num===''?'•':'#'+x.num} ${x.customer} — ${trF(x.kg)} kg`));
   L.push('','*Output*');
@@ -8105,39 +8105,51 @@ function trTextPresent(){
   return L.join('\n');
 }
 function trPrintPresent(){
-  const d=trPresentData(), r=d.r, o=trSplitOut(d), e=trEsc;
+  const d=trPresentData(), r=d.r, o=trSplitOut(d), e=trEsc, N=d.ords.length;
+  const fs=N<=10?13:N<=16?12:N<=24?11:N<=34?10:9, two=N>14;           // everything must fit ONE A4 page
   const kgBig=x=>`<td class="num"><b>${trF(x)}</b><span> kg</span></td>`;
   const tray=o.trays.map(p=>`<tr class="g"><td>${e(p.name)}</td><td class="num">${trF(p.qty)}</td>${kgBig(p.kg)}</tr>`).join('');
+  const oRow=(x,items)=>`<tr class="${x.extra?'ex':''}"><td><span class="badge">${e(x.num===''?'·':x.num)}</span>${e(x.customer)}</td><td class="num"><b>${trF(x.kg)}</b></td>${items?`<td class="n">${e(x.items.join(' · '))}</td>`:''}</tr>`;
+  const half=Math.ceil(N/2);
+  const ordTable=(list,items)=>`<table><tr><th>Customer</th><th class="num">KG</th>${items?'<th>Items</th>':''}</tr>${list.map(x=>oRow(x,items)).join('')}</table>`;
+  const ordersHtml=two?`<div class="two">${ordTable(d.ords.slice(0,half),false)}${ordTable(d.ords.slice(half),false)}</div>`:ordTable(d.ords,true);
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Tender report ${e(trDay())}</title><style>
-  @page{size:A4;margin:10mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  body{font-family:"Segoe UI",Arial,sans-serif;color:#1c2733;font-size:13px;margin:0;background:#fff}
-  .band{background:linear-gradient(120deg,#0f2a4a,#1d4e89);color:#fff;padding:18px 20px;border-radius:12px;display:flex;justify-content:space-between;align-items:center}
-  .band h1{margin:0;font-size:22px;letter-spacing:.3px}.band .d{font-size:13px;opacity:.85;margin-top:3px}.band .tag{font-size:11px;letter-spacing:.14em;text-transform:uppercase;background:#ffffff22;padding:5px 10px;border-radius:20px}
-  .tiles{display:flex;gap:10px;margin:14px 0}.tile{flex:1;border-radius:10px;padding:10px 12px;border:1px solid #e3e8ef}.tile small{display:block;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#6b7a8c}.tile b{font-size:20px}
-  .t1{background:#eef4ff;border-color:#c9dcff}.t2{background:#e8f8f3;border-color:#bfe9dc}.t3{background:#fff5e3;border-color:#ffe0a8}.t4{background:#eaf7ec;border-color:#b7e2bf}
-  h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;margin:18px 0 6px;padding-left:10px;border-left:5px solid #1d4e89;color:#0f2a4a}
-  h2.o{border-color:#16a085}table{width:100%;border-collapse:separate;border-spacing:0;border-radius:10px;overflow:hidden;border:1px solid #e3e8ef}
-  th{background:#0f2a4a;color:#fff;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;padding:7px 10px;text-align:left}
-  td{padding:7px 10px;border-top:1px solid #edf0f4}tr:nth-child(even) td{background:#f8fafc}.num{text-align:right;white-space:nowrap}.num span{color:#7a8794;font-size:11px}th.num{text-align:right}
-  .n{color:#6b7a8c;font-size:11px}.ex td{background:#fff9e0!important}.ex .badge{background:#f4b400;color:#3b2b00}
-  .badge{display:inline-block;min-width:22px;text-align:center;background:#1d4e89;color:#fff;border-radius:11px;padding:1px 7px;font-size:11px;font-weight:700;margin-right:6px}
-  .sec td{background:#f1f5fa!important;font-weight:700;color:#0f2a4a;font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+  @page{size:A4;margin:8mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  html,body{margin:0;background:#fff}body{font-family:"Segoe UI",Arial,sans-serif;color:#1c2733;font-size:${fs}px}
+  .sheet{width:100%;height:281mm;display:flex;flex-direction:column;overflow:hidden}
+  .top{flex:1 1 50%;min-height:0;overflow:hidden}.bottom{flex:0 0 auto;padding-top:6px}
+  .band{background:linear-gradient(120deg,#0f2a4a,#1d4e89);color:#fff;padding:12px 16px;border-radius:12px;display:flex;justify-content:space-between;align-items:center}
+  .band h1{margin:0;font-size:1.7em;letter-spacing:.3px}.band .d{font-size:.95em;opacity:.85;margin-top:2px}.band .tag{font-size:.8em;letter-spacing:.14em;text-transform:uppercase;background:#ffffff22;padding:4px 10px;border-radius:20px}
+  .tiles{display:flex;gap:8px;margin:8px 0}.tile{flex:1;border-radius:10px;padding:7px 10px;border:1px solid #e3e8ef}.tile small{display:block;font-size:.72em;letter-spacing:.1em;text-transform:uppercase;color:#6b7a8c}.tile b{font-size:1.5em}
+  .t1{background:#eef4ff;border-color:#c9dcff}.t2{background:#e8f8f3;border-color:#bfe9dc}.t3{background:#fff5e3;border-color:#ffe0a8}.t5{background:#f3ecff;border-color:#dcc8fb}
+  h2{font-size:.95em;letter-spacing:.08em;text-transform:uppercase;margin:8px 0 4px;padding-left:9px;border-left:5px solid #1d4e89;color:#0f2a4a}
+  h2.o{border-color:#16a085;margin-top:2px}table{width:100%;border-collapse:separate;border-spacing:0;border-radius:9px;overflow:hidden;border:1px solid #e3e8ef}
+  .two{display:flex;gap:8px}.two table{flex:1}
+  th{background:#0f2a4a;color:#fff;font-size:.78em;letter-spacing:.08em;text-transform:uppercase;padding:4px 8px;text-align:left}
+  td{padding:${N>24?3:5}px 8px;border-top:1px solid #edf0f4}tr:nth-child(even) td{background:#f8fafc}.num{text-align:right;white-space:nowrap}.num span{color:#7a8794;font-size:.85em}th.num{text-align:right}
+  .n{color:#6b7a8c;font-size:.85em}.ex td{background:#fff9e0!important}.ex .badge{background:#f4b400;color:#3b2b00}
+  .badge{display:inline-block;min-width:20px;text-align:center;background:#1d4e89;color:#fff;border-radius:10px;padding:0 6px;font-size:.85em;font-weight:700;margin-right:5px}
+  .sec td{background:#f1f5fa!important;font-weight:700;color:#0f2a4a;font-size:.82em;letter-spacing:.06em;text-transform:uppercase;padding-top:3px;padding-bottom:3px}
   .g td:first-child{border-left:4px solid #16a085}.k td:first-child{border-left:4px solid #2f80ed}.tr td:first-child{border-left:4px solid #f2994a}.bl td:first-child{border-left:4px solid #9b51e0}.ot td:first-child{border-left:4px solid #9aa5b1}
   .sub td{background:#e8f8f3!important;font-weight:700}
-  .total{margin-top:12px;background:linear-gradient(120deg,#0b6b3a,#16a085);color:#fff;border-radius:12px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center}
-  .total span{font-size:12px;letter-spacing:.14em;text-transform:uppercase;opacity:.9}.total b{font-size:30px}.total b small{font-size:14px;font-weight:600;opacity:.9}
-  .foot{margin-top:12px;font-size:10px;color:#8a97a5;text-align:center}
-  </style></head><body>
-  <div class="band"><div><h1>Tender Report</h1><div class="d">IAT Trading · ${e(trDay())}</div></div><div class="tag">Daily summary</div></div>
-  <div class="tiles"><div class="tile t1"><small>Cartons used</small><b>${trF(d.n)}</b></div><div class="tile t2"><small>Orders</small><b>${d.ords.length}</b></div>${r.ret>0?`<div class="tile t3"><small>Returns</small><b>${trF(r.ret)}</b> kg</div>`:''}<div class="tile t4"><small>Total output</small><b>${trF(d.total)}</b> kg</div></div>
-  <h2>Orders</h2><table><tr><th>Customer</th><th class="num">KG</th><th>Items</th></tr>${d.ords.map(x=>`<tr class="${x.extra?'ex':''}"><td><span class="badge">${e(x.num===''?'·':x.num)}</span>${e(x.customer)}</td><td class="num"><b>${trF(x.kg)}</b></td><td class="n">${e(x.items.join(' · '))}</td></tr>`).join('')}</table>
-  <h2 class="o">Output</h2><table><tr><th>Type</th><th class="num">Trays</th><th class="num">Equivalent weight</th></tr>
-  ${o.trays.length?`<tr class="sec"><td colspan="3">Trays</td></tr>${tray}<tr class="sub"><td>Total trays</td><td class="num">${trF(o.trayQty)}</td>${kgBig(o.trayKg)}</tr>`:''}
-  ${o.kgSold>0?`<tr class="sec"><td colspan="3">Sold by kilo</td></tr><tr class="k"><td>KG</td><td class="num">—</td>${kgBig(o.kgSold)}</tr>`:''}
-  ${(r.trim>0||r.manOut>0||r.close>0)?`<tr class="sec"><td colspan="3">Other</td></tr>`:''}
-  ${r.trim>0?`<tr class="tr"><td>Trimming</td><td class="num">—</td>${kgBig(r.trim)}</tr>`:''}${r.manOut>0?`<tr class="ot"><td>Other</td><td class="num">—</td>${kgBig(r.manOut)}</tr>`:''}${r.close>0?`<tr class="bl"><td>Balance Tender</td><td class="num">—</td>${kgBig(r.close)}</tr>`:''}</table>
-  <div class="total"><span>Total Output</span><b>${trF(d.total)} <small>kg</small></b></div>
-  <div class="foot">Generated by IAT Orders · ${e(new Date().toTimeString().slice(0,5))}</div>
+  .total{margin-top:8px;background:linear-gradient(120deg,#0b6b3a,#16a085);color:#fff;border-radius:12px;padding:10px 16px;display:flex;justify-content:space-between;align-items:center}
+  .total span{font-size:.95em;letter-spacing:.14em;text-transform:uppercase;opacity:.9}.total b{font-size:2.2em}.total b small{font-size:.5em;font-weight:600;opacity:.9}
+  .foot{margin-top:6px;font-size:.75em;color:#8a97a5;text-align:center}
+  </style></head><body><div class="sheet">
+  <div class="top">
+   <div class="band"><div><h1>Tender Report</h1><div class="d">IAT Trading · ${e(trDay())}</div></div><div class="tag">Daily summary</div></div>
+   <div class="tiles"><div class="tile t5"><small>Balance at start</small><b>${trF(r.open)}</b> kg</div><div class="tile t1"><small>Cartons used</small><b>${trF(d.n)}</b></div>${r.ret>0?`<div class="tile t3"><small>Returns</small><b>${trF(r.ret)}</b> kg</div>`:''}<div class="tile t2"><small>Orders</small><b>${N}</b></div></div>
+   <h2>Customers</h2>${ordersHtml}
+  </div>
+  <div class="bottom">
+   <h2 class="o">Output</h2><table><tr><th>Type</th><th class="num">Trays</th><th class="num">Equivalent weight</th></tr>
+   ${o.trays.length?`<tr class="sec"><td colspan="3">Trays</td></tr>${tray}<tr class="sub"><td>Total trays</td><td class="num">${trF(o.trayQty)}</td>${kgBig(o.trayKg)}</tr>`:''}
+   ${o.kgSold>0?`<tr class="sec"><td colspan="3">Sold by kilo</td></tr><tr class="k"><td>KG</td><td class="num">—</td>${kgBig(o.kgSold)}</tr>`:''}
+   ${(r.trim>0||r.manOut>0||r.close>0)?`<tr class="sec"><td colspan="3">Other</td></tr>`:''}
+   ${r.trim>0?`<tr class="tr"><td>Trimming</td><td class="num">—</td>${kgBig(r.trim)}</tr>`:''}${r.manOut>0?`<tr class="ot"><td>Other</td><td class="num">—</td>${kgBig(r.manOut)}</tr>`:''}${r.close>0?`<tr class="bl"><td>Balance Tender</td><td class="num">—</td>${kgBig(r.close)}</tr>`:''}</table>
+   <div class="total"><span>Total Output</span><b>${trF(d.total)} <small>kg</small></b></div>
+   <div class="foot">Generated by IAT Orders · ${e(new Date().toTimeString().slice(0,5))}</div>
+  </div></div>
   <script>window.onload=()=>setTimeout(()=>window.print(),400)<\/script></body></html>`;
   const w=window.open('','_blank'); if(!w){toast('Allow pop-ups to open the report','err');return;}
   w.document.write(html); w.document.close();
