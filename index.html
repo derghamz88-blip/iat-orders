@@ -7272,8 +7272,7 @@ function sendDriversWhatsAppFromPage(){
     <div style="display:flex;gap:6px">
       <button class="btn btn-teal btn-sm" id="trReadBtn" onclick="trRead()" style="font-size:.7rem;padding:4px 8px">🔄 Orders</button>
       <button class="btn btn-ghost btn-sm" onclick="trPrint()" title="Details (for me)" style="font-size:.7rem;padding:4px 8px">📄 Details</button>
-      <button class="btn btn-ghost btn-sm" onclick="trPrintPresent()" title="Report to present" style="font-size:.7rem;padding:4px 8px">📤 Present</button>
-      <button class="btn btn-green btn-sm" onclick="trWA()" title="Send the presented report on WhatsApp" style="font-size:.7rem;padding:4px 8px">💬</button>
+
     </div>
   </div>
   <div id="trBody" style="flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:10px"></div>
@@ -7990,8 +7989,8 @@ function trCalc(){
     const ok=(r.num===''?'':r.num)+'|'+r.customer;
     if(!byProd.has(pk)) byProd.set(pk,{name:r.product,qty:0,kg:0,ords:new Set()});
     const p=byProd.get(pk); p.qty+=r.qty; p.kg+=kg; p.ords.add(ok);
-    if(!byOrd.has(ok)) byOrd.set(ok,{num:r.num,customer:r.customer,kg:0,items:[]});
-    const o=byOrd.get(ok); o.kg+=kg; o.items.push(r.product+' × '+trF(r.qty));
+    if(!byOrd.has(ok)) byOrd.set(ok,{num:r.num,customer:r.customer,kg:0,items:[],lines:[]});
+    const o=byOrd.get(ok); o.kg+=kg; o.items.push(r.product+' × '+trF(r.qty)); o.lines.push({p:r.product,q:r.qty,kg});
   });
   const prods=[...byProd.values()].sort((a,b)=>b.kg-a.kg), ords=[...byOrd.values()].sort((a,b)=>(trNum(a.num)-trNum(b.num))||String(a.customer).localeCompare(String(b.customer)));
   const ordersKg=prods.reduce((s,p)=>s+p.kg,0);
@@ -8047,7 +8046,9 @@ function trRender(){
     line('Total input',trF(r.inp)+' kg')+line('Total output (orders + extras + trimming + end balance)',trF(r.out)+' kg')
     +`<div style="font-size:1.1rem;margin:8px 0 2px">${trVerdict(r.diff,r.pct)}</div>`
     +(r.waste>0?`<div style="font-size:.7rem;color:var(--muted);margin-top:4px">With the waste (${trF(r.waste)} kg) counted as accounted for:</div><div style="font-size:.85rem">${trVerdict(r.afterWaste,r.pctW)}</div>`:''),'var(--amber)');
-  box.innerHTML=h;
+  const seg=`<div style="display:flex;gap:6px"><button class="btn btn-sm ${_trView==='edit'?'btn-teal':'btn-ghost'}" onclick="trView('edit')" style="flex:1;font-size:.74rem;padding:7px">✏️ Edit</button><button class="btn btn-sm ${_trView==='report'?'btn-teal':'btn-ghost'}" onclick="trView('report')" style="flex:1;font-size:.74rem;padding:7px">📤 Report</button></div>`;
+  if(_trView==='report'){ box.innerHTML=seg+trReportHTML(); trFillFrame(); return; }
+  box.innerHTML=seg+h;
 }
 function trAddMan(){
   const t=document.getElementById('trT').value, l=document.getElementById('trL').value.trim(), q=trNum(document.getElementById('trK').value);
@@ -8073,8 +8074,8 @@ function trText(){
 function trPresentData(){
   const r=trCalc(), rows=((_trOrd&&_trOrd.rows)||[]).slice();
   let last=0; rows.forEach(x=>{const n=parseInt(x.num); if(isFinite(n)&&n>last) last=n;});
-  const ords=r.ords.map(o=>({num:o.num,customer:o.customer,kg:o.kg,items:o.items,extra:false}));
-  r.man.filter(x=>x.t==='order').forEach(x=>{ last++; ords.push({num:last,customer:x.c||'Extra order',kg:trKg(x.l,x.q),items:[x.l+' × '+trF(trNum(x.q))],extra:true}); });
+  const ords=r.ords.map(o=>({num:o.num,customer:o.customer,kg:o.kg,items:o.items,lines:o.lines,extra:false}));
+  r.man.filter(x=>x.t==='order').forEach(x=>{ last++; ords.push({num:last,customer:x.c||'Extra order',kg:trKg(x.l,x.q),items:[x.l+' × '+trF(trNum(x.q))],lines:[{p:x.l,q:trNum(x.q),kg:trKg(x.l,x.q)}],extra:true}); });
   const g=new Map();
   rows.forEach(x=>{ const k=String(x.product).toLowerCase().replace(/\s+/g,' ').trim(); if(!g.has(k)) g.set(k,{name:x.product,qty:0,kg:0}); const p=g.get(k); p.qty+=x.qty; p.kg+=trKg(x.product,x.qty); });
   r.man.filter(x=>x.t==='order').forEach(x=>{ const k=String(x.l).toLowerCase().replace(/\s+/g,' ').trim(); if(!g.has(k)) g.set(k,{name:x.l,qty:0,kg:0}); const p=g.get(k); p.qty+=trNum(x.q); p.kg+=trKg(x.l,x.q); });
@@ -8094,7 +8095,8 @@ function trTextPresent(){
   L.push('📈 *Tender report* — '+trDay(),'');
   L.push('Balance at start: '+trF(r.open)+' kg','Cartons used: '+trF(d.n)); if(r.ret>0) L.push('Returns: '+trF(r.ret)+' kg');
   L.push('',`*Orders (${d.ords.length}):*`);
-  d.ords.forEach(x=>L.push(`${x.num===''?'•':'#'+x.num} ${x.customer} — ${trF(x.kg)} kg`));
+  const isKgP=n=>/^\s*kg\s*$/i.test(String(n));
+  d.ords.forEach(x=>{ L.push(`${x.num===''?'•':'#'+x.num} *${x.customer}* — ${trF(x.kg)} kg`); (x.lines||[]).forEach(l=>L.push(isKgP(l.p)?`      ${trF(l.q)} kg`:`      ${l.p}: ${trF(l.q)} trays = ${trF(l.kg)} kg`)); });
   L.push('','*Output*');
   if(o.trays.length){ L.push('🟢 Trays:'); o.trays.forEach(p=>L.push(`   ${p.name}: ${trF(p.qty)} trays = ${trF(p.kg)} kg`)); L.push(`   Trays total: ${trF(o.trayQty)} trays = ${trF(o.trayKg)} kg`); }
   if(o.kgSold>0) L.push(`🔵 Sold by KG: ${trF(o.kgSold)} kg`);
@@ -8104,30 +8106,33 @@ function trTextPresent(){
   L.push('',`*Total Output: ${trF(d.total)} kg*`);
   return L.join('\n');
 }
-function trPrintPresent(){
+function trPresentDoc(print){
   const d=trPresentData(), r=d.r, o=trSplitOut(d), e=trEsc, N=d.ords.length;
-  const fs=N<=10?13:N<=16?12:N<=24?11:N<=34?10:9, two=N>14;           // everything must fit ONE A4 page
+  const fs=N<=8?14:N<=14?13:N<=22?12:11, two=N>12;                     // font shrinks further by itself until everything fits ONE A4 page
+  const isKgP=n=>/^\s*kg\s*$/i.test(String(n));
   const kgBig=x=>`<td class="num"><b>${trF(x)}</b><span> kg</span></td>`;
   const tray=o.trays.map(p=>`<tr class="g"><td>${e(p.name)}</td><td class="num">${trF(p.qty)}</td>${kgBig(p.kg)}</tr>`).join('');
-  const oRow=(x,items)=>`<tr class="${x.extra?'ex':''}"><td><span class="badge">${e(x.num===''?'·':x.num)}</span>${e(x.customer)}</td><td class="num"><b>${trF(x.kg)}</b></td>${items?`<td class="n">${e(x.items.join(' · '))}</td>`:''}</tr>`;
+  const lineH=l=>isKgP(l.p)?`<div class="it"><span>KG</span><span class="q">${trF(l.q)} kg</span></div>`:`<div class="it"><span>${e(l.p)}</span><span class="q">${trF(l.q)} trays</span><span class="eq">= ${trF(l.kg)} kg</span></div>`;
+  const oRow=x=>`<tr class="${x.extra?'ex':''}"><td><span class="badge">${e(x.num===''?'·':x.num)}</span><b>${e(x.customer)}</b><div class="its">${(x.lines||[]).map(lineH).join('')}</div></td><td class="num tot1"><b>${trF(x.kg)}</b><span> kg</span></td></tr>`;
   const half=Math.ceil(N/2);
-  const ordTable=(list,items)=>`<table><tr><th>Customer</th><th class="num">KG</th>${items?'<th>Items</th>':''}</tr>${list.map(x=>oRow(x,items)).join('')}</table>`;
-  const ordersHtml=two?`<div class="two">${ordTable(d.ords.slice(0,half),false)}${ordTable(d.ords.slice(half),false)}</div>`:ordTable(d.ords,true);
-  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Tender report ${e(trDay())}</title><style>
+  const ordTable=list=>`<table><tr><th>Customer / order</th><th class="num">Total</th></tr>${list.map(oRow).join('')}</table>`;
+  const ordersHtml=two?`<div class="two">${ordTable(d.ords.slice(0,half))}${ordTable(d.ords.slice(half))}</div>`:ordTable(d.ords);
+  return `<!DOCTYPE html><html class="${print?'prn':'scr'}"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Tender report ${e(trDay())}</title><style>
   @page{size:A4;margin:8mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  html,body{margin:0;background:#fff}body{font-family:"Segoe UI",Arial,sans-serif;color:#1c2733;font-size:${fs}px}
-  .sheet{width:100%;height:281mm;display:flex;flex-direction:column;overflow:hidden}
-  .top{flex:1 1 50%;min-height:0;overflow:hidden}.bottom{flex:0 0 auto;padding-top:6px}
+  html,body{margin:0;background:#fff}html.scr body{padding:8mm}body{font-family:"Segoe UI",Arial,sans-serif;color:#1c2733;font-size:${fs}px}
+  .sheet{width:100%;height:281mm;display:flex;flex-direction:column}
+  .bottom{margin-top:auto;padding-top:6px}
   .band{background:linear-gradient(120deg,#0f2a4a,#1d4e89);color:#fff;padding:12px 16px;border-radius:12px;display:flex;justify-content:space-between;align-items:center}
   .band h1{margin:0;font-size:1.7em;letter-spacing:.3px}.band .d{font-size:.95em;opacity:.85;margin-top:2px}.band .tag{font-size:.8em;letter-spacing:.14em;text-transform:uppercase;background:#ffffff22;padding:4px 10px;border-radius:20px}
   .tiles{display:flex;gap:8px;margin:8px 0}.tile{flex:1;border-radius:10px;padding:7px 10px;border:1px solid #e3e8ef}.tile small{display:block;font-size:.72em;letter-spacing:.1em;text-transform:uppercase;color:#6b7a8c}.tile b{font-size:1.5em}
   .t1{background:#eef4ff;border-color:#c9dcff}.t2{background:#e8f8f3;border-color:#bfe9dc}.t3{background:#fff5e3;border-color:#ffe0a8}.t5{background:#f3ecff;border-color:#dcc8fb}
   h2{font-size:.95em;letter-spacing:.08em;text-transform:uppercase;margin:8px 0 4px;padding-left:9px;border-left:5px solid #1d4e89;color:#0f2a4a}
   h2.o{border-color:#16a085;margin-top:2px}table{width:100%;border-collapse:separate;border-spacing:0;border-radius:9px;overflow:hidden;border:1px solid #e3e8ef}
-  .two{display:flex;gap:8px}.two table{flex:1}
+  .two{display:flex;gap:8px;align-items:flex-start}.two table{flex:1}
   th{background:#0f2a4a;color:#fff;font-size:.78em;letter-spacing:.08em;text-transform:uppercase;padding:4px 8px;text-align:left}
-  td{padding:${N>24?3:5}px 8px;border-top:1px solid #edf0f4}tr:nth-child(even) td{background:#f8fafc}.num{text-align:right;white-space:nowrap}.num span{color:#7a8794;font-size:.85em}th.num{text-align:right}
-  .n{color:#6b7a8c;font-size:.85em}.ex td{background:#fff9e0!important}.ex .badge{background:#f4b400;color:#3b2b00}
+  td{padding:4px 8px;border-top:1px solid #edf0f4;vertical-align:top}tr:nth-child(even) td{background:#f8fafc}.num{text-align:right;white-space:nowrap}.num span{color:#7a8794;font-size:.85em}th.num{text-align:right}
+  .tot1{font-size:1.05em}.its{margin:2px 0 0 26px}.it{display:flex;gap:8px;font-size:.84em;color:#55616e;line-height:1.35}.it .q{color:#1d4e89;font-weight:600}.it .eq{margin-left:auto;color:#0b6b3a;font-weight:700;white-space:nowrap}
+  .ex td{background:#fff9e0!important}.ex .badge{background:#f4b400;color:#3b2b00}
   .badge{display:inline-block;min-width:20px;text-align:center;background:#1d4e89;color:#fff;border-radius:10px;padding:0 6px;font-size:.85em;font-weight:700;margin-right:5px}
   .sec td{background:#f1f5fa!important;font-weight:700;color:#0f2a4a;font-size:.82em;letter-spacing:.06em;text-transform:uppercase;padding-top:3px;padding-bottom:3px}
   .g td:first-child{border-left:4px solid #16a085}.k td:first-child{border-left:4px solid #2f80ed}.tr td:first-child{border-left:4px solid #f2994a}.bl td:first-child{border-left:4px solid #9b51e0}.ot td:first-child{border-left:4px solid #9aa5b1}
@@ -8150,9 +8155,44 @@ function trPrintPresent(){
    <div class="total"><span>Total Output</span><b>${trF(d.total)} <small>kg</small></b></div>
    <div class="foot">Generated by IAT Orders · ${e(new Date().toTimeString().slice(0,5))}</div>
   </div></div>
-  <script>window.onload=()=>setTimeout(()=>window.print(),400)<\/script></body></html>`;
+  <script>(function(){var s=document.querySelector('.sheet'),f=parseFloat(getComputedStyle(document.body).fontSize),g=0;
+  function fit(){while(s.scrollHeight>s.clientHeight+1&&f>6&&g++<80){f-=0.5;document.body.style.fontSize=f+'px';}}
+  window.addEventListener('load',function(){fit();${print?'setTimeout(function(){window.print()},400);':''}});})();<\/script></body></html>`;
+}
+function trPrintPresent(){
   const w=window.open('','_blank'); if(!w){toast('Allow pop-ups to open the report','err');return;}
-  w.document.write(html); w.document.close();
+  w.document.write(trPresentDoc(true)); w.document.close();
+}
+// ── the presented report shown directly in the app (no saving needed) + send as an image / text on WhatsApp ──
+let _trView='edit';
+function trView(v){ _trView=v; trRender(); }
+function trFit(){ const fr=document.getElementById('trFrame'), box=document.getElementById('trFrameBox'); if(!fr||!box) return; const k=Math.min(1,box.clientWidth/794); fr.style.transform='scale('+k+')'; box.style.height=(1123*k)+'px'; }
+function trReportHTML(){
+  return `<div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="btn btn-green btn-sm" id="trShareBtn" onclick="trShareImage()" style="font-size:.74rem;padding:7px 12px">💬 Send on WhatsApp (image)</button>
+      <button class="btn btn-ghost btn-sm" onclick="trWA()" style="font-size:.72rem;padding:7px 10px">💬 As text</button>
+      <button class="btn btn-ghost btn-sm" onclick="trPrintPresent()" style="font-size:.72rem;padding:7px 10px">🖨 Print / PDF</button></div>
+    <div id="trFrameBox" style="width:100%;overflow:hidden;border:1px solid var(--b2);border-radius:8px;background:#fff"><iframe id="trFrame" style="width:794px;height:1123px;border:0;transform-origin:0 0;background:#fff" onload="trFit()"></iframe></div>`;
+}
+function trFillFrame(){ const fr=document.getElementById('trFrame'); if(fr){ fr.srcdoc=trPresentDoc(false); trFit(); } }
+window.addEventListener('resize',()=>{ try{trFit();}catch(e){} });
+async function trShareImage(){
+  const btn=document.getElementById('trShareBtn'), fr=document.getElementById('trFrame');
+  const done=()=>{ if(btn){btn.disabled=false;btn.textContent='💬 Send on WhatsApp (image)';} };
+  try{
+    if(typeof html2canvas==='undefined') throw new Error('image tool not loaded');
+    const el=fr&&fr.contentDocument&&fr.contentDocument.querySelector('.sheet'); if(!el) throw new Error('report not ready');
+    if(btn){btn.disabled=true;btn.textContent='⏳...';}
+    const canvas=await html2canvas(el,{backgroundColor:'#ffffff',scale:2,useCORS:true,logging:false});
+    const blob=await new Promise(res=>canvas.toBlob(res,'image/png')); if(!blob) throw new Error('could not make the image');
+    const file=new File([blob],'Tender_'+trDay()+'.png',{type:'image/png'});
+    done();
+    if(navigator.canShare&&navigator.canShare({files:[file]})&&navigator.share){
+      try{ await navigator.share({files:[file],title:'Tender report '+trDay()}); return; }catch(e){ if(e&&e.name==='AbortError') return; }
+    }
+    const url=URL.createObjectURL(blob), a=document.createElement('a'); a.href=url; a.download=file.name; a.click(); setTimeout(()=>URL.revokeObjectURL(url),2000);
+    toast('Image saved - attach it in WhatsApp','ok');
+  }catch(e){ done(); toast('⚠ '+(e.message||e)+' - sending as text','err'); trWA(); }
 }
 function trWA(){ window.open('https://wa.me/?text='+encodeURIComponent(trTextPresent()),'_blank'); }
 function trWAdetail(){ window.open('https://wa.me/?text='+encodeURIComponent(trText()),'_blank'); }
