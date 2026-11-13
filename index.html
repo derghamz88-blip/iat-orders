@@ -1,6 +1,242 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>window.XL_CFG={app:'orders',signal:'print_signal.json',testFile:'production/production.xlsm',bottom:96};
+/* ══ IAT Excel bridge ══════════════════════════════════════════════
+   Two ways to write to the Excel files on OneDrive:
+     🖥 LAPTOP  (default): every Excel write is sent as a small job file to OneDrive
+                (folder IAT_excel_jobs); the print script on the laptop writes it into
+                Excel itself and saves. Works even when Microsoft blocks the Excel API.
+     ☁ DIRECT  : the old way - the phone writes into Excel through Microsoft (Excel API).
+   Tap the small pill (bottom-left) to switch, see the last result, or test the old way.
+   Needs window.XL_CFG = {app:'orders'|'stickers', signal:'print_signal.json', label:'...'}
+   ═════════════════════════════════════════════════════════════════ */
+(function(){
+  const CFG = window.XL_CFG || {app:'app', signal:'print_signal.json'};
+  const DIR = 'IAT_excel_jobs';
+  const G = 'https://graph.microsoft.com/v1.0';
+  const raw = window.fetch.bind(window);
+  window.__rawFetch = raw;
+  const KEY = 'xl_mode_' + CFG.app;
+  const mode = () => { try { return localStorage.getItem(KEY) || 'laptop'; } catch (e) { return 'laptop'; } };
+  window.xlMode = mode;
+
+  let pending = [], timer = null, flushing = Promise.resolve(), lastAuth = '';
+  let unacked = [];                       // [{id, at}]
+  let state = {last: '', ok: null, at: 0};
+
+  // ── helpers ──
+  const J = (o, s) => new Response(JSON.stringify(o), {status: s || 200, headers: {'Content-Type': 'application/json'}});
+  function hdr(init, name) {
+    const h = (init && init.headers) || {};
+    if (h instanceof Headers) return h.get(name) || '';
+    for (const k in h) if (k.toLowerCase() === name.toLowerCase()) return h[k];
+    return '';
+  }
+  async function bodyText(b) {
+    if (b == null) return '';
+    if (typeof b === 'string') return b;
+    if (b instanceof Blob) return await b.text();
+    try { return await new Response(b).text(); } catch (e) { return ''; }
+  }
+  function wbParse(url) {
+    let u; try { u = new URL(url); } catch (e) { return null; }
+    if (u.host !== 'graph.microsoft.com') return null;
+    let p; try { p = decodeURIComponent(u.pathname); } catch (e) { p = u.pathname; }
+    const m = p.match(/\/drive\/items\/([^/]+)\/workbook(\/.*)?$/);
+    if (!m) return null;
+    const rest = m[2] || '';
+    const r = rest.match(/^\/worksheets\/(.+?)\/range\(address='([^']+)'\)(\/clear)?$/i);
+    return {item: m[1], rest, sheet: r ? r[1] : null, addr: r ? r[2] : null, clear: !!(r && r[3])};
+  }
+  function rid() { return CFG.app + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7); }
+
+  // ── job files ──
+  async function put(path, obj) {
+    const url = `${G}/me/drive/root:/${path.split('/').map(encodeURIComponent).join('/')}:/content`;
+    const go = () => raw(url, {method: 'PUT', headers: {'Authorization': lastAuth, 'Content-Type': 'application/json'}, body: JSON.stringify(obj)});
+    let r = await go();
+    if (r.status === 404 || r.status === 409) {           // folder missing: make it, try again
+      await raw(`${G}/me/drive/root/children`, {method: 'POST', headers: {'Authorization': lastAuth, 'Content-Type': 'application/json'},
+        body: JSON.stringify({name: DIR, folder: {}, '@microsoft.graph.conflictBehavior': 'fail'})}).catch(() => {});
+      r = await go();
+    }
+    if (!r.ok) throw new Error('could not send to OneDrive [' + r.status + '] ' + (await r.text()).slice(0, 120));
+  }
+  function flushNow() {
+    clearTimeout(timer); timer = null;
+    if (!pending.length) return flushing;
+    const ops = pending; pending = [];
+    const id = rid();
+    flushing = flushing.then(async () => {
+      try {
+        await put(`${DIR}/${id}.json`, {id, app: CFG.app, ts: Date.now(), ops});
+        unacked.push({id, at: Date.now()});
+        pill('⏳ sent to laptop (' + ops.length + ')', 'wait');
+        watchAck();
+      } catch (e) {
+        pending = ops.concat(pending);                       // keep them, try again with the next write
+        pill('✗ not sent', 'bad');
+        state = {last: 'Could not send to OneDrive: ' + e.message, ok: false, at: Date.now()};
+        throw e;
+      }
+    });
+    return flushing;
+  }
+  function queue(op) {
+    pending.push(op);
+    clearTimeout(timer);
+    timer = setTimeout(() => flushNow().catch(() => {}), 700);
+  }
+
+  // ── answer from the laptop ──
+  let ackTimer = null;
+  function watchAck() {
+    if (ackTimer) return;
+    const t0 = Date.now();
+    ackTimer = setInterval(async () => {
+      if (!unacked.length) { clearInterval(ackTimer); ackTimer = null; return; }
+      try {
+        const r = await raw(`${G}/me/drive/root:/${DIR}/ack_${CFG.app}.json:/content?t=${Date.now()}`, {headers: {'Authorization': lastAuth}});
+        if (r.ok) {
+          const a = await r.json();
+          const done = {}; (a.done || []).forEach(d => done[d.id] = d);
+          const left = [];
+          for (const u of unacked) {
+            const d = done[u.id];
+            if (!d) { left.push(u); continue; }
+            state = {last: d.ok ? `Laptop wrote ${d.n || ''} change(s) into Excel at ${d.at || ''}` : 'Laptop could NOT write: ' + (d.err || '?'), ok: !!d.ok, at: Date.now()};
+            pill(d.ok ? '✓ written by laptop' : '✗ laptop error', d.ok ? 'ok' : 'bad');
+            if (!d.ok) alert('Laptop could not write into Excel:\n' + (d.err || '?'));
+          }
+          unacked = left;
+        }
+      } catch (e) {}
+      if (unacked.length && Date.now() - t0 > 180000) {
+        state = {last: 'No answer from the laptop for 3 min - is the print script running and OneDrive syncing on the laptop?', ok: false, at: Date.now()};
+        pill('⚠ laptop not answering', 'bad');
+        unacked = []; clearInterval(ackTimer); ackTimer = null;
+      }
+    }, 5000);
+  }
+
+  // ── reads in laptop mode come from the copy the laptop publishes ──
+  let snap = null, snapAt = 0;
+  async function snapshot() {
+    if (snap && Date.now() - snapAt < 60000) return snap;
+    const r = await raw(`${G}/me/drive/root:/${DIR}/snapshot_${CFG.app}.json:/content?t=${Date.now()}`, {headers: {'Authorization': lastAuth}});
+    if (!r.ok) return null;
+    snap = await r.json(); snapAt = Date.now();
+    return snap;
+  }
+  const norm = s => String(s || '').toLowerCase().replace(/\$/g, '').trim();
+
+  // ── the fetch hook ──
+  window.fetch = async function (input, init) {
+    const url = typeof input === 'string' ? input : (input && input.url) || '';
+    const method = ((init && init.method) || (input && input.method) || 'GET').toUpperCase();
+    const auth = hdr(init, 'Authorization'); if (auth) lastAuth = auth;
+    if (mode() !== 'laptop' || url.indexOf('graph.microsoft.com') < 0) return raw(input, init);
+
+    // print signal: make sure the Excel changes go first, and never wait for a phone save
+    if (method === 'PUT' && url.indexOf(':/' + CFG.signal + ':/content') > 0) {
+      try {
+        const txt = await bodyText(init && init.body);
+        const d = JSON.parse(txt);
+        if (d && Array.isArray(d.jobs)) {
+          try { await flushNow(); } catch (e) { return J({error: {code: 'LaptopModeSendFailed', message: e.message}}, 503); }
+          d.save_ts = 0;
+          d.needs = unacked.filter(u => Date.now() - u.at < 900000).map(u => u.id);
+          init = Object.assign({}, init, {body: JSON.stringify(d)});
+        }
+      } catch (e) {}
+      return raw(input, init);
+    }
+
+    const w = wbParse(url);
+    if (!w) return raw(input, init);
+    if (/^\/(createSession|refreshSession)$/i.test(w.rest)) return J({id: 'laptop-mode', persistChanges: true}, 201);
+    if (/^\/closeSession$/i.test(w.rest)) return new Response(null, {status: 204});
+
+    if (w.sheet && w.addr) {
+      if (method === 'PATCH') {
+        let b = {}; try { b = JSON.parse(await bodyText(init && init.body)); } catch (e) {}
+        const op = {t: 'set', sheet: w.sheet, addr: w.addr};
+        if (b.values !== undefined) op.values = b.values;
+        if (b.formulas !== undefined) op.formulas = b.formulas;
+        if (op.values === undefined && op.formulas === undefined) return J({address: w.addr});
+        queue(op);
+        return J({address: w.sheet + '!' + w.addr, values: b.values || b.formulas});
+      }
+      if (method === 'POST' && w.clear) {
+        let b = {}; try { b = JSON.parse(await bodyText(init && init.body)); } catch (e) {}
+        queue({t: 'clear', sheet: w.sheet, addr: w.addr, applyTo: b.applyTo || 'Contents'});
+        return new Response(null, {status: 204});
+      }
+      if (method === 'GET') {
+        const s = await snapshot().catch(() => null);
+        const k = Object.keys((s && s.ranges) || {}).find(x => norm(x) === norm(w.sheet + '!' + w.addr));
+        if (k) return J({address: k, values: s.ranges[k]});
+        return J({error: {code: 'LaptopMode', message: `Laptop mode: "${w.sheet}!${w.addr}" is not in the copy the laptop shares. Switch to ☁ Direct to read it, or ask for it to be added.`}}, 404);
+      }
+    }
+    if (method === 'GET' && /^\/worksheets(\?.*)?$/i.test(w.rest + (new URL(url).search || ''))) {
+      const s = await snapshot().catch(() => null);
+      return J({value: ((s && s.sheets) || []).map(n => ({name: n}))});
+    }
+    return J({error: {code: 'LaptopMode', message: 'This Excel action is not available in 🖥 Laptop mode: ' + method + ' ' + w.rest}}, 501);
+  };
+
+  // ── the small pill + menu ──
+  let pillEl = null, pillT = null;
+  function pill(text, kind) {
+    if (!pillEl) return;
+    pillEl.querySelector('b').textContent = text || (mode() === 'laptop' ? '🖥 Laptop' : '☁ Direct');
+    pillEl.style.borderColor = {ok: '#14b8a6', bad: '#ef4444', wait: '#fbbf24'}[kind] || '#475569';
+    clearTimeout(pillT);
+    if (text) pillT = setTimeout(() => pill(), kind === 'bad' ? 20000 : 6000);
+  }
+  async function testDirect() {
+    if (!lastAuth) return 'Do one save first (so the app is signed in), then test again.';
+    try {
+      const f = await raw(`${G}/me/drive/root:/${encodeURI(CFG.testFile)}`, {headers: {'Authorization': lastAuth}});
+      if (!f.ok) return 'File not found: ' + CFG.testFile + ' [' + f.status + ']';
+      const id = (await f.json()).id;
+      const r = await raw(`${G}/me/drive/items/${id}/workbook/worksheets?$select=name`, {headers: {'Authorization': lastAuth}});
+      if (r.ok) return '✓ The old ☁ Direct way WORKS again - you can switch back if you want.';
+      return '✗ The old ☁ Direct way still does NOT work: [' + r.status + '] ' + (await r.text()).slice(0, 160) + '\n\nStay on 🖥 Laptop.';
+    } catch (e) { return 'Test failed: ' + e.message; }
+  }
+  function menu() {
+    const m = mode();
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100000;display:flex;align-items:flex-end;justify-content:center';
+    ov.innerHTML = `<div style="background:#111827;color:#e8edf5;border:1px solid #2a3548;border-radius:14px 14px 0 0;width:100%;max-width:520px;padding:16px;font:14px system-ui;direction:rtl;text-align:right">
+      <div style="font-weight:700;margin-bottom:10px">طريقة الكتابة عالإكسل</div>
+      <label style="display:block;padding:10px;border:1px solid ${m === 'laptop' ? '#14b8a6' : '#374357'};border-radius:10px;margin-bottom:8px"><input type="radio" name="xlm" value="laptop" ${m === 'laptop' ? 'checked' : ''}> 🖥 <b>عن طريق اللابتوب</b><br><small style="color:#7c8ba1">الموبايل بيبعت التغييرات، وبرنامج الطباعة عاللابتوب بيكتبها بالإكسل.</small></label>
+      <label style="display:block;padding:10px;border:1px solid ${m === 'direct' ? '#14b8a6' : '#374357'};border-radius:10px;margin-bottom:10px"><input type="radio" name="xlm" value="direct" ${m === 'direct' ? 'checked' : ''}> ☁ <b>مباشرة (الطريقة القديمة)</b><br><small style="color:#7c8ba1">الموبايل بيكتب بالإكسل عن طريق Microsoft.</small></label>
+      <div id="xlst" style="font-size:12px;color:#7c8ba1;background:#1a2234;border-radius:8px;padding:8px;margin-bottom:10px;direction:ltr;text-align:left;white-space:pre-wrap">${(state.last || 'No result yet.').replace(/</g, '&lt;')}${pending.length ? '\nWaiting to send: ' + pending.length : ''}${unacked.length ? '\nWaiting for the laptop: ' + unacked.length : ''}</div>
+      <div style="display:flex;gap:8px"><button id="xlt" style="flex:1;padding:10px;border-radius:8px;border:1px solid #374357;background:#232d42;color:#e8edf5">🔍 جرّب الطريقة القديمة</button>
+      <button id="xlc" style="flex:1;padding:10px;border-radius:8px;border:0;background:#14b8a6;color:#04201c;font-weight:700">تم</button></div></div>`;
+    document.body.appendChild(ov);
+    ov.querySelectorAll('input[name=xlm]').forEach(i => i.onchange = () => { try { localStorage.setItem(KEY, i.value); } catch (e) {} pill(); ov.remove(); menu(); });
+    ov.querySelector('#xlc').onclick = () => ov.remove();
+    ov.onclick = e => { if (e.target === ov) ov.remove(); };
+    ov.querySelector('#xlt').onclick = async () => { const st = ov.querySelector('#xlst'); st.textContent = '...'; st.textContent = await testDirect(); };
+  }
+  function addPill() {
+    pillEl = document.createElement('div');
+    pillEl.style.cssText = 'position:fixed;left:6px;bottom:' + (CFG.bottom || 86) + 'px;z-index:99999;background:#0f172acc;color:#e8edf5;border:1.5px solid #475569;border-radius:20px;padding:4px 10px;font:600 11px system-ui;cursor:pointer;backdrop-filter:blur(4px)';
+    pillEl.innerHTML = '<b></b>';
+    pillEl.onclick = menu;
+    document.body.appendChild(pillEl);
+    pill();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', addPill); else addPill();
+  window.addEventListener('beforeunload', () => { if (pending.length) flushNow(); });
+})();
+
+</script>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content"/>
 <title>IAT Orders</title>
